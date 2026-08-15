@@ -40,6 +40,7 @@
   small.muted{color:var(--muted);}
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:var(--border);}
   .badge.atrasado{background:var(--bad);color:#0b0d10;}
+  button.badge{width:auto;min-height:32px;display:inline-block;margin:4px 8px 0 0;padding:2px 10px;font-size:12px;}
 </style>
 </head>
 <body>
@@ -172,6 +173,51 @@
       </div>`;
   }
   /* === MAPA (Tarefa 6) === */
+  const STATUS_CONTEUDO_ORDEM = ['nao_iniciado','estudado','revisado','dominado'];
+  const STATUS_CONTEUDO_LABEL = { nao_iniciado:'não iniciado', estudado:'estudado', revisado:'revisado', dominado:'dominado' };
+  const CONCURSO_ORDEM = ['ambos','transpetro','inea'];
+  const CONCURSO_LABEL = { ambos:'Transpetro + INEA', transpetro:'Transpetro', inea:'INEA' };
+
+  function proximoStatusConteudo(atual){
+    const i = STATUS_CONTEUDO_ORDEM.indexOf(atual);
+    return STATUS_CONTEUDO_ORDEM[(i+1) % STATUS_CONTEUDO_ORDEM.length];
+  }
+  function proximoConcurso(atual){
+    const i = CONCURSO_ORDEM.indexOf(atual);
+    return CONCURSO_ORDEM[(i+1) % CONCURSO_ORDEM.length];
+  }
+
+  function renderMapa(){
+    return `<div class="card"><h2>Mapa de Conteúdo</h2><small class="muted">Toque no status pra avançar; toque no concurso pra trocar.</small></div>` +
+      state.conteudo.map((c, i) => `
+        <div class="card">
+          <b>${c.assunto}</b><br>
+          <button data-status-idx="${i}" class="badge">${STATUS_CONTEUDO_LABEL[c.status]}</button>
+          <button data-concurso-idx="${i}" class="badge">${CONCURSO_LABEL[c.concurso]}</button>
+        </div>`).join('');
+  }
+
+  function attachMapaHandlers(){
+    const app = document.getElementById('app');
+    app.querySelectorAll('button[data-status-idx]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const c = state.conteudo[Number(btn.dataset.statusIdx)];
+        c.status = proximoStatusConteudo(c.status);
+        c.atualizadoEm = hojeISO();
+        saveState(state);
+        render();
+      });
+    });
+    app.querySelectorAll('button[data-concurso-idx]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const c = state.conteudo[Number(btn.dataset.concursoIdx)];
+        c.concurso = proximoConcurso(c.concurso);
+        saveState(state);
+        render();
+      });
+    });
+  }
+
   /* === SEMANA (Tarefa 7) === */
   /* === DESEMPENHO (Tarefa 8) === */
   /* === EXPORT (Tarefa 9) === */
@@ -320,10 +366,6 @@
       });
     });
   }
-  function renderMapa(){
-    return `<div class="card"><h2>Mapa de Conteúdo</h2></div>` +
-      state.conteudo.map(c=>`<div class="card">${c.assunto} — <small class="muted">${c.status}</small></div>`).join('');
-  }
   function renderSemana(){
     return `<div class="card"><h2>Semana</h2><p class="muted">(meta x realizado entra na Tarefa 7)</p></div>`;
   }
@@ -336,6 +378,7 @@
     document.getElementById('app').innerHTML = map[currentTab]();
     if(currentTab==='hoje') attachHojeHandlers();
     if(currentTab==='erros') attachErrosHandlers();
+    if(currentTab==='mapa') attachMapaHandlers();
   }
 
   function render(){ renderTabsNav(); renderScreen(); }
