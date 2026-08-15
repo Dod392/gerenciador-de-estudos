@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gerenciador de Estudos</title>
+<style>
+  :root{
+    --bg:#0f1115; --fg:#e8eaed; --muted:#9aa0a6; --card:#1b1e24;
+    --accent:#4f9dde; --ok:#3ecf8e; --warn:#e0a83e; --bad:#e05a4f;
+    --border:#2a2e35; --radius:12px; --gap:12px; --tap:48px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+  body{padding-bottom:calc(72px + env(safe-area-inset-bottom));}
+  #app{max-width:480px;margin:0 auto;padding:var(--gap);}
+  h1,h2,h3{margin:0 0 8px;}
+  p{margin:0 0 8px;}
+  .card{background:var(--card);border:1px solid var(--border);
+    border-radius:var(--radius);padding:var(--gap);margin-bottom:var(--gap);}
+  button{font:inherit;min-height:var(--tap);border-radius:var(--radius);
+    border:1px solid var(--border);background:var(--card);color:var(--fg);
+    padding:0 16px;width:100%;margin-bottom:8px;}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#0b0d10;font-weight:600;}
+  button.ok{background:var(--ok);border-color:var(--ok);color:#0b0d10;}
+  button.bad{background:var(--bad);border-color:var(--bad);color:#0b0d10;}
+  .row{display:flex;gap:8px;}
+  .row>*{flex:1;margin-bottom:0;}
+  label{display:block;font-size:13px;color:var(--muted);margin:8px 0 4px;}
+  input,select,textarea{width:100%;min-height:var(--tap);border-radius:var(--radius);
+    border:1px solid var(--border);background:var(--bg);color:var(--fg);padding:0 12px;font:inherit;}
+  textarea{padding:12px;min-height:80px;}
+  nav#tabs{position:fixed;left:0;right:0;bottom:0;display:flex;
+    background:var(--card);border-top:1px solid var(--border);
+    padding-bottom:env(safe-area-inset-bottom);z-index:10;}
+  nav#tabs button{margin:0;border:none;border-radius:0;background:none;
+    min-height:56px;font-size:12px;color:var(--muted);}
+  nav#tabs button.active{color:var(--accent);font-weight:700;}
+  small.muted{color:var(--muted);}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:var(--border);}
+  .badge.atrasado{background:var(--bad);color:#0b0d10;}
+</style>
+</head>
+<body>
+  <div id="app"></div>
+  <nav id="tabs"></nav>
+  <script>
+  /* === HELPERS (Tarefa 2) === */
+  /* === STATE (Tarefa 2) === */
+  /* === HOJE (Tarefa 3) === */
+  /* === ERROS (Tarefa 4) === */
+  /* === MAPA (Tarefa 6) === */
+  /* === SEMANA (Tarefa 7) === */
+  /* === DESEMPENHO (Tarefa 8) === */
+  /* === EXPORT (Tarefa 9) === */
+
+  /* === RENDER === */
+  const TABS = [
+    {id:'hoje', label:'Hoje'},
+    {id:'erros', label:'Erros'},
+    {id:'mapa', label:'Mapa'},
+    {id:'semana', label:'Semana'},
+    {id:'desempenho', label:'Desempenho'},
+  ];
+  let currentTab = 'hoje';
+
+  const EXEMPLO = {
+    meta: { provaData: '2026-11-29', cicloInicio: '2026-08-01' },
+    checkins: [
+      { data:'2026-08-14', status:'base', minutos:150, assunto:'CONAMA 357', questoes:10, acertos:7, obs:'' },
+    ],
+    erros: [
+      { id:'ex1', assunto:'CONAMA 357', oQueErrei:'confundi classe 2 com classe 3', regraCorreta:'reler art. 4', grau:'erro_novo', proximaRevisao:'2026-08-15', criadoEm:'2026-08-13' },
+    ],
+    conteudo: [
+      { assunto:'PNMA (6.938/81)', status:'estudado', concurso:'ambos' },
+      { assunto:'CONAMA 357', status:'revisado', concurso:'ambos' },
+    ],
+    planejamento: [
+      { semanaId:'2026-08-10', assuntosAlvo:['CONAMA 357','PNRS'], diasAlvo:6, horasAlvo:15 },
+    ],
+  };
+
+  function renderTabsNav(){
+    document.getElementById('tabs').innerHTML = TABS.map(t =>
+      `<button data-tab="${t.id}" class="${t.id===currentTab?'active':''}">${t.label}</button>`
+    ).join('');
+  }
+
+  function renderHoje(){
+    return `<div class="card"><h2>Hoje</h2><p class="muted">(esqueleto — contagem regressiva e check-in entram na Tarefa 3)</p></div>
+      <div class="card"><h3>Revisar hoje</h3><p class="muted">${EXEMPLO.erros.length} item(ns) de exemplo</p></div>`;
+  }
+  function renderErros(){
+    return `<div class="card"><h2>Caderno de Erros</h2></div>` +
+      EXEMPLO.erros.map(e=>`<div class="card"><b>${e.assunto}</b><br><small class="muted">${e.grau} — próx. ${e.proximaRevisao}</small></div>`).join('');
+  }
+  function renderMapa(){
+    return `<div class="card"><h2>Mapa de Conteúdo</h2></div>` +
+      EXEMPLO.conteudo.map(c=>`<div class="card">${c.assunto} — <small class="muted">${c.status}</small></div>`).join('');
+  }
+  function renderSemana(){
+    return `<div class="card"><h2>Semana</h2><p class="muted">(meta x realizado entra na Tarefa 7)</p></div>`;
+  }
+  function renderDesempenho(){
+    return `<div class="card"><h2>Desempenho</h2><p class="muted">(gráfico SVG entra na Tarefa 8)</p></div>`;
+  }
+
+  function renderScreen(){
+    const map = {hoje:renderHoje, erros:renderErros, mapa:renderMapa, semana:renderSemana, desempenho:renderDesempenho};
+    document.getElementById('app').innerHTML = map[currentTab]();
+  }
+
+  function render(){ renderTabsNav(); renderScreen(); }
+
+  document.getElementById('tabs').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-tab]');
+    if(!btn) return;
+    currentTab = btn.dataset.tab;
+    render();
+  });
+
+  /* === INIT === */
+  render();
+  </script>
+</body>
+</html>
