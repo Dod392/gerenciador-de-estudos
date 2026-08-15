@@ -50,6 +50,9 @@
   <nav id="tabs"></nav>
   <script>
   /* === HELPERS (Tarefa 2) === */
+  function escapeHtml(str){
+    return String(str ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
   function hojeISO(){ return new Date().toISOString().slice(0,10); }
   function addDays(iso, n){
     const d = new Date(iso + 'T00:00:00');
@@ -83,12 +86,18 @@
     };
   }
 
+  function estadoValido(obj){
+    return !!obj && typeof obj.meta === 'object' && obj.meta !== null &&
+      Array.isArray(obj.checkins) && Array.isArray(obj.erros) &&
+      Array.isArray(obj.conteudo) && Array.isArray(obj.planejamento);
+  }
+
   function loadState(){
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if(!raw) return seedState();
       const parsed = JSON.parse(raw);
-      if(!parsed || !Array.isArray(parsed.conteudo)) return seedState();
+      if(!estadoValido(parsed)) return seedState();
       return parsed;
     } catch(e){
       return seedState();
@@ -96,7 +105,13 @@
   }
 
   function saveState(s){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+      return true;
+    } catch(e){
+      alert('Não foi possível salvar: armazenamento indisponível ou cheio.');
+      return false;
+    }
   }
 
   let state = loadState();
@@ -165,9 +180,9 @@
     const atrasado = e.proximaRevisao <= hojeISO();
     return `
       <div class="card" data-erro-id="${e.id}">
-        <b>${e.assunto}</b>
+        <b>${escapeHtml(e.assunto)}</b>
         <span class="badge ${atrasado?'atrasado':''}">${GRAU_LABEL[e.grau]} — próx. ${e.proximaRevisao}</span>
-        <p><small class="muted">${e.oQueErrei}</small></p>
+        <p><small class="muted">${escapeHtml(e.oQueErrei)}</small></p>
         <div class="row">
           <button class="ok" data-acertei="${e.id}">Acertei</button>
           <button class="bad" data-errei="${e.id}">Errei</button>
@@ -193,7 +208,7 @@
     return `<div class="card"><h2>Mapa de Conteúdo</h2><small class="muted">Toque no status pra avançar; toque no concurso pra trocar.</small></div>` +
       state.conteudo.map((c, i) => `
         <div class="card">
-          <b>${c.assunto}</b><br>
+          <b>${escapeHtml(c.assunto)}</b><br>
           <button data-status-idx="${i}" class="badge">${STATUS_CONTEUDO_LABEL[c.status]}</button>
           <button data-concurso-idx="${i}" class="badge">${CONCURSO_LABEL[c.concurso]}</button>
         </div>`).join('');
@@ -305,7 +320,7 @@
       const y = i * altoLinha + 4;
       const w = Math.max(2, (largura - esquerda) * (d.pct/100));
       return `
-        <text x="0" y="${y+14}" font-size="11" fill="var(--fg)">${d.assunto.slice(0,18)}</text>
+        <text x="0" y="${y+14}" font-size="11" fill="var(--fg)">${escapeHtml(d.assunto.slice(0,18))}</text>
         <rect x="${esquerda}" y="${y}" width="${w}" height="16" rx="3" fill="var(--accent)"></rect>
         <text x="${esquerda + w + 6}" y="${y+13}" font-size="11" fill="var(--muted)">${d.pct}%</text>
       `;
@@ -381,7 +396,7 @@
 
   function importarJSON(texto){
     const parsed = JSON.parse(texto);
-    if(!parsed || !Array.isArray(parsed.conteudo) || !Array.isArray(parsed.erros) || !Array.isArray(parsed.checkins)){
+    if(!estadoValido(parsed)){
       throw new Error('JSON inválido: formato inesperado');
     }
     state = parsed;
@@ -433,14 +448,14 @@
           <label>Assunto</label>
           <select id="hoje-assunto">
             <option value="">—</option>
-            ${state.conteudo.map(c => `<option value="${c.assunto}" ${ci?.assunto===c.assunto?'selected':''}>${c.assunto}</option>`).join('')}
+            ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}" ${ci?.assunto===c.assunto?'selected':''}>${escapeHtml(c.assunto)}</option>`).join('')}
           </select>
           <div class="row">
             <div><label>Questões</label><input type="number" id="hoje-questoes" value="${ci?.questoes ?? ''}"></div>
             <div><label>Acertos</label><input type="number" id="hoje-acertos" value="${ci?.acertos ?? ''}"></div>
           </div>
           <label>Observação</label>
-          <textarea id="hoje-obs">${ci?.obs ?? ''}</textarea>
+          <textarea id="hoje-obs">${escapeHtml(ci?.obs ?? '')}</textarea>
           <button id="hoje-salvar-detalhe" class="primary">Salvar detalhe</button>
         </details>
       </div>
@@ -509,7 +524,7 @@
         <details>
           <summary>+ novo item</summary>
           <label>Assunto</label>
-          <select id="erro-assunto">${state.conteudo.map(c=>`<option value="${c.assunto}">${c.assunto}</option>`).join('')}</select>
+          <select id="erro-assunto">${state.conteudo.map(c=>`<option value="${escapeHtml(c.assunto)}">${escapeHtml(c.assunto)}</option>`).join('')}</select>
           <label>O que errei</label>
           <textarea id="erro-oque"></textarea>
           <label>Regra correta</label>
@@ -567,7 +582,7 @@
           <h3>Definir meta da semana</h3>
           <label>Assuntos-alvo</label>
           <select id="semana-assuntos" multiple size="6">
-            ${state.conteudo.map(c => `<option value="${c.assunto}">${c.assunto}</option>`).join('')}
+            ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}">${escapeHtml(c.assunto)}</option>`).join('')}
           </select>
           <label>Dias-alvo</label>
           <input type="number" id="semana-dias" value="5">
@@ -591,14 +606,14 @@
       </div>
       <div class="card">
         <h3>Assuntos-alvo</h3>
-        ${plano.assuntosAlvo.map(a => `<p>${atrasados.includes(a) ? '⏳' : '✅'} ${a}</p>`).join('')}
+        ${plano.assuntosAlvo.map(a => `<p>${atrasados.includes(a) ? '⏳' : '✅'} ${escapeHtml(a)}</p>`).join('')}
       </div>
       <div class="card">
         <details>
           <summary>Editar meta</summary>
           <label>Assuntos-alvo</label>
           <select id="semana-assuntos" multiple size="6">
-            ${state.conteudo.map(c => `<option value="${c.assunto}" ${plano.assuntosAlvo.includes(c.assunto)?'selected':''}>${c.assunto}</option>`).join('')}
+            ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}" ${plano.assuntosAlvo.includes(c.assunto)?'selected':''}>${escapeHtml(c.assunto)}</option>`).join('')}
           </select>
           <label>Dias-alvo</label>
           <input type="number" id="semana-dias" value="${plano.diasAlvo}">
@@ -638,18 +653,26 @@
       </div>
       <div class="card">
         <h3>5 piores assuntos</h3>
-        ${piores.length ? piores.map(p=>`<p>${p.assunto} — ${p.pct}%</p>`).join('') : '<p class="muted">Sem dados suficientes.</p>'}
+        ${piores.length ? piores.map(p=>`<p>${escapeHtml(p.assunto)} — ${p.pct}%</p>`).join('') : '<p class="muted">Sem dados suficientes.</p>'}
       </div>
     `;
   }
 
   function renderScreen(){
+    const app = document.getElementById('app');
+    const openIdx = [...app.querySelectorAll('details')].reduce((acc,d,i)=>{ if(d.open) acc.push(i); return acc; }, []);
+    const fieldValues = {};
+    app.querySelectorAll('details input, details select, details textarea').forEach(el => { if(el.id) fieldValues[el.id] = el.value; });
+
     const map = {hoje:renderHoje, erros:renderErros, mapa:renderMapa, semana:renderSemana, desempenho:renderDesempenho};
-    document.getElementById('app').innerHTML = map[currentTab]();
+    app.innerHTML = map[currentTab]();
     if(currentTab==='hoje') attachHojeHandlers();
     if(currentTab==='erros') attachErrosHandlers();
     if(currentTab==='mapa') attachMapaHandlers();
     if(currentTab==='semana') attachSemanaHandlers();
+
+    app.querySelectorAll('details').forEach((d,i) => { if(openIdx.includes(i)) d.open = true; });
+    Object.entries(fieldValues).forEach(([id,val]) => { const el = document.getElementById(id); if(el) el.value = val; });
   }
 
   function render(){ renderTabsNav(); renderScreen(); }
