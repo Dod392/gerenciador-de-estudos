@@ -404,6 +404,39 @@
     return state;
   }
 
+  function tentarImportar(texto){
+    if(!confirm('Importar vai substituir todos os dados atuais. Continuar?')) return false;
+    try { importarJSON(texto); render(); return true; }
+    catch(err){ alert('Falha ao importar: ' + err.message); return false; }
+  }
+
+  function copiarTexto(texto){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(texto).then(
+        () => alert('JSON copiado! Cole em um app de notas/mensagens pra guardar, ou direto no campo "colar JSON" no outro aparelho.'),
+        () => copiarTextoFallback(texto)
+      );
+    } else {
+      copiarTextoFallback(texto);
+    }
+  }
+
+  function copiarTextoFallback(texto){
+    const ta = document.createElement('textarea');
+    ta.value = texto;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try {
+      document.execCommand('copy');
+      alert('JSON copiado! Cole em um app de notas/mensagens pra guardar, ou direto no campo "colar JSON" no outro aparelho.');
+    } catch(e){
+      alert('Não foi possível copiar automaticamente. Selecione o texto exportado manualmente.');
+    }
+    document.body.removeChild(ta);
+  }
+
   /* === RENDER === */
   const TABS = [
     {id:'hoje', label:'Hoje'},
@@ -432,9 +465,13 @@
       </div>
       <div class="card">
         <button id="btn-export-md">Exportar Markdown</button>
-        <button id="btn-export-json">Exportar JSON</button>
-        <label>Importar JSON</label>
+        <button id="btn-export-json">Exportar JSON (arquivo)</button>
+        <button id="btn-copy-json">Copiar JSON (área de transferência)</button>
+        <label>Importar JSON (arquivo)</label>
         <input type="file" id="input-import-json" accept="application/json">
+        <label>ou colar JSON aqui</label>
+        <textarea id="input-import-paste" placeholder="Cole aqui o JSON exportado"></textarea>
+        <button id="btn-import-paste">Importar JSON colado</button>
       </div>
       <div class="card">
         <h3>Como foi hoje?</h3>
@@ -504,17 +541,27 @@
     });
     document.getElementById('btn-export-md')?.addEventListener('click', exportarMarkdown);
     document.getElementById('btn-export-json')?.addEventListener('click', exportarJSON);
+    document.getElementById('btn-copy-json')?.addEventListener('click', () => {
+      copiarTexto(JSON.stringify(state, null, 2));
+    });
     document.getElementById('input-import-json')?.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if(!file) return;
-      if(!confirm('Importar vai substituir todos os dados atuais. Continuar?')) { e.target.value=''; return; }
       const reader = new FileReader();
       reader.onload = () => {
-        try { importarJSON(reader.result); render(); }
-        catch(err){ alert('Falha ao importar: ' + err.message); }
+        if(!tentarImportar(reader.result)) e.target.value = '';
       };
       reader.readAsText(file);
     });
+    const btnImportPaste = document.getElementById('btn-import-paste');
+    if(btnImportPaste){
+      btnImportPaste.addEventListener('click', () => {
+        const textarea = document.getElementById('input-import-paste');
+        const texto = textarea.value.trim();
+        if(!texto) return;
+        if(tentarImportar(texto)) textarea.value = '';
+      });
+    }
   }
   function renderErros(){
     const lista = ordenarErrosPorRevisao(state.erros);
