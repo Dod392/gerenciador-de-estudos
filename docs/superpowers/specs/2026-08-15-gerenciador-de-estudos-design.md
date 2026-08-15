@@ -17,17 +17,23 @@ mostra o que está atrasado e onde estão os buracos.
 
 ## Restrições (não-negociáveis)
 
-- Arquivo único `index.html` (HTML+CSS+JS embutidos). Sem backend, sem build,
-  sem npm, sem bibliotecas externas.
-- Dados em `localStorage`, no navegador do dispositivo em uso.
-- Mobile-first, otimizado para uso com uma mão, offline.
+- HTML+CSS+JS sem framework, sem build, sem npm, sem bibliotecas externas.
+  O núcleo do app é um `index.html` autocontido; os únicos arquivos extras
+  tolerados são os exigidos pelo PWA (manifest, service worker, ícones —
+  ver seção PWA).
+- Dados em `localStorage`, no navegador do dispositivo em uso. Uso
+  principal é o celular (Android, no trem); o PC é só ambiente de
+  desenvolvimento.
+- Mobile-first de verdade: layout de uma coluna, alvo de toque grande o
+  bastante pro polegar, nada que dependa de hover ou de tela larga.
+  Referência de teste: viewport de 390px de largura.
 - Registrar o check-in do dia precisa caber em 1 toque (ver seção Telas).
 - MVP em uma sessão de implementação. Sem features especulativas.
 
 ## Arquitetura
 
-- Um único `index.html`. `<style>` e `<script>` embutidos, sem separação em
-  múltiplos arquivos (evita o problema de abrir no celular via file://).
+- `index.html` com `<style>` e `<script>` embutidos — a lógica do app
+  inteira vive aqui, sem separação em múltiplos arquivos JS/CSS.
 - Estado = um objeto JS único em memória (`state`), persistido no
   `localStorage` sob a chave `estudos_v1` a cada mutação, via uma função
   `save()` chamada ao final de toda ação que altera `state`.
@@ -39,6 +45,9 @@ mostra o que está atrasado e onde estão os buracos.
   virtual DOM, sem framework — event delegation simples para os handlers.
 - Sem roteamento por URL/hash: a aba ativa é só estado em memória (não
   precisa sobreviver a um refresh manual da página).
+- CSS mobile-first desde a base: nenhuma media query "desktop-first" a
+  desfazer; larguras fluidas, botões com área de toque ≥44px, uma coluna
+  única do topo ao rodapé.
 
 ## Modelo de dados
 
@@ -156,23 +165,72 @@ Três ações, acessíveis por um botão/menu simples (não é uma 5ª tela):
 - **Importar JSON**: substitui `state` inteiro pelo conteúdo de um arquivo
   JSON previamente exportado, com confirmação antes de sobrescrever.
 
+`localStorage` é local ao navegador/dispositivo — o que é registrado no
+celular não aparece no PC e vice-versa, não há sincronização automática.
+A tela Hoje traz um aviso curto e permanente sobre isso, e o Export/Import
+JSON é o caminho oficial de backup e de transferência entre dispositivos.
+
+## PWA (instalável, offline)
+
+Escopo mínimo para "Adicionar à tela inicial" funcionar de verdade no
+Android e o app abrir offline depois de instalado:
+
+- `manifest.json`: nome, ícone(s), `display: standalone`,
+  `start_url` e `scope` relativos (`.` / `./`) para funcionar tanto em
+  `localhost` quanto sob o subcaminho de um GitHub Pages de projeto
+  (`usuario.github.io/repo/`).
+- `sw.js`: service worker simples, estratégia cache-first para os
+  arquivos estáticos do app (`index.html`, `manifest.json`, ícones).
+  Sem sincronização em background, sem push — só cache pra abrir offline.
+- 1–2 ícones PNG (ex. 192px e 512px) para o ícone da tela inicial.
+- `index.html` registra o service worker (`navigator.serviceWorker.register`)
+  e referencia o manifest via `<link rel="manifest">`.
+- Isso torna o projeto multi-arquivo (`index.html` + `manifest.json` +
+  `sw.js` + ícones), mas continua sem backend/build/npm/framework — só
+  arquivos estáticos servidos juntos.
+- Limitação assumida: service worker exige `http(s)` (localhost ou GitHub
+  Pages); abrindo `index.html` direto via `file://` no PC, o app funciona
+  normalmente mas sem cache offline nem prompt de instalação.
+
+## Publicação (GitHub Pages)
+
+Depois do MVP validado localmente (servidor estático simples, ex.
+`python -m http.server` ou extensão Live Server, para o service worker
+funcionar):
+
+1. Criar repositório no GitHub, push do conteúdo do projeto.
+2. Habilitar GitHub Pages apontando pra branch/pasta do projeto.
+3. Como o site fica em `usuario.github.io/nome-do-repo/` (subcaminho, não
+   raiz), `start_url`/`scope` do manifest e o caminho de registro do
+   service worker precisam ser relativos — já contemplado na seção PWA
+   acima — para não quebrar nesse subcaminho.
+4. URL final é aberta e testada no celular (Chrome Android): confirmar
+   prompt de instalação, funcionamento offline, e que o app abre em modo
+   standalone (sem barra de endereço) depois de instalado.
+
 ## Fora de escopo
 
 - Geração de questões, flashcards ou conteúdo didático.
-- Sincronização entre dispositivos (o Export/Import JSON é o mecanismo
-  manual para isso).
+- Sincronização automática entre dispositivos (o Export/Import JSON é o
+  mecanismo manual para isso).
 - Login, backend, contas de usuário.
-- PWA/instalação como app (o uso é abrir o arquivo `index.html` direto).
+- Push notifications, background sync.
 - Roteamento por URL, histórico de navegação do browser.
 
 ## Testes
 
-Sem framework de testes (arquivo único, sem build). Verificação manual
-funcional, cobrindo:
+Sem framework de testes (sem build). Verificação manual funcional,
+cobrindo:
 - Check-in do dia em 1 toque, idempotência ao re-tocar no mesmo dia.
 - Transições de grau no Caderno de Erros (acertei sobe, errei sempre vai
   pra `deficiencia`/1 dia).
 - Persistência: recarregar a página mantém o estado salvo.
 - Export Markdown reflete o estado atual; Export/Import JSON faz round-trip
   sem perda de dados.
-- Uso em viewport mobile estreito (ex.: 360px de largura).
+- Layout em viewport de 390px de largura: uma coluna, sem overflow
+  horizontal, alvos de toque acessíveis com o polegar.
+- PWA: manifest válido, service worker registra e cacheia, prompt de
+  "Adicionar à tela inicial" aparece no Chrome Android, app abre offline
+  depois de instalado.
+- Após publicar no GitHub Pages: app carrega no subcaminho do projeto sem
+  referências quebradas (manifest, ícones, service worker).
