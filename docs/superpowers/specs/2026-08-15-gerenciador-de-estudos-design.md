@@ -12,8 +12,9 @@ Rotina de estudo: 2h30/dia em casa + até 2h extras num trem, sem sinal
 garantido, uso majoritariamente no celular e com uma mão.
 
 O app não ensina nem gera conteúdo (isso já existe em outro lugar). Ele só
-registra o que foi estudado, controla a repetição espaçada dos erros, e
-mostra o que está atrasado e onde estão os buracos.
+registra o que foi estudado, controla a repetição espaçada dos erros,
+compara meta x realizado da semana, e mostra o que está atrasado e onde
+estão os buracos.
 
 ## Restrições (não-negociáveis)
 
@@ -37,7 +38,7 @@ mostra o que está atrasado e onde estão os buracos.
 - Estado = um objeto JS único em memória (`state`), persistido no
   `localStorage` sob a chave `estudos_v1` a cada mutação, via uma função
   `save()` chamada ao final de toda ação que altera `state`.
-- Navegação: barra inferior fixa com 4 abas (Hoje / Erros / Mapa /
+- Navegação: barra inferior fixa com 5 abas (Hoje / Erros / Mapa / Semana /
   Desempenho), alcançável com o polegar. Trocar de aba atualiza
   `state.telaAtual` e chama `render()`.
 - Renderização: cada tela tem uma função `render<Tela>()` que gera HTML via
@@ -84,9 +85,18 @@ mostra o que está atrasado e onde estão os buracos.
     {
       assunto: "PNMA (6.938/81)",
       status: "nao_iniciado" | "estudado" | "revisado" | "dominado",
-      concurso: "transpetro" | "inea" | "ambos"
+      concurso: "transpetro" | "inea" | "ambos",
+      atualizadoEm: "2026-08-15"       // YYYY-MM-DD da última mudança de status
     }
     // pré-populado com os 17 assuntos abaixo
+  ],
+  planejamento: [
+    {
+      semanaId: "2026-08-10",          // segunda-feira da semana (YYYY-MM-DD)
+      assuntosAlvo: ["CONAMA 357", "PNRS"],
+      diasAlvo: 6,
+      horasAlvo: 15
+    }
   ]
 }
 ```
@@ -114,6 +124,27 @@ tela Desempenho consiga agregar corretamente por assunto.
 - A fila de revisão (tela Hoje e tela Caderno de Erros) mostra itens com
   `proximaRevisao <= hoje`, ordenados por `proximaRevisao` ascendente
   (mais atrasado primeiro).
+
+## Planejamento semanal (meta x realizado)
+
+Semana = semana calendário, segunda a domingo; `semanaId` é a data da
+segunda-feira daquela semana. Uma meta é global à semana (não por
+assunto): número de dias-alvo, horas-alvo, e uma lista de assuntos-alvo
+(sem hora individual por assunto — mantém o check-in diário simples, sem
+precisar registrar múltiplos assuntos por dia).
+
+- **Dias realizados** = nº de `checkins` na semana com `status != "nao"`.
+- **Horas realizadas** = soma de `minutos` dos `checkins` da semana; se um
+  checkin não tem `minutos` preenchido, usa 150 quando `status == "base"`
+  (a base é sempre 2h30) e 0 quando `status == "minimo"` (duração do
+  mínimo não é padronizada, então sem detalhe preenchido não soma horas —
+  limitação assumida do MVP).
+- **Assuntos tocados** = união de `checkins[].assunto` da semana com os
+  assuntos de `conteudo` cujo `atualizadoEm` caiu dentro da semana (ou
+  seja, teve o status alterado no Mapa de Conteúdo naquela semana).
+- **O que ficou pra trás** = assuntos de `assuntosAlvo` que não estão em
+  "assuntos tocados", mais o quanto faltou de dias e de horas
+  (`max(0, alvo - realizado)` para cada um).
 
 ## Telas
 
@@ -143,7 +174,16 @@ tela Desempenho consiga agregar corretamente por assunto.
   ou ícone distinto por status para leitura rápida do "buraco de
   cobertura".
 
-### 4. Desempenho
+### 4. Semana (planejamento semanal)
+- Mostra a semana atual: dias realizados/alvo, horas realizadas/alvo, e a
+  lista de assuntos-alvo com indicador tocado/não tocado.
+- Se não existe meta para a semana atual, mostra estado vazio com CTA
+  "Definir meta da semana".
+- Form de definir/editar meta: seleção múltipla de assuntos (a partir de
+  `conteudo`), campo dias-alvo, campo horas-alvo. Salvar cria ou
+  atualiza o `planejamento` daquele `semanaId`.
+
+### 5. Desempenho
 - Gráfico de barras em SVG puro (sem lib): % de acerto por assunto,
   calculado agregando `questoes`/`acertos` de todos os `checkins` que
   referenciam aquele assunto.
@@ -158,8 +198,9 @@ Três ações, acessíveis por um botão/menu simples (não é uma 5ª tela):
 
 - **Exportar Markdown**: gera um snapshot completo em texto —
   dias estudados vs. ciclo, fila de revisão atrasada, mapa de conteúdo com
-  status por assunto, e desempenho (% por assunto, 5 piores) — pronto para
-  colar num chat de IA e pedir diagnóstico/plano.
+  status por assunto, meta x realizado da semana atual (dias, horas,
+  assuntos que ficaram pra trás), e desempenho (% por assunto, 5 piores)
+  — pronto para colar num chat de IA e pedir diagnóstico/plano.
 - **Exportar JSON**: dump cru de `state` para arquivo, como backup real /
   transferência entre dispositivos.
 - **Importar JSON**: substitui `state` inteiro pelo conteúdo de um arquivo
@@ -229,6 +270,9 @@ cobrindo:
   sem perda de dados.
 - Layout em viewport de 390px de largura: uma coluna, sem overflow
   horizontal, alvos de toque acessíveis com o polegar.
+- Meta x realizado: criar meta da semana, registrar checkins/mudanças de
+  status dentro e fora da semana, confirmar que dias/horas/assuntos
+  tocados calculam certo e que itens fora da semana não contam.
 - PWA: manifest válido, service worker registra e cacheia, prompt de
   "Adicionar à tela inicial" aparece no Chrome Android, app abre offline
   depois de instalado.
