@@ -47,7 +47,56 @@
   <nav id="tabs"></nav>
   <script>
   /* === HELPERS (Tarefa 2) === */
+  function hojeISO(){ return new Date().toISOString().slice(0,10); }
+  function addDays(iso, n){
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0,10);
+  }
+  function segundaFeiraDaSemana(iso){
+    const d = new Date(iso + 'T00:00:00');
+    const diaSemana = d.getDay(); // 0=domingo .. 6=sábado
+    const offset = diaSemana === 0 ? -6 : 1 - diaSemana;
+    d.setDate(d.getDate() + offset);
+    return d.toISOString().slice(0,10);
+  }
   /* === STATE (Tarefa 2) === */
+  const STORAGE_KEY = 'estudos_v1';
+  const SEED_CONTEUDO = [
+    'PNMA (6.938/81)','SNUC (9.985/00)','LC 140/2011','PNRH','CONAMA 357',
+    'CONAMA 430','PNRS','NBR 10004','licenciamento ambiental',
+    'abastecimento de água','tratamento de água','qualidade da água',
+    'tratamento de esgoto','poluição hídrica','efluentes',
+    'resíduos sólidos','Português'
+  ];
+
+  function seedState(){
+    return {
+      meta: { provaData: '2026-11-29', cicloInicio: hojeISO() },
+      checkins: [],
+      erros: [],
+      conteudo: SEED_CONTEUDO.map(assunto => ({ assunto, status:'nao_iniciado', concurso:'ambos', atualizadoEm: hojeISO() })),
+      planejamento: [],
+    };
+  }
+
+  function loadState(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return seedState();
+      const parsed = JSON.parse(raw);
+      if(!parsed || !Array.isArray(parsed.conteudo)) return seedState();
+      return parsed;
+    } catch(e){
+      return seedState();
+    }
+  }
+
+  function saveState(s){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  }
+
+  let state = loadState();
   /* === HOJE (Tarefa 3) === */
   /* === ERROS (Tarefa 4) === */
   /* === MAPA (Tarefa 6) === */
@@ -98,7 +147,7 @@
   }
   function renderMapa(){
     return `<div class="card"><h2>Mapa de Conteúdo</h2></div>` +
-      EXEMPLO.conteudo.map(c=>`<div class="card">${c.assunto} — <small class="muted">${c.status}</small></div>`).join('');
+      state.conteudo.map(c=>`<div class="card">${c.assunto} — <small class="muted">${c.status}</small></div>`).join('');
   }
   function renderSemana(){
     return `<div class="card"><h2>Semana</h2><p class="muted">(meta x realizado entra na Tarefa 7)</p></div>`;
