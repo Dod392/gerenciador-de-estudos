@@ -312,6 +312,80 @@
   }
 
   /* === EXPORT (Tarefa 9) === */
+  function gerarMarkdownSnapshot(state, hojeIso){
+    const agregado = agregarPorAssunto(state.checkins);
+    const estudados = diasEstudados(state.checkins);
+    const ciclo = diasDeCiclo(state.meta.cicloInicio, hojeIso);
+    const piores = piores5(agregado);
+    const atrasados = filaRevisao(state.erros, hojeIso);
+    const semanaId = semanaAtualId();
+    const plano = obterPlano(state, semanaId);
+    const diasSemana = diasRealizadosNaSemana(state.checkins, semanaId);
+    const horasSemana = horasRealizadasNaSemana(state.checkins, semanaId);
+    const tocadosSemana = assuntosTocadosNaSemana(state, semanaId);
+    const atrasadosSemana = plano ? assuntosAtrasadosNaSemana(plano.assuntosAlvo, tocadosSemana) : [];
+
+    const linhas = [];
+    linhas.push(`# Snapshot — Gerenciador de Estudos — ${hojeIso}`);
+    linhas.push('');
+    linhas.push(`Dias até a prova (${state.meta.provaData}): ${diasAte(hojeIso, state.meta.provaData)}`);
+    linhas.push(`Dias estudados: ${estudados} de ${ciclo} dias de ciclo`);
+    linhas.push('');
+    linhas.push('## Meta da semana atual');
+    linhas.push(plano
+      ? [
+          `- Dias: ${diasSemana}/${plano.diasAlvo}`,
+          `- Horas: ${horasSemana}/${plano.horasAlvo}`,
+          `- Assuntos-alvo que ficaram pra trás: ${atrasadosSemana.length ? atrasadosSemana.join(', ') : 'nenhum'}`,
+        ].join('\n')
+      : '- nenhuma meta definida para esta semana');
+    linhas.push('');
+    linhas.push('## Fila de revisão atrasada');
+    linhas.push(atrasados.length
+      ? atrasados.map(e => `- ${e.assunto} (${GRAU_LABEL[e.grau]}, venceu ${e.proximaRevisao})`).join('\n')
+      : '- nenhum item atrasado');
+    linhas.push('');
+    linhas.push('## Mapa de conteúdo');
+    linhas.push(state.conteudo.map(c => `- ${c.assunto}: ${STATUS_CONTEUDO_LABEL[c.status]} (${CONCURSO_LABEL[c.concurso]})`).join('\n'));
+    linhas.push('');
+    linhas.push('## Desempenho por assunto');
+    linhas.push(agregado.length
+      ? agregado.map(a => `- ${a.assunto}: ${a.pct}% (${a.acertos}/${a.questoes})`).join('\n')
+      : '- sem questões registradas ainda');
+    linhas.push('');
+    linhas.push('## 5 piores assuntos');
+    linhas.push(piores.length
+      ? piores.map(p => `- ${p.assunto}: ${p.pct}%`).join('\n')
+      : '- sem dados suficientes');
+    return linhas.join('\n');
+  }
+
+  function baixarArquivo(nome, conteudo, tipo){
+    const blob = new Blob([conteudo], {type: tipo});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = nome;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportarMarkdown(){
+    baixarArquivo(`estudos-${hojeISO()}.md`, gerarMarkdownSnapshot(state, hojeISO()), 'text/markdown');
+  }
+
+  function exportarJSON(){
+    baixarArquivo(`estudos-${hojeISO()}.json`, JSON.stringify(state, null, 2), 'application/json');
+  }
+
+  function importarJSON(texto){
+    const parsed = JSON.parse(texto);
+    if(!parsed || !Array.isArray(parsed.conteudo) || !Array.isArray(parsed.erros) || !Array.isArray(parsed.checkins)){
+      throw new Error('JSON inválido: formato inesperado');
+    }
+    state = parsed;
+    saveState(state);
+    return state;
+  }
 
   /* === RENDER === */
   const TABS = [
@@ -338,6 +412,12 @@
       <div class="card">
         <h2>${dias} dias até a prova</h2>
         <small class="muted">Dados salvos só neste aparelho — use Exportar/Importar JSON pra levar pro celular ou fazer backup.</small>
+      </div>
+      <div class="card">
+        <button id="btn-export-md">Exportar Markdown</button>
+        <button id="btn-export-json">Exportar JSON</button>
+        <label>Importar JSON</label>
+        <input type="file" id="input-import-json" accept="application/json">
       </div>
       <div class="card">
         <h3>Como foi hoje?</h3>
@@ -404,6 +484,19 @@
         saveState(state);
         render();
       });
+    });
+    document.getElementById('btn-export-md')?.addEventListener('click', exportarMarkdown);
+    document.getElementById('btn-export-json')?.addEventListener('click', exportarJSON);
+    document.getElementById('input-import-json')?.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      if(!confirm('Importar vai substituir todos os dados atuais. Continuar?')) { e.target.value=''; return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        try { importarJSON(reader.result); render(); }
+        catch(err){ alert('Falha ao importar: ' + err.message); }
+      };
+      reader.readAsText(file);
     });
   }
   function renderErros(){
