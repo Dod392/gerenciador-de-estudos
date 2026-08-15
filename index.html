@@ -5,12 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gerenciador de Estudos</title>
 <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#0f1115">
+<meta name="theme-color" content="#0b0d11">
 <style>
   :root{
-    --bg:#0f1115; --fg:#e8eaed; --muted:#9aa0a6; --card:#1b1e24;
-    --accent:#4f9dde; --ok:#3ecf8e; --warn:#e0a83e; --bad:#e05a4f;
-    --border:#2a2e35; --radius:12px; --gap:12px; --tap:48px;
+    --bg:#0b0d11; --surface:#14171d; --card:#1a1e26;
+    --fg:#e8eaed; --muted:#9aa0a6;
+    --accent:#4f9dde; --accent-fg:#06121c;
+    --ok:#3ecf8e; --warn:#e0a83e; --bad:#e05a4f;
+    --border:#2a2f3a;
+    --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-6:24px; --space-8:32px;
+    --radius-sm:8px; --radius:12px; --radius-lg:16px;
+    --text-xs:12px; --text-sm:13px; --text-base:14px; --text-lg:16px; --text-xl:20px; --text-2xl:28px;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow:0 4px 16px rgba(0,0,0,.4);
+    --tap:48px;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
@@ -20,7 +27,7 @@
   h1,h2,h3{margin:0 0 8px;}
   p{margin:0 0 8px;}
   .card{background:var(--card);border:1px solid var(--border);
-    border-radius:var(--radius);padding:var(--gap);margin-bottom:var(--gap);}
+    border-radius:var(--radius);padding:var(--space-3);margin-bottom:var(--space-3);box-shadow:var(--shadow-sm);}
   button{font:inherit;min-height:var(--tap);border-radius:var(--radius);
     border:1px solid var(--border);background:var(--card);color:var(--fg);
     padding:0 16px;width:100%;margin-bottom:8px;}
@@ -43,11 +50,65 @@
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:var(--border);}
   .badge.atrasado{background:var(--bad);color:#0b0d10;}
   button.badge{width:auto;min-height:32px;display:inline-block;margin:4px 8px 0 0;padding:2px 10px;font-size:12px;}
+
+  #layout{display:flex;min-height:100vh;}
+  #main{flex:1;min-width:0;}
+  #app{max-width:1280px;margin:0 auto;padding:var(--space-6);}
+  #sidebar{display:none;}
+  #mais-sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:20;display:flex;align-items:flex-end;}
+  #mais-sheet.hidden{display:none;}
+  #mais-sheet .sheet-content{background:var(--surface);width:100%;border-radius:16px 16px 0 0;
+    padding:var(--space-4);padding-bottom:calc(var(--space-4) + env(safe-area-inset-bottom));}
+  #mais-sheet button{display:flex;align-items:center;gap:var(--space-3);justify-content:flex-start;text-align:left;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--space-4);}
+  .grid-2{display:grid;grid-template-columns:1fr;gap:var(--space-4);}
+  .stat-card{position:relative;}
+  .stat-card .stat-label{font-size:var(--text-xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .stat-card .stat-value{font-size:var(--text-2xl);font-weight:650;margin-top:4px;}
+  .stat-card .stat-icon{position:absolute;top:var(--space-4);right:var(--space-4);opacity:.5;font-size:18px;}
+  .progress{height:8px;border-radius:999px;background:var(--border);overflow:hidden;margin-top:6px;}
+  .progress > i{display:block;height:100%;background:var(--accent);}
+  table.data{width:100%;border-collapse:collapse;font-size:var(--text-sm);}
+  table.data th{text-align:left;color:var(--muted);font-weight:600;font-size:var(--text-xs);
+    text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--border);}
+  table.data td{padding:8px;border-bottom:1px solid var(--border);}
+  table.data tr:nth-child(even) td{background:rgba(255,255,255,.02);}
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--space-4);}
+
+  @media (min-width:900px){
+    body{padding-bottom:0;}
+    nav#tabs{display:none;}
+    #mais-sheet{display:none !important;}
+    #sidebar{display:flex;flex-direction:column;width:220px;flex-shrink:0;
+      background:var(--surface);border-right:1px solid var(--border);
+      padding:var(--space-4);position:sticky;top:0;height:100vh;box-sizing:border-box;}
+    #sidebar.collapsed{width:64px;}
+    #sidebar.collapsed .nav-label,#sidebar.collapsed .brand-text{display:none;}
+    #sidebar-brand{font-weight:650;font-size:var(--text-lg);display:flex;gap:8px;align-items:center;}
+    #sidebar-nav{display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);flex:1;}
+    #sidebar-nav button{width:100%;min-height:44px;background:transparent;border:none;
+      color:var(--muted);border-radius:var(--radius-sm);display:flex;align-items:center;
+      gap:var(--space-3);text-align:left;padding:0 var(--space-3);}
+    #sidebar-nav button.active{background:var(--card);color:var(--accent);font-weight:650;}
+    #sidebar-toggle{background:transparent;border:1px solid var(--border);color:var(--muted);}
+    .grid-2{grid-template-columns:1fr 1fr;}
+  }
 </style>
 </head>
 <body>
-  <div id="app"></div>
+  <div id="layout">
+    <aside id="sidebar">
+      <div id="sidebar-brand">📚 <span class="brand-text">Estudos</span></div>
+      <nav id="sidebar-nav"></nav>
+      <button id="sidebar-toggle" title="Recolher menu">«</button>
+    </aside>
+    <div id="main">
+      <div id="app"></div>
+    </div>
+  </div>
   <nav id="tabs"></nav>
+  <div id="mais-sheet" class="hidden"></div>
   <script>
   /* === HELPERS (Tarefa 2) === */
   function escapeHtml(str){
@@ -437,21 +498,90 @@
     document.body.removeChild(ta);
   }
 
-  /* === RENDER === */
-  const TABS = [
-    {id:'hoje', label:'Hoje'},
-    {id:'erros', label:'Erros'},
-    {id:'mapa', label:'Mapa'},
-    {id:'semana', label:'Semana'},
-    {id:'desempenho', label:'Desempenho'},
-  ];
-  let currentTab = 'hoje';
+  /* === DASHBOARD (redesign, Tarefa 2) === */
+  function renderDashboard(){ return '<div class="card"><h2>Dashboard</h2><p class="muted">Em construção.</p></div>'; }
+  function attachDashboardHandlers(){}
 
+  /* === CONFIG (redesign, Tarefa 6) === */
+  function renderConfig(){ return '<div class="card"><h2>Configurações</h2><p class="muted">Em construção.</p></div>'; }
+  function attachConfigHandlers(){}
+
+  /* === RENDER === */
+  const NAV_ITEMS = [
+    {id:'dashboard', label:'Dashboard', icon:'📊'},
+    {id:'hoje', label:'Hoje', icon:'✅'},
+    {id:'planejamento', label:'Planejamento', icon:'🗓️'},
+    {id:'mapa', label:'Mapa de Conteúdo', icon:'🗺️'},
+    {id:'erros', label:'Caderno de Erros', icon:'📓'},
+    {id:'desempenho', label:'Desempenho', icon:'📈'},
+    {id:'config', label:'Configurações', icon:'⚙️'},
+  ];
+  const MOBILE_PRIMARY = ['hoje', 'planejamento', 'desempenho'];
+  let currentTab = (window.matchMedia && window.matchMedia('(min-width:900px)').matches) ? 'dashboard' : 'hoje';
+  let sidebarCollapsed = false;
+
+  function renderSidebar(){
+    const nav = document.getElementById('sidebar-nav');
+    if(!nav) return;
+    nav.innerHTML = NAV_ITEMS.map(t =>
+      `<button data-tab="${t.id}" class="${t.id===currentTab?'active':''}"><span>${t.icon}</span><span class="nav-label">${t.label}</span></button>`
+    ).join('');
+  }
+
+  function attachSidebarHandlers(){
+    document.getElementById('sidebar-nav')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-tab]');
+      if(!btn) return;
+      currentTab = btn.dataset.tab;
+      render();
+    });
+    document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
+      sidebarCollapsed = !sidebarCollapsed;
+      document.getElementById('sidebar').classList.toggle('collapsed', sidebarCollapsed);
+    });
+  }
 
   function renderTabsNav(){
-    document.getElementById('tabs').innerHTML = TABS.map(t =>
-      `<button data-tab="${t.id}" class="${t.id===currentTab?'active':''}">${t.label}</button>`
-    ).join('');
+    const outrosAtivo = !MOBILE_PRIMARY.includes(currentTab);
+    document.getElementById('tabs').innerHTML = MOBILE_PRIMARY.map(id => {
+      const t = NAV_ITEMS.find(n => n.id === id);
+      return `<button data-tab="${id}" class="${id===currentTab?'active':''}">${t.label}</button>`;
+    }).join('') + `<button id="btn-mais" class="${outrosAtivo?'active':''}">Mais</button>`;
+  }
+
+  function renderMaisSheet(){
+    const outros = NAV_ITEMS.filter(t => !MOBILE_PRIMARY.includes(t.id));
+    document.getElementById('mais-sheet').innerHTML = `
+      <div class="sheet-content">
+        ${outros.map(t => `<button data-tab="${t.id}"><span>${t.icon}</span> ${t.label}</button>`).join('')}
+        <button id="mais-fechar">Fechar</button>
+      </div>`;
+  }
+
+  function fecharMais(){
+    document.getElementById('mais-sheet').classList.add('hidden');
+  }
+
+  function attachTabsHandlers(){
+    document.getElementById('tabs').addEventListener('click', (e) => {
+      if(e.target.closest('#btn-mais')){
+        renderMaisSheet();
+        document.getElementById('mais-sheet').classList.remove('hidden');
+        return;
+      }
+      const btn = e.target.closest('button[data-tab]');
+      if(!btn) return;
+      currentTab = btn.dataset.tab;
+      render();
+    });
+    document.getElementById('mais-sheet').addEventListener('click', (e) => {
+      if(e.target.id === 'mais-sheet' || e.target.id === 'mais-fechar'){ fecharMais(); return; }
+      const btn = e.target.closest('button[data-tab]');
+      if(!btn) return;
+      currentTab = btn.dataset.tab;
+      fecharMais();
+      render();
+    });
   }
 
   function renderHoje(){
@@ -711,25 +841,24 @@
     const fieldValues = {};
     app.querySelectorAll('details input, details select, details textarea').forEach(el => { if(el.id) fieldValues[el.id] = el.value; });
 
-    const map = {hoje:renderHoje, erros:renderErros, mapa:renderMapa, semana:renderSemana, desempenho:renderDesempenho};
+    const map = {hoje:renderHoje, erros:renderErros, mapa:renderMapa, semana:renderSemana, desempenho:renderDesempenho, dashboard:renderDashboard, config:renderConfig, planejamento:renderSemana};
     app.innerHTML = map[currentTab]();
     if(currentTab==='hoje') attachHojeHandlers();
     if(currentTab==='erros') attachErrosHandlers();
     if(currentTab==='mapa') attachMapaHandlers();
     if(currentTab==='semana') attachSemanaHandlers();
+    if(currentTab==='dashboard') attachDashboardHandlers();
+    if(currentTab==='config') attachConfigHandlers();
+    if(currentTab==='planejamento') attachSemanaHandlers();
 
     app.querySelectorAll('details').forEach((d,i) => { if(openIdx.includes(i)) d.open = true; });
     Object.entries(fieldValues).forEach(([id,val]) => { const el = document.getElementById(id); if(el) el.value = val; });
   }
 
-  function render(){ renderTabsNav(); renderScreen(); }
+  function render(){ renderSidebar(); renderTabsNav(); renderScreen(); }
 
-  document.getElementById('tabs').addEventListener('click', (e)=>{
-    const btn = e.target.closest('button[data-tab]');
-    if(!btn) return;
-    currentTab = btn.dataset.tab;
-    render();
-  });
+  attachSidebarHandlers();
+  attachTabsHandlers();
 
   /* === INIT === */
   render();
