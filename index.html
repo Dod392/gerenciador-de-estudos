@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gerenciador de Estudos</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0f1115">
 <style>
   :root{
     --bg:#0f1115; --fg:#e8eaed; --muted:#9aa0a6; --card:#1b1e24;
@@ -661,6 +663,12 @@
 
   /* === INIT === */
   render();
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW falhou:', err));
+    });
+  }
   </script>
 </body>
 </html>
