@@ -98,6 +98,26 @@
 
   let state = loadState();
   /* === HOJE (Tarefa 3) === */
+  function diasAte(hojeIso, alvoIso){
+    const a = new Date(hojeIso + 'T00:00:00');
+    const b = new Date(alvoIso + 'T00:00:00');
+    return Math.round((b - a) / 86400000);
+  }
+
+  function registrarCheckin(state, data, status){
+    const idx = state.checkins.findIndex(c => c.data === data);
+    if(idx === -1){
+      state.checkins.push({ data, status, minutos:null, assunto:null, questoes:null, acertos:null, obs:'' });
+    } else {
+      state.checkins[idx].status = status;
+    }
+    return state;
+  }
+
+  function checkinDeHoje(){
+    return state.checkins.find(c => c.data === hojeISO());
+  }
+
   /* === ERROS (Tarefa 4) === */
   /* === MAPA (Tarefa 6) === */
   /* === SEMANA (Tarefa 7) === */
@@ -138,8 +158,63 @@
   }
 
   function renderHoje(){
-    return `<div class="card"><h2>Hoje</h2><p class="muted">(esqueleto — contagem regressiva e check-in entram na Tarefa 3)</p></div>
-      <div class="card"><h3>Revisar hoje</h3><p class="muted">${EXEMPLO.erros.length} item(ns) de exemplo</p></div>`;
+    const dias = diasAte(hojeISO(), state.meta.provaData);
+    const ci = checkinDeHoje();
+    const statusAtivo = ci ? ci.status : null;
+    return `
+      <div class="card">
+        <h2>${dias} dias até a prova</h2>
+        <small class="muted">Dados salvos só neste aparelho — use Exportar/Importar JSON pra levar pro celular ou fazer backup.</small>
+      </div>
+      <div class="card">
+        <h3>Como foi hoje?</h3>
+        <button data-checkin="base" class="${statusAtivo==='base'?'primary':''}">Base 2h30 ${statusAtivo==='base'?'✓':''}</button>
+        <button data-checkin="minimo" class="${statusAtivo==='minimo'?'primary':''}">Mínimo ${statusAtivo==='minimo'?'✓':''}</button>
+        <button data-checkin="nao" class="${statusAtivo==='nao'?'primary':''}">Não estudei ${statusAtivo==='nao'?'✓':''}</button>
+        <details>
+          <summary>+ detalhar (opcional)</summary>
+          <label>Minutos</label>
+          <input type="number" id="hoje-minutos" value="${ci?.minutos ?? ''}">
+          <label>Assunto</label>
+          <select id="hoje-assunto">
+            <option value="">—</option>
+            ${state.conteudo.map(c => `<option value="${c.assunto}" ${ci?.assunto===c.assunto?'selected':''}>${c.assunto}</option>`).join('')}
+          </select>
+          <div class="row">
+            <div><label>Questões</label><input type="number" id="hoje-questoes" value="${ci?.questoes ?? ''}"></div>
+            <div><label>Acertos</label><input type="number" id="hoje-acertos" value="${ci?.acertos ?? ''}"></div>
+          </div>
+          <label>Observação</label>
+          <textarea id="hoje-obs">${ci?.obs ?? ''}</textarea>
+          <button id="hoje-salvar-detalhe" class="primary">Salvar detalhe</button>
+        </details>
+      </div>
+      <!-- FILA_REVISAO -->
+    `;
+  }
+
+  function attachHojeHandlers(){
+    const app = document.getElementById('app');
+    app.querySelectorAll('button[data-checkin]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        registrarCheckin(state, hojeISO(), btn.dataset.checkin);
+        saveState(state);
+        render();
+      });
+    });
+    const salvarDetalhe = document.getElementById('hoje-salvar-detalhe');
+    if(salvarDetalhe){
+      salvarDetalhe.addEventListener('click', () => {
+        const ci = checkinDeHoje() || registrarCheckin(state, hojeISO(), 'minimo').checkins.find(c=>c.data===hojeISO());
+        ci.minutos = Number(document.getElementById('hoje-minutos').value) || null;
+        ci.assunto = document.getElementById('hoje-assunto').value || null;
+        ci.questoes = Number(document.getElementById('hoje-questoes').value) || null;
+        ci.acertos = Number(document.getElementById('hoje-acertos').value) || null;
+        ci.obs = document.getElementById('hoje-obs').value;
+        saveState(state);
+        render();
+      });
+    }
   }
   function renderErros(){
     return `<div class="card"><h2>Caderno de Erros</h2></div>` +
@@ -159,6 +234,7 @@
   function renderScreen(){
     const map = {hoje:renderHoje, erros:renderErros, mapa:renderMapa, semana:renderSemana, desempenho:renderDesempenho};
     document.getElementById('app').innerHTML = map[currentTab]();
+    if(currentTab==='hoje') attachHojeHandlers();
   }
 
   function render(){ renderTabsNav(); renderScreen(); }
