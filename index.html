@@ -219,6 +219,56 @@
   }
 
   /* === SEMANA (Tarefa 7) === */
+  function semanaAtualId(){
+    return segundaFeiraDaSemana(hojeISO());
+  }
+
+  function obterPlano(state, semanaId){
+    return state.planejamento.find(p => p.semanaId === semanaId);
+  }
+
+  function salvarPlano(state, semanaId, {assuntosAlvo, diasAlvo, horasAlvo}){
+    const existente = obterPlano(state, semanaId);
+    if(existente){
+      existente.assuntosAlvo = assuntosAlvo;
+      existente.diasAlvo = diasAlvo;
+      existente.horasAlvo = horasAlvo;
+      return existente;
+    }
+    const novo = { semanaId, assuntosAlvo, diasAlvo, horasAlvo };
+    state.planejamento.push(novo);
+    return novo;
+  }
+
+  function dentroDaSemana(dataIso, semanaId){
+    return dataIso >= semanaId && dataIso <= addDays(semanaId, 6);
+  }
+
+  function diasRealizadosNaSemana(checkins, semanaId){
+    return checkins.filter(c => c.status !== 'nao' && dentroDaSemana(c.data, semanaId)).length;
+  }
+
+  function horasRealizadasNaSemana(checkins, semanaId){
+    const minutos = checkins
+      .filter(c => dentroDaSemana(c.data, semanaId))
+      .reduce((soma, c) => soma + (c.minutos ?? (c.status === 'base' ? 150 : 0)), 0);
+    return Math.round((minutos / 60) * 10) / 10;
+  }
+
+  function assuntosTocadosNaSemana(state, semanaId){
+    const doCheckin = state.checkins
+      .filter(c => dentroDaSemana(c.data, semanaId) && c.assunto)
+      .map(c => c.assunto);
+    const doMapa = state.conteudo
+      .filter(c => c.atualizadoEm && dentroDaSemana(c.atualizadoEm, semanaId))
+      .map(c => c.assunto);
+    return [...new Set([...doCheckin, ...doMapa])];
+  }
+
+  function assuntosAtrasadosNaSemana(assuntosAlvo, tocados){
+    return assuntosAlvo.filter(a => !tocados.includes(a));
+  }
+
   /* === DESEMPENHO (Tarefa 8) === */
   /* === EXPORT (Tarefa 9) === */
 
@@ -367,7 +417,74 @@
     });
   }
   function renderSemana(){
-    return `<div class="card"><h2>Semana</h2><p class="muted">(meta x realizado entra na Tarefa 7)</p></div>`;
+    const semanaId = semanaAtualId();
+    const plano = obterPlano(state, semanaId);
+    const fimSemana = addDays(semanaId, 6);
+
+    if(!plano){
+      return `
+        <div class="card">
+          <h2>Semana de ${semanaId} a ${fimSemana}</h2>
+          <p class="muted">Nenhuma meta definida ainda.</p>
+        </div>
+        <div class="card">
+          <h3>Definir meta da semana</h3>
+          <label>Assuntos-alvo</label>
+          <select id="semana-assuntos" multiple size="6">
+            ${state.conteudo.map(c => `<option value="${c.assunto}">${c.assunto}</option>`).join('')}
+          </select>
+          <label>Dias-alvo</label>
+          <input type="number" id="semana-dias" value="5">
+          <label>Horas-alvo</label>
+          <input type="number" id="semana-horas" value="12">
+          <button id="semana-salvar" class="primary">Salvar meta</button>
+        </div>
+      `;
+    }
+
+    const diasFeitos = diasRealizadosNaSemana(state.checkins, semanaId);
+    const horasFeitas = horasRealizadasNaSemana(state.checkins, semanaId);
+    const tocados = assuntosTocadosNaSemana(state, semanaId);
+    const atrasados = assuntosAtrasadosNaSemana(plano.assuntosAlvo, tocados);
+
+    return `
+      <div class="card">
+        <h2>Semana de ${semanaId} a ${fimSemana}</h2>
+        <p>Dias: ${diasFeitos}/${plano.diasAlvo}</p>
+        <p>Horas: ${horasFeitas}h/${plano.horasAlvo}h</p>
+      </div>
+      <div class="card">
+        <h3>Assuntos-alvo</h3>
+        ${plano.assuntosAlvo.map(a => `<p>${atrasados.includes(a) ? '⏳' : '✅'} ${a}</p>`).join('')}
+      </div>
+      <div class="card">
+        <details>
+          <summary>Editar meta</summary>
+          <label>Assuntos-alvo</label>
+          <select id="semana-assuntos" multiple size="6">
+            ${state.conteudo.map(c => `<option value="${c.assunto}" ${plano.assuntosAlvo.includes(c.assunto)?'selected':''}>${c.assunto}</option>`).join('')}
+          </select>
+          <label>Dias-alvo</label>
+          <input type="number" id="semana-dias" value="${plano.diasAlvo}">
+          <label>Horas-alvo</label>
+          <input type="number" id="semana-horas" value="${plano.horasAlvo}">
+          <button id="semana-salvar" class="primary">Salvar meta</button>
+        </details>
+      </div>
+    `;
+  }
+
+  function attachSemanaHandlers(){
+    const salvar = document.getElementById('semana-salvar');
+    if(!salvar) return;
+    salvar.addEventListener('click', () => {
+      const assuntosAlvo = [...document.getElementById('semana-assuntos').selectedOptions].map(o => o.value);
+      const diasAlvo = Number(document.getElementById('semana-dias').value) || 0;
+      const horasAlvo = Number(document.getElementById('semana-horas').value) || 0;
+      salvarPlano(state, semanaAtualId(), { assuntosAlvo, diasAlvo, horasAlvo });
+      saveState(state);
+      render();
+    });
   }
   function renderDesempenho(){
     return `<div class="card"><h2>Desempenho</h2><p class="muted">(gráfico SVG entra na Tarefa 8)</p></div>`;
@@ -379,6 +496,7 @@
     if(currentTab==='hoje') attachHojeHandlers();
     if(currentTab==='erros') attachErrosHandlers();
     if(currentTab==='mapa') attachMapaHandlers();
+    if(currentTab==='semana') attachSemanaHandlers();
   }
 
   function render(){ renderTabsNav(); renderScreen(); }
