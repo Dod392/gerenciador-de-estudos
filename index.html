@@ -119,6 +119,54 @@
   }
 
   /* === ERROS (Tarefa 4) === */
+  const GRAU_ORDEM = ['deficiencia','erro_novo','reforcado','corrigido'];
+  const GRAU_DIAS = { deficiencia:1, erro_novo:2, reforcado:7, corrigido:21 };
+  const GRAU_LABEL = { deficiencia:'deficiência confirmada', erro_novo:'erro novo', reforcado:'reforçado', corrigido:'corrigido' };
+
+  function criarErro(state, {assunto, oQueErrei, regraCorreta}){
+    const hoje = hojeISO();
+    const erro = {
+      id: String(Date.now()) + Math.random().toString(36).slice(2,7),
+      assunto, oQueErrei, regraCorreta,
+      grau: 'erro_novo',
+      proximaRevisao: addDays(hoje, GRAU_DIAS.erro_novo),
+      criadoEm: hoje,
+    };
+    state.erros.push(erro);
+    return erro;
+  }
+
+  function graduarAcerto(erro){
+    const i = GRAU_ORDEM.indexOf(erro.grau);
+    const novoGrau = i < GRAU_ORDEM.length - 1 ? GRAU_ORDEM[i+1] : erro.grau;
+    erro.grau = novoGrau;
+    erro.proximaRevisao = addDays(hojeISO(), GRAU_DIAS[novoGrau]);
+    return erro;
+  }
+
+  function graduarErro(erro){
+    erro.grau = 'deficiencia';
+    erro.proximaRevisao = addDays(hojeISO(), GRAU_DIAS.deficiencia);
+    return erro;
+  }
+
+  function ordenarErrosPorRevisao(erros){
+    return [...erros].sort((a,b) => a.proximaRevisao < b.proximaRevisao ? -1 : a.proximaRevisao > b.proximaRevisao ? 1 : 0);
+  }
+
+  function cardErro(e){
+    const atrasado = e.proximaRevisao <= hojeISO();
+    return `
+      <div class="card" data-erro-id="${e.id}">
+        <b>${e.assunto}</b>
+        <span class="badge ${atrasado?'atrasado':''}">${GRAU_LABEL[e.grau]} — próx. ${e.proximaRevisao}</span>
+        <p><small class="muted">${e.oQueErrei}</small></p>
+        <div class="row">
+          <button class="ok" data-acertei="${e.id}">Acertei</button>
+          <button class="bad" data-errei="${e.id}">Errei</button>
+        </div>
+      </div>`;
+  }
   /* === MAPA (Tarefa 6) === */
   /* === SEMANA (Tarefa 7) === */
   /* === DESEMPENHO (Tarefa 8) === */
@@ -134,22 +182,6 @@
   ];
   let currentTab = 'hoje';
 
-  const EXEMPLO = {
-    meta: { provaData: '2026-11-29', cicloInicio: '2026-08-01' },
-    checkins: [
-      { data:'2026-08-14', status:'base', minutos:150, assunto:'CONAMA 357', questoes:10, acertos:7, obs:'' },
-    ],
-    erros: [
-      { id:'ex1', assunto:'CONAMA 357', oQueErrei:'confundi classe 2 com classe 3', regraCorreta:'reler art. 4', grau:'erro_novo', proximaRevisao:'2026-08-15', criadoEm:'2026-08-13' },
-    ],
-    conteudo: [
-      { assunto:'PNMA (6.938/81)', status:'estudado', concurso:'ambos' },
-      { assunto:'CONAMA 357', status:'revisado', concurso:'ambos' },
-    ],
-    planejamento: [
-      { semanaId:'2026-08-10', assuntosAlvo:['CONAMA 357','PNRS'], diasAlvo:6, horasAlvo:15 },
-    ],
-  };
 
   function renderTabsNav(){
     document.getElementById('tabs').innerHTML = TABS.map(t =>
@@ -217,8 +249,55 @@
     }
   }
   function renderErros(){
-    return `<div class="card"><h2>Caderno de Erros</h2></div>` +
-      EXEMPLO.erros.map(e=>`<div class="card"><b>${e.assunto}</b><br><small class="muted">${e.grau} — próx. ${e.proximaRevisao}</small></div>`).join('');
+    const lista = ordenarErrosPorRevisao(state.erros);
+    return `
+      <div class="card">
+        <h2>Caderno de Erros</h2>
+        <details>
+          <summary>+ novo item</summary>
+          <label>Assunto</label>
+          <select id="erro-assunto">${state.conteudo.map(c=>`<option value="${c.assunto}">${c.assunto}</option>`).join('')}</select>
+          <label>O que errei</label>
+          <textarea id="erro-oque"></textarea>
+          <label>Regra correta</label>
+          <textarea id="erro-regra"></textarea>
+          <button id="erro-salvar" class="primary">Adicionar</button>
+        </details>
+      </div>
+      ${lista.map(cardErro).join('') || '<p class="muted">Nenhum item ainda.</p>'}
+    `;
+  }
+
+  function attachErrosHandlers(){
+    const app = document.getElementById('app');
+    const salvar = document.getElementById('erro-salvar');
+    if(salvar){
+      salvar.addEventListener('click', () => {
+        const assunto = document.getElementById('erro-assunto').value;
+        const oQueErrei = document.getElementById('erro-oque').value.trim();
+        const regraCorreta = document.getElementById('erro-regra').value.trim();
+        if(!oQueErrei || !regraCorreta) return;
+        criarErro(state, {assunto, oQueErrei, regraCorreta});
+        saveState(state);
+        render();
+      });
+    }
+    app.querySelectorAll('button[data-acertei]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const e = state.erros.find(x => x.id === btn.dataset.acertei);
+        graduarAcerto(e);
+        saveState(state);
+        render();
+      });
+    });
+    app.querySelectorAll('button[data-errei]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const e = state.erros.find(x => x.id === btn.dataset.errei);
+        graduarErro(e);
+        saveState(state);
+        render();
+      });
+    });
   }
   function renderMapa(){
     return `<div class="card"><h2>Mapa de Conteúdo</h2></div>` +
@@ -235,6 +314,7 @@
     const map = {hoje:renderHoje, erros:renderErros, mapa:renderMapa, semana:renderSemana, desempenho:renderDesempenho};
     document.getElementById('app').innerHTML = map[currentTab]();
     if(currentTab==='hoje') attachHojeHandlers();
+    if(currentTab==='erros') attachErrosHandlers();
   }
 
   function render(){ renderTabsNav(); renderScreen(); }
