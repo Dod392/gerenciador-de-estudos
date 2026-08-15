@@ -270,6 +270,47 @@
   }
 
   /* === DESEMPENHO (Tarefa 8) === */
+  function agregarPorAssunto(checkins){
+    const map = new Map();
+    for(const c of checkins){
+      if(!c.assunto || !c.questoes) continue;
+      const cur = map.get(c.assunto) || {assunto:c.assunto, questoes:0, acertos:0};
+      cur.questoes += c.questoes;
+      cur.acertos += c.acertos || 0;
+      map.set(c.assunto, cur);
+    }
+    return [...map.values()].map(x => ({...x, pct: x.questoes ? Math.round((x.acertos/x.questoes)*100) : 0}));
+  }
+
+  function diasEstudados(checkins){
+    return checkins.filter(c => c.status !== 'nao').length;
+  }
+
+  function diasDeCiclo(cicloInicioIso, hojeIso){
+    const a = new Date(cicloInicioIso + 'T00:00:00');
+    const b = new Date(hojeIso + 'T00:00:00');
+    return Math.round((b - a) / 86400000) + 1;
+  }
+
+  function piores5(agregado){
+    return [...agregado].filter(a => a.questoes > 0).sort((a,b) => a.pct - b.pct).slice(0,5);
+  }
+
+  function barrasSVG(dados){
+    const largura = 300, altoLinha = 28, esquerda = 130;
+    const altura = dados.length * altoLinha + 10;
+    const barras = dados.map((d,i) => {
+      const y = i * altoLinha + 4;
+      const w = Math.max(2, (largura - esquerda) * (d.pct/100));
+      return `
+        <text x="0" y="${y+14}" font-size="11" fill="var(--fg)">${d.assunto.slice(0,18)}</text>
+        <rect x="${esquerda}" y="${y}" width="${w}" height="16" rx="3" fill="var(--accent)"></rect>
+        <text x="${esquerda + w + 6}" y="${y+13}" font-size="11" fill="var(--muted)">${d.pct}%</text>
+      `;
+    }).join('');
+    return `<svg viewBox="0 0 ${largura} ${altura}" width="100%" height="${altura}">${barras}</svg>`;
+  }
+
   /* === EXPORT (Tarefa 9) === */
 
   /* === RENDER === */
@@ -487,7 +528,24 @@
     });
   }
   function renderDesempenho(){
-    return `<div class="card"><h2>Desempenho</h2><p class="muted">(gráfico SVG entra na Tarefa 8)</p></div>`;
+    const agregado = agregarPorAssunto(state.checkins);
+    const estudados = diasEstudados(state.checkins);
+    const ciclo = diasDeCiclo(state.meta.cicloInicio, hojeISO());
+    const piores = piores5(agregado);
+    return `
+      <div class="card">
+        <h2>Desempenho</h2>
+        <p>${estudados} de ${ciclo} dias do ciclo estudados</p>
+      </div>
+      <div class="card">
+        <h3>% de acerto por assunto</h3>
+        ${agregado.length ? barrasSVG(agregado) : '<p class="muted">Sem questões registradas ainda.</p>'}
+      </div>
+      <div class="card">
+        <h3>5 piores assuntos</h3>
+        ${piores.length ? piores.map(p=>`<p>${p.assunto} — ${p.pct}%</p>`).join('') : '<p class="muted">Sem dados suficientes.</p>'}
+      </div>
+    `;
   }
 
   function renderScreen(){
