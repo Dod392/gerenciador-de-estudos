@@ -147,8 +147,8 @@
   .grid-hoje{display:grid;grid-template-columns:1fr;gap:var(--space-4);}
   @media(min-width:900px){.grid-hoje{grid-template-columns:2fr 1fr;align-items:start;}}
 
-  .highlight-pulse{animation:pulseBorder 1.2s ease;}
-  @keyframes pulseBorder{0%{box-shadow:0 0 0 3px var(--accent);}100%{box-shadow:var(--shadow-sm);}}
+  .timer-display{font-size:var(--text-2xl);font-weight:650;text-align:center;margin:var(--space-3) 0;font-variant-numeric:tabular-nums;}
+  .hero-card .row{margin-top:var(--space-3);}
 </style>
 </head>
 <body>
@@ -946,6 +946,15 @@
       </div>
     `;
 
+    const timerHtml = state.sessaoEmAndamento ? `
+      <div class="card hero-card">
+        <div class="hero-eyebrow">Sessão em andamento</div>
+        <h3>${escapeHtml(state.sessaoEmAndamento.assunto || 'Estudo livre')}</h3>
+        <div class="timer-display" id="timer-elapsed" data-inicio="${state.sessaoEmAndamento.inicioEm}">00:00</div>
+        <button class="primary" id="timer-finalizar">Finalizar</button>
+      </div>
+    ` : '';
+
     const heroHtml = proxima ? (
       proxima.origem === 'conteudo' ? `
         <div class="card hero-card">
@@ -956,7 +965,10 @@
             ${proxima.tag ? `<span class="badge">${escapeHtml(proxima.tag)}</span>` : ''}
             ${proxima.estado==='atrasada' ? `<span class="status-pill atrasada">Atrasada</span>` : ''}
           </div>
-          <button class="primary" data-abrir-registro="${escapeHtml(proxima.assunto)}" data-tipo-sugerido="questoes">Registrar</button>
+          <div class="row">
+            <button class="primary" data-iniciar-timer="${escapeHtml(proxima.assunto)}" data-tipo-sugerido="questoes" data-origem="proxima">▶ Iniciar estudo</button>
+            <button data-abrir-registro="${escapeHtml(proxima.assunto)}" data-tipo-sugerido="questoes">Registrar</button>
+          </div>
         </div>
       ` : `
         <div class="card hero-card">
@@ -966,7 +978,10 @@
             <span class="muted">Revisão — ${GRAU_LABEL[proxima.erro.grau]}</span>
             <span class="status-pill ${proxima.erro.proximaRevisao < hojeIso ? 'atrasada' : 'pendente'}">${proxima.erro.proximaRevisao < hojeIso ? 'Atrasada' : 'Pendente'}</span>
           </div>
-          <button class="primary" data-abrir-registro="${escapeHtml(proxima.erro.assunto)}" data-tipo-sugerido="revisao">Registrar</button>
+          <div class="row">
+            <button class="primary" data-iniciar-timer="${escapeHtml(proxima.erro.assunto)}" data-tipo-sugerido="revisao" data-origem="proxima">▶ Iniciar estudo</button>
+            <button data-abrir-registro="${escapeHtml(proxima.erro.assunto)}" data-tipo-sugerido="revisao">Registrar</button>
+          </div>
         </div>
       `
     ) : (atividades.length ? `
@@ -987,7 +1002,10 @@
                 </div>
               </div>
               <span class="status-pill ${a.estado}">${a.estado==='concluida'?'Concluída':a.estado==='atrasada'?'Atrasada':'Pendente'}</span>
-              ${a.estado!=='concluida' ? `<button class="activity-action" data-abrir-registro="${escapeHtml(a.assunto)}" data-tipo-sugerido="questoes">Registrar</button>` : ''}
+              ${a.estado!=='concluida' ? `
+                <button class="activity-action" data-iniciar-timer="${escapeHtml(a.assunto)}" data-tipo-sugerido="questoes" data-origem="plano">Iniciar</button>
+                <button class="activity-action" data-abrir-registro="${escapeHtml(a.assunto)}" data-tipo-sugerido="questoes">Registrar</button>
+              ` : ''}
             </div>`).join('')}
         </div>` : `
         <div class="empty-state">
@@ -1105,7 +1123,7 @@
       ${headerHtml}
       <div class="grid-hoje">
         <div>
-          ${heroHtml}
+          ${state.sessaoEmAndamento ? timerHtml : heroHtml}
           ${planoHtml}
         </div>
         <div>
@@ -1209,6 +1227,35 @@
       saveState(state);
       registroAberto = null;
       render();
+    });
+
+    if(timerIntervalId){ clearInterval(timerIntervalId); timerIntervalId = null; }
+    const timerEl = document.getElementById('timer-elapsed');
+    if(timerEl){
+      const inicio = new Date(timerEl.dataset.inicio).getTime();
+      const tick = () => {
+        const segundos = Math.floor((Date.now() - inicio) / 1000);
+        const mm = String(Math.floor(segundos/60)).padStart(2,'0');
+        const ss = String(segundos%60).padStart(2,'0');
+        timerEl.textContent = `${mm}:${ss}`;
+      };
+      tick();
+      timerIntervalId = setInterval(tick, 1000);
+    }
+    document.getElementById('timer-finalizar')?.addEventListener('click', () => {
+      const resultado = finalizarSessaoEmAndamento(state);
+      saveState(state);
+      if(resultado){
+        registroAberto = { assunto: resultado.assunto, tipo: resultado.tipo || 'questoes', minutosPreenchidos: resultado.minutos };
+      }
+      render();
+    });
+    app.querySelectorAll('[data-iniciar-timer]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        iniciarSessaoEmAndamento(state, { assunto: btn.dataset.iniciarTimer || null, tipo: btn.dataset.tipoSugerido || null, origem: btn.dataset.origem || null });
+        saveState(state);
+        render();
+      });
     });
   }
 
