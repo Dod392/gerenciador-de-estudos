@@ -109,6 +109,7 @@
   </div>
   <nav id="tabs"></nav>
   <div id="mais-sheet" class="hidden"></div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script>
   /* === HELPERS (Tarefa 2) === */
   function escapeHtml(str){
@@ -499,8 +500,143 @@
   }
 
   /* === DASHBOARD (redesign, Tarefa 2) === */
-  function renderDashboard(){ return '<div class="card"><h2>Dashboard</h2><p class="muted">Em construção.</p></div>'; }
-  function attachDashboardHandlers(){}
+  function calcularSequencia(checkins, hojeIso){
+    const estudados = new Set(checkins.filter(c => c.status !== 'nao').map(c => c.data));
+    let dia = hojeIso;
+    if(!estudados.has(dia)) dia = addDays(dia, -1);
+    let sequencia = 0;
+    while(estudados.has(dia)){ sequencia++; dia = addDays(dia, -1); }
+    return sequencia;
+  }
+  function pctCronograma(conteudo){
+    if(!conteudo.length) return 0;
+    const tocados = conteudo.filter(c => c.status !== 'nao_iniciado').length;
+    return Math.round((tocados / conteudo.length) * 100);
+  }
+  function horasNoDia(checkins, dataIso){
+    const c = checkins.find(x => x.data === dataIso);
+    if(!c) return 0;
+    const minutos = c.minutos ?? (c.status === 'base' ? 150 : 0);
+    return Math.round((minutos/60)*10)/10;
+  }
+  function horasPorDiaDaSemana(checkins, semanaId){
+    const dias = [];
+    for(let i=0;i<7;i++) dias.push(horasNoDia(checkins, addDays(semanaId, i)));
+    return dias;
+  }
+  function melhores5(agregado){
+    return [...agregado].filter(a => a.questoes > 0).sort((a,b) => b.pct - a.pct).slice(0,5);
+  }
+  function evolucaoSemanal(checkins, hojeIso, numSemanas){
+    const semanaFim = segundaFeiraDaSemana(hojeIso);
+    const buckets = [];
+    for(let i = numSemanas - 1; i >= 0; i--){
+      const semanaId = addDays(semanaFim, -7*i);
+      const fimSemana = addDays(semanaId, 6);
+      const doSemana = checkins.filter(c => c.data >= semanaId && c.data <= fimSemana && c.questoes);
+      const questoes = doSemana.reduce((s,c) => s + c.questoes, 0);
+      const acertos = doSemana.reduce((s,c) => s + (c.acertos||0), 0);
+      buckets.push({ semanaId, pct: questoes ? Math.round((acertos/questoes)*100) : null });
+    }
+    return buckets;
+  }
+
+  let chartInstances = {};
+  function criarOuAtualizarChart(canvasId, config){
+    const canvas = document.getElementById(canvasId);
+    if(!canvas) return;
+    if(chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    chartInstances[canvasId] = new Chart(canvas, config);
+  }
+  function corAccent(){
+    return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  }
+
+  function renderDashboard(){
+    const hojeIso = hojeISO();
+    const semanaId = semanaAtualId();
+    const dias = diasAte(hojeIso, state.meta.provaData);
+    const agregado = agregarPorAssunto(state.checkins);
+    const piores = piores5(agregado);
+    const fila = filaRevisao(state.erros, hojeIso);
+    const ci = checkinDeHoje();
+    const statusAtivo = ci ? ci.status : null;
+    return `
+      <div class="card"><h2>${dias} dias até a prova</h2></div>
+      <div class="kpi-grid">
+        <div class="card stat-card"><div class="stat-label">Horas hoje</div><div class="stat-value">${horasNoDia(state.checkins, hojeIso)}h</div><div class="stat-icon">⏱️</div></div>
+        <div class="card stat-card"><div class="stat-label">Horas na semana</div><div class="stat-value">${horasRealizadasNaSemana(state.checkins, semanaId)}h</div><div class="stat-icon">🗓️</div></div>
+        <div class="card stat-card"><div class="stat-label">Questões feitas</div><div class="stat-value">${agregado.reduce((s,a)=>s+a.questoes,0)}</div><div class="stat-icon">❓</div></div>
+        <div class="card stat-card"><div class="stat-label">% de acerto</div><div class="stat-value">${agregado.length ? Math.round(agregado.reduce((s,a)=>s+a.acertos,0)/Math.max(1,agregado.reduce((s,a)=>s+a.questoes,0))*100) : 0}%</div><div class="stat-icon">✅</div></div>
+        <div class="card stat-card"><div class="stat-label">Revisões pendentes</div><div class="stat-value">${fila.length}</div><div class="stat-icon">🔁</div></div>
+        <div class="card stat-card"><div class="stat-label">Dias em sequência</div><div class="stat-value">${calcularSequencia(state.checkins, hojeIso)}</div><div class="stat-icon">🔥</div></div>
+        <div class="card stat-card"><div class="stat-label">% do cronograma</div><div class="stat-value">${pctCronograma(state.conteudo)}%</div><div class="stat-icon">📘</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Horas por dia da semana</h3>
+          <canvas id="chart-horas-semana" height="220"></canvas>
+        </div>
+        <div class="card">
+          <h3>Desempenho por disciplina</h3>
+          ${agregado.length ? `<table class="data"><thead><tr><th>Assunto</th><th>%</th></tr></thead><tbody>
+            ${agregado.map(a => `<tr><td>${escapeHtml(a.assunto)}<div class="progress"><i style="width:${a.pct}%"></i></div></td><td>${a.pct}%</td></tr>`).join('')}
+          </tbody></table>` : '<p class="muted">Sem questões registradas ainda.</p>'}
+        </div>
+        <div class="card">
+          <h3>Assuntos com pior desempenho</h3>
+          ${piores.length ? piores.map(p=>`<p>${escapeHtml(p.assunto)} — ${p.pct}%</p>`).join('') : '<p class="muted">Sem dados suficientes.</p>'}
+        </div>
+        <div class="card">
+          <h3>O que estudar hoje</h3>
+          ${fila.map(cardErro).join('') || '<p class="muted">Nada atrasado — bom sinal.</p>'}
+        </div>
+        <div class="card">
+          <h3>Como foi hoje?</h3>
+          <button data-checkin="base" class="${statusAtivo==='base'?'primary':''}">Base 2h30 ${statusAtivo==='base'?'✓':''}</button>
+          <button data-checkin="minimo" class="${statusAtivo==='minimo'?'primary':''}">Mínimo ${statusAtivo==='minimo'?'✓':''}</button>
+          <button data-checkin="nao" class="${statusAtivo==='nao'?'primary':''}">Não estudei ${statusAtivo==='nao'?'✓':''}</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function attachDashboardHandlers(){
+    const app = document.getElementById('app');
+    app.querySelectorAll('button[data-checkin]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        registrarCheckin(state, hojeISO(), btn.dataset.checkin);
+        saveState(state);
+        render();
+      });
+    });
+    app.querySelectorAll('button[data-acertei]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const e = state.erros.find(x => x.id === btn.dataset.acertei);
+        graduarAcerto(e); saveState(state); render();
+      });
+    });
+    app.querySelectorAll('button[data-errei]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const e = state.erros.find(x => x.id === btn.dataset.errei);
+        graduarErro(e); saveState(state); render();
+      });
+    });
+    criarOuAtualizarChart('chart-horas-semana', {
+      type: 'bar',
+      data: {
+        labels: ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'],
+        datasets: [{ data: horasPorDiaDaSemana(state.checkins, semanaAtualId()), backgroundColor: corAccent() }]
+      },
+      options: {
+        responsive:true, plugins:{ legend:{ display:false } },
+        scales:{
+          x:{ grid:{ display:false }, ticks:{ color:'#9aa0a6' } },
+          y:{ beginAtZero:true, grid:{ color:'#2a2f3a' }, ticks:{ color:'#9aa0a6' } }
+        }
+      }
+    });
+  }
 
   /* === CONFIG (redesign, Tarefa 6) === */
   function renderConfig(){ return '<div class="card"><h2>Configurações</h2><p class="muted">Em construção.</p></div>'; }
@@ -865,7 +1001,9 @@
 
   if('serviceWorker' in navigator){
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW falhou:', err));
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => reg.update())
+        .catch(err => console.warn('SW falhou:', err));
     });
   }
   </script>
