@@ -1,7 +1,7 @@
 // Bump CACHE_VERSION when precached files change, as an extra safety net —
 // navigation requests below are network-first, so this mainly protects
 // icons/manifest/Chart.js from going stale.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE = 'estudos-' + CACHE_VERSION;
 const LOCAIS = [
   './', './index.html', './manifest.json',
