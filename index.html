@@ -933,13 +933,17 @@
         </div>
         <div class="card">
           <h3>O que estudar hoje</h3>
-          ${fila.map(cardErro).join('') || '<p class="muted">Nada atrasado — bom sinal.</p>'}
+          ${fila.length ? `
+            <p>${fila.length} revisão${fila.length===1?'':'ões'} pendente${fila.length===1?'':'s'}</p>
+            ${fila.slice(0,5).map(e => `<p class="muted">${escapeHtml(e.assunto)} — ${escapeHtml(GRAU_LABEL[e.grau])}</p>`).join('')}
+            ${fila.length > 5 ? `<p class="muted">+ ${fila.length - 5} outra${fila.length - 5===1?'':'s'}</p>` : ''}
+            <button data-ir-hoje>Ir para Hoje →</button>
+          ` : '<p class="muted">Nada atrasado — bom sinal.</p>'}
         </div>
         <div class="card">
           <h3>Como foi hoje?</h3>
-          <button data-checkin="base" class="${statusAtivo==='base'?'primary':''}">Base 2h30 ${statusAtivo==='base'?'✓':''}</button>
-          <button data-checkin="minimo" class="${statusAtivo==='minimo'?'primary':''}">Mínimo ${statusAtivo==='minimo'?'✓':''}</button>
-          <button data-checkin="nao" class="${statusAtivo==='nao'?'primary':''}">Não estudei ${statusAtivo==='nao'?'✓':''}</button>
+          ${statusAtivo==='base' ? '<p>✓ Meta cumprida</p>' : statusAtivo==='minimo' ? '<p>★ Fiz o mínimo</p>' : statusAtivo==='nao' ? '<p>✕ Não estudei</p>' : '<p class="muted">Ainda não registrado hoje.</p>'}
+          <button data-ir-hoje>Ir para Hoje →</button>
         </div>
       </div>
     `;
@@ -947,24 +951,8 @@
 
   function attachDashboardHandlers(){
     const app = document.getElementById('app');
-    app.querySelectorAll('button[data-checkin]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        registrarCheckin(state, hojeISO(), btn.dataset.checkin);
-        saveState(state);
-        render();
-      });
-    });
-    app.querySelectorAll('button[data-acertei]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const e = state.erros.find(x => x.id === btn.dataset.acertei);
-        graduarAcerto(e); saveState(state); render();
-      });
-    });
-    app.querySelectorAll('button[data-errei]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const e = state.erros.find(x => x.id === btn.dataset.errei);
-        graduarErro(e); saveState(state); render();
-      });
+    app.querySelectorAll('[data-ir-hoje]').forEach(btn => {
+      btn.addEventListener('click', () => { currentTab = 'hoje'; render(); });
     });
     criarOuAtualizarChart('chart-horas-semana', {
       type: 'bar',
