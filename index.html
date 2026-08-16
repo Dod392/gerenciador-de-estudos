@@ -94,6 +94,16 @@
     #sidebar-toggle{background:transparent;border:1px solid var(--border);color:var(--muted);}
     .grid-2{grid-template-columns:1fr 1fr;}
   }
+
+  .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+  .week-day{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:8px 4px;text-align:center;}
+  .week-day.feito{border-color:var(--ok);}
+  .week-day-label{font-size:var(--text-xs);color:var(--muted);}
+  .week-day-date{font-weight:650;font-size:var(--text-sm);margin:2px 0;}
+  .week-day-badge{font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .week-day-badge.ok{color:var(--ok);}
+  @media(max-width:480px){.week-grid{gap:4px;} .week-day{padding:6px 2px;}}
 </style>
 </head>
 <body>
@@ -847,10 +857,30 @@
       });
     });
   }
-  function renderSemana(){
+  function renderPlanejamento(){
     const semanaId = semanaAtualId();
     const plano = obterPlano(state, semanaId);
     const fimSemana = addDays(semanaId, 6);
+
+    const DIAS_LABEL = ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'];
+    const grade = DIAS_LABEL.map((label, i) => {
+      const dataIso = addDays(semanaId, i);
+      const c = state.checkins.find(x => x.data === dataIso);
+      const feito = c && c.status !== 'nao';
+      return { label, dataIso, feito, assunto: c?.assunto || null };
+    });
+    const gradeHtml = `
+      <div class="card">
+        <h3>Semana</h3>
+        <div class="week-grid">
+          ${grade.map(d => `
+            <div class="week-day ${d.feito?'feito':''}">
+              <div class="week-day-label">${d.label}</div>
+              <div class="week-day-date">${d.dataIso.slice(8,10)}</div>
+              <div class="week-day-badge ${d.feito?'ok':''}">${d.feito ? `✓${d.assunto?` ${escapeHtml(d.assunto.slice(0,14))}`:''}` : '—'}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
 
     if(!plano){
       return `
@@ -858,6 +888,7 @@
           <h2>Semana de ${semanaId} a ${fimSemana}</h2>
           <p class="muted">Nenhuma meta definida ainda.</p>
         </div>
+        ${gradeHtml}
         <div class="card">
           <h3>Definir meta da semana</h3>
           <label>Assuntos-alvo</label>
@@ -882,8 +913,11 @@
       <div class="card">
         <h2>Semana de ${semanaId} a ${fimSemana}</h2>
         <p>Dias: ${diasFeitos}/${plano.diasAlvo}</p>
+        <div class="progress"><i style="width:${Math.min(100, plano.diasAlvo ? Math.round(diasFeitos/plano.diasAlvo*100) : 0)}%"></i></div>
         <p>Horas: ${horasFeitas}h/${plano.horasAlvo}h</p>
+        <div class="progress"><i style="width:${Math.min(100, plano.horasAlvo ? Math.round(horasFeitas/plano.horasAlvo*100) : 0)}%"></i></div>
       </div>
+      ${gradeHtml}
       <div class="card">
         <h3>Assuntos-alvo</h3>
         ${plano.assuntosAlvo.map(a => `<p>${atrasados.includes(a) ? '⏳' : '✅'} ${escapeHtml(a)}</p>`).join('')}
@@ -905,7 +939,7 @@
     `;
   }
 
-  function attachSemanaHandlers(){
+  function attachPlanejamentoHandlers(){
     const salvar = document.getElementById('semana-salvar');
     if(!salvar) return;
     salvar.addEventListener('click', () => {
@@ -944,15 +978,14 @@
     const fieldValues = {};
     app.querySelectorAll('details input, details select, details textarea').forEach(el => { if(el.id) fieldValues[el.id] = el.value; });
 
-    const map = {hoje:renderHoje, erros:renderErros, mapa:renderMapa, semana:renderSemana, desempenho:renderDesempenho, dashboard:renderDashboard, config:renderConfig, planejamento:renderSemana};
+    const map = {hoje:renderHoje, erros:renderErros, mapa:renderMapa, desempenho:renderDesempenho, dashboard:renderDashboard, config:renderConfig, planejamento:renderPlanejamento};
     app.innerHTML = map[currentTab]();
     if(currentTab==='hoje') attachHojeHandlers();
     if(currentTab==='erros') attachErrosHandlers();
     if(currentTab==='mapa') attachMapaHandlers();
-    if(currentTab==='semana') attachSemanaHandlers();
     if(currentTab==='dashboard') attachDashboardHandlers();
     if(currentTab==='config') attachConfigHandlers();
-    if(currentTab==='planejamento') attachSemanaHandlers();
+    if(currentTab==='planejamento') attachPlanejamentoHandlers();
 
     app.querySelectorAll('details').forEach((d,i) => { if(openIdx.includes(i)) d.open = true; });
     Object.entries(fieldValues).forEach(([id,val]) => { const el = document.getElementById(id); if(el) el.value = val; });
