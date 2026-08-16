@@ -200,6 +200,8 @@
       erros: [],
       conteudo: SEED_CONTEUDO.map(assunto => ({ assunto, status:'nao_iniciado', concurso:'ambos', atualizadoEm: hojeISO() })),
       planejamento: [],
+      sessoes: [],
+      sessaoEmAndamento: null,
     };
   }
 
@@ -215,7 +217,7 @@
       if(!raw) return seedState();
       const parsed = JSON.parse(raw);
       if(!estadoValido(parsed)) return seedState();
-      return parsed;
+      return normalizarCamposNovos(parsed);
     } catch(e){
       return seedState();
     }
@@ -251,6 +253,61 @@
 
   function checkinDeHoje(){
     return state.checkins.find(c => c.data === hojeISO());
+  }
+
+  /* === HOJE (redesign — sessões) === */
+  function calcularErros(questoes, acertos){
+    if(questoes == null || acertos == null) return null;
+    return Math.max(0, questoes - acertos);
+  }
+  function calcularAproveitamento(questoes, acertos){
+    if(!questoes) return null;
+    return Math.round(((acertos||0) / questoes) * 100);
+  }
+  function criarSessao({data, tipo, assunto, minutos, questoes, acertos, paginas, concluida, dificuldade, cartoes, obs}){
+    return {
+      id: String(Date.now()) + Math.random().toString(36).slice(2,7),
+      data, tipo, assunto: assunto || null, minutos: Number(minutos) || 0,
+      questoes: tipo === 'questoes' ? (Number(questoes) || 0) : null,
+      acertos: tipo === 'questoes' ? (Number(acertos) || 0) : null,
+      paginas: tipo === 'teoria' && paginas ? Number(paginas) : null,
+      concluida: tipo === 'teoria' ? !!concluida : null,
+      dificuldade: tipo === 'revisao' ? (dificuldade || null) : null,
+      cartoes: tipo === 'anki' && cartoes ? Number(cartoes) : null,
+      obs: obs || '',
+      criadoEm: new Date().toISOString(),
+    };
+  }
+  function acumularMinutosHoje(state, hojeIso, minutos){
+    let ci = state.checkins.find(c => c.data === hojeIso);
+    if(!ci){
+      ci = { data: hojeIso, status: null, minutos: 0, assunto: null, questoes: null, acertos: null, obs: '' };
+      state.checkins.push(ci);
+    }
+    ci.minutos = (ci.minutos || 0) + minutos;
+    return ci;
+  }
+  function registrarSessao(state, hojeIso, dados){
+    const sessao = criarSessao({data: hojeIso, ...dados});
+    state.sessoes.push(sessao);
+    acumularMinutosHoje(state, hojeIso, sessao.minutos);
+    return sessao;
+  }
+  function iniciarSessaoEmAndamento(state, {assunto, tipo, origem}){
+    state.sessaoEmAndamento = { assunto: assunto || null, tipo: tipo || null, origem: origem || null, inicioEm: new Date().toISOString() };
+    return state.sessaoEmAndamento;
+  }
+  function finalizarSessaoEmAndamento(state){
+    const sessao = state.sessaoEmAndamento;
+    if(!sessao) return null;
+    const minutos = Math.max(1, Math.round((Date.now() - new Date(sessao.inicioEm).getTime()) / 60000));
+    state.sessaoEmAndamento = null;
+    return { assunto: sessao.assunto, tipo: sessao.tipo, origem: sessao.origem, minutos };
+  }
+  function normalizarCamposNovos(s){
+    if(!Array.isArray(s.sessoes)) s.sessoes = [];
+    if(!s.sessaoEmAndamento || typeof s.sessaoEmAndamento !== 'object') s.sessaoEmAndamento = null;
+    return s;
   }
 
   /* === ERROS (Tarefa 4) === */
@@ -509,7 +566,7 @@
     if(!estadoValido(parsed)){
       throw new Error('JSON inválido: formato inesperado');
     }
-    state = parsed;
+    state = normalizarCamposNovos(parsed);
     saveState(state);
     return state;
   }
