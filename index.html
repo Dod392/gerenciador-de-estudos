@@ -231,6 +231,11 @@
   .erros-dica b{font-size:var(--text-sm);}
   .erros-dica p{margin:2px 0 0;font-size:var(--text-xs);}
 
+  .revisao-sessao-panel{max-width:480px;}
+  .revisao-sessao-progresso{font-size:var(--text-sm);color:var(--muted);margin-bottom:4px;}
+  .revisao-sessao-secao{margin-top:var(--space-3);}
+  .revisao-sessao-secao p{margin-top:4px;}
+
   /* === HOJE (redesign) === */
   .hoje-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3);flex-wrap:wrap;}
   .hoje-header{display:flex;align-items:flex-start;gap:var(--space-3);}
@@ -667,6 +672,30 @@
 
   function filaRevisao(erros, hojeIso){
     return ordenarErrosPorRevisao(erros.filter(e => e.proximaRevisao <= hojeIso));
+  }
+
+  function ordenarErros(erros, criterio){
+    const copia = [...erros];
+    if(criterio === 'prioridade'){
+      const peso = { alta:0, media:1, baixa:2 };
+      return copia.sort((a,b) => peso[prioridadeErro(a)] - peso[prioridadeErro(b)]);
+    }
+    if(criterio === 'assunto') return copia.sort((a,b) => a.assunto.localeCompare(b.assunto));
+    if(criterio === 'recente') return copia.sort((a,b) => b.criadoEm.localeCompare(a.criadoEm));
+    return ordenarErrosPorRevisao(copia);
+  }
+  function diasAtrasoLabel(proximaRevisao, hojeIso){
+    if(proximaRevisao > hojeIso) return `Próxima ${proximaRevisao}`;
+    const dias = diasAte(proximaRevisao, hojeIso);
+    return dias === 0 ? 'Vence hoje' : `Atrasada há ${dias} dia${dias===1?'':'s'}`;
+  }
+  function iniciarSessaoRevisao(erros, hojeIso){
+    const fila = filaRevisao(erros, hojeIso).map(e => e.id);
+    if(!fila.length) return null;
+    return { fila, indice: 0, revelado: false };
+  }
+  function contarErrosPorAssunto(erros, assunto, excluirId){
+    return erros.filter(e => e.assunto === assunto && e.id !== excluirId).length;
   }
 
   /* === MAPA (Tarefa 6) === */
@@ -1501,6 +1530,8 @@
   const errosRevisando = new Set();
   let erroModalAberto = null; // { modo: 'novo' } | { modo: 'editar', id }
   let erroMenuAberto = null;
+  let errosOrdenacao = 'atrasado';
+  let revisaoSessao = null; // { fila: [id,...], indice, revelado }
 
   function renderPreservandoFoco(){
     const ativo = document.activeElement;
@@ -2208,7 +2239,7 @@
   function renderErros(){
     const hojeIso = hojeISO();
     const stats = statsErros(state.erros, hojeIso);
-    const listaFiltrada = ordenarErrosPorRevisao(filtrarErros(state.erros, { filtro: errosFiltro, assunto: errosFiltroAssunto, busca: errosBusca, hojeIso }));
+    const listaFiltrada = ordenarErros(filtrarErros(state.erros, { filtro: errosFiltro, assunto: errosFiltroAssunto, busca: errosBusca, hojeIso }), errosOrdenacao);
     const assuntosComErro = [...new Set(state.erros.map(e => e.assunto))].sort();
 
     const headerHtml = `
@@ -2223,6 +2254,7 @@
           </div>
           <div class="erros-header-actions">
             <input type="text" id="erros-busca-input" placeholder="Buscar erro ou assunto..." value="${escapeHtml(errosBusca)}">
+            ${stats.pendentes ? `<button class="primary" id="erros-revisar-pendentes-btn">▶ Revisar pendentes (${stats.pendentes})</button>` : ''}
             <button class="primary" id="erros-novo-btn">+ Novo erro</button>
           </div>
         </div>
@@ -2234,6 +2266,12 @@
             <button class="mapa-filtro-btn ${errosFiltro==='revisados'?'active':''}" data-erros-filtro="revisados"><i class="mapa-dot" style="color:var(--status-reviewed)"></i>Revisados</button>
             <button class="mapa-filtro-btn ${errosFiltro==='alta_prioridade'?'active':''}" data-erros-filtro="alta_prioridade"><i class="mapa-dot" style="color:var(--status-high-priority)"></i>Alta prioridade</button>
           </div>
+          <select id="erros-ordenar-select" class="erros-assunto-select">
+            <option value="atrasado" ${errosOrdenacao==='atrasado'?'selected':''}>Mais atrasado primeiro</option>
+            <option value="prioridade" ${errosOrdenacao==='prioridade'?'selected':''}>Prioridade</option>
+            <option value="assunto" ${errosOrdenacao==='assunto'?'selected':''}>Assunto (A-Z)</option>
+            <option value="recente" ${errosOrdenacao==='recente'?'selected':''}>Mais recente</option>
+          </select>
           <select id="erros-assunto-select" class="erros-assunto-select">
             <option value="todos">Todos os assuntos</option>
             ${assuntosComErro.map(a => `<option value="${escapeHtml(a)}" ${errosFiltroAssunto===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}
@@ -2287,7 +2325,7 @@
             </div>
             <div class="erro-card-meta">
               <span class="erro-prioridade-badge prioridade-${prioridade}">${PRIORIDADE_LABEL[prioridade]}</span>
-              <span class="erro-card-data">📅 ${atrasado?'Atrasada':'Próxima'} ${e.proximaRevisao}</span>
+              <span class="erro-card-data">📅 ${diasAtrasoLabel(e.proximaRevisao, hojeIso)}</span>
             </div>
             <button class="erro-card-chevron" aria-label="Expandir">${expandido?'▲':'▼'}</button>
           </div>
@@ -2352,6 +2390,8 @@
     const erroModalHtml = erroModalAberto ? (() => {
       const editando = erroModalAberto.modo === 'editar';
       const erro = editando ? state.erros.find(e => e.id === erroModalAberto.id) : null;
+      const assuntoInicial = editando ? erro.assunto : (state.conteudo[0]?.assunto || '');
+      const contagemInicial = assuntoInicial ? contarErrosPorAssunto(state.erros, assuntoInicial, editando ? erro.id : null) : 0;
       return `
         <div class="modal-backdrop" id="erro-modal-backdrop">
           <div class="modal-panel">
@@ -2360,6 +2400,7 @@
             <select id="erro-form-assunto">
               ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}" ${(erro?.assunto||'')===c.assunto?'selected':''}>${escapeHtml(c.assunto)}</option>`).join('')}
             </select>
+            <small class="muted" id="erro-form-aviso">${contagemInicial ? `Você já tem ${contagemInicial} erro${contagemInicial===1?'':'s'} registrado${contagemInicial===1?'':'s'} para este assunto.` : ''}</small>
             <label>O que errei</label>
             <textarea id="erro-form-oque">${editando ? escapeHtml(erro.oQueErrei) : ''}</textarea>
             <label>Regra correta</label>
@@ -2376,7 +2417,46 @@
         </div>`;
     })() : '';
 
-    return `<div class="erros-screen">${headerHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}</div>`;
+    const sessaoModalHtml = revisaoSessao ? (() => {
+      const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
+      const terminou = revisaoSessao.indice >= revisaoSessao.fila.length || !erroAtual;
+      return `
+        <div class="modal-backdrop" id="revisao-sessao-backdrop">
+          <div class="modal-panel revisao-sessao-panel">
+            ${terminou ? `
+              <div class="empty-state">
+                <div class="empty-state-icon">🎉</div>
+                <b>Sessão concluída!</b>
+                <p class="muted">Você revisou ${revisaoSessao.fila.length} erro${revisaoSessao.fila.length===1?'':'s'}.</p>
+                <button class="primary" id="revisao-sessao-fechar">Fechar</button>
+              </div>
+            ` : `
+              <div class="revisao-sessao-progresso">${revisaoSessao.indice+1} de ${revisaoSessao.fila.length}</div>
+              <div class="progress"><i style="width:${Math.round((revisaoSessao.indice)/revisaoSessao.fila.length*100)}%"></i></div>
+              <h3>${escapeHtml(erroAtual.assunto)}</h3>
+              <div class="revisao-sessao-secao">
+                <div class="erro-card-col-titulo erro-col-bad">✗ O que errei</div>
+                <p>${escapeHtml(erroAtual.oQueErrei)}</p>
+              </div>
+              ${revisaoSessao.revelado ? `
+                <div class="revisao-sessao-secao">
+                  <div class="erro-card-col-titulo erro-col-ok">✓ Regra correta</div>
+                  <p>${escapeHtml(erroAtual.regraCorreta)}</p>
+                </div>
+                <div class="row">
+                  <button class="ok" id="revisao-sessao-acertei">✓ Acertei</button>
+                  <button class="bad" id="revisao-sessao-errei">✗ Errei</button>
+                </div>
+              ` : `
+                <button class="primary" id="revisao-sessao-revelar">Mostrar regra correta</button>
+              `}
+              <button class="card-link" id="revisao-sessao-cancelar">Encerrar sessão</button>
+            `}
+          </div>
+        </div>`;
+    })() : '';
+
+    return `<div class="erros-screen">${headerHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}${sessaoModalHtml}</div>`;
   }
 
   function attachErrosHandlers(){
@@ -2387,6 +2467,10 @@
     });
     document.getElementById('erros-assunto-select')?.addEventListener('change', (e) => {
       errosFiltroAssunto = e.target.value;
+      render();
+    });
+    document.getElementById('erros-ordenar-select')?.addEventListener('change', (e) => {
+      errosOrdenacao = e.target.value;
       render();
     });
     const buscaInput = document.getElementById('erros-busca-input');
@@ -2467,6 +2551,13 @@
     document.getElementById('erro-modal-backdrop')?.addEventListener('click', (e) => {
       if(e.target.id === 'erro-modal-backdrop'){ erroModalAberto = null; render(); }
     });
+    document.getElementById('erro-form-assunto')?.addEventListener('change', (e) => {
+      const assunto = e.target.value;
+      const excluirId = erroModalAberto?.modo === 'editar' ? erroModalAberto.id : null;
+      const count = contarErrosPorAssunto(state.erros, assunto, excluirId);
+      const aviso = document.getElementById('erro-form-aviso');
+      if(aviso) aviso.textContent = count ? `Você já tem ${count} erro${count===1?'':'s'} registrado${count===1?'':'s'} para este assunto.` : '';
+    });
     document.getElementById('erro-form-salvar')?.addEventListener('click', () => {
       const assunto = document.getElementById('erro-form-assunto').value;
       const oQueErrei = document.getElementById('erro-form-oque').value.trim();
@@ -2481,6 +2572,42 @@
       saveState(state);
       erroModalAberto = null;
       render();
+    });
+
+    document.getElementById('erros-revisar-pendentes-btn')?.addEventListener('click', () => {
+      revisaoSessao = iniciarSessaoRevisao(state.erros, hojeISO());
+      render();
+    });
+    document.getElementById('revisao-sessao-revelar')?.addEventListener('click', () => {
+      revisaoSessao.revelado = true;
+      render();
+    });
+    document.getElementById('revisao-sessao-acertei')?.addEventListener('click', () => {
+      const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
+      if(erroAtual) graduarAcerto(erroAtual);
+      saveState(state);
+      revisaoSessao.indice++;
+      revisaoSessao.revelado = false;
+      render();
+    });
+    document.getElementById('revisao-sessao-errei')?.addEventListener('click', () => {
+      const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
+      if(erroAtual) graduarErro(erroAtual);
+      saveState(state);
+      revisaoSessao.indice++;
+      revisaoSessao.revelado = false;
+      render();
+    });
+    document.getElementById('revisao-sessao-fechar')?.addEventListener('click', () => {
+      revisaoSessao = null;
+      render();
+    });
+    document.getElementById('revisao-sessao-cancelar')?.addEventListener('click', () => {
+      revisaoSessao = null;
+      render();
+    });
+    document.getElementById('revisao-sessao-backdrop')?.addEventListener('click', (e) => {
+      if(e.target.id === 'revisao-sessao-backdrop'){ revisaoSessao = null; render(); }
     });
   }
   const DIAS_SEMANA_LABEL = ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'];
