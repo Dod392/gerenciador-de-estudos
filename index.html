@@ -398,6 +398,7 @@
       checkins: [],
       erros: [],
       conteudo: SEED_CONTEUDO.map(assunto => ({ assunto, status:'nao_iniciado', concurso:'ambos', atualizadoEm: hojeISO() })),
+      concursos: ['Transpetro', 'INEA'],
       planejamento: [],
       sessoes: [],
       sessaoEmAndamento: null,
@@ -512,6 +513,7 @@
   function normalizarCamposNovos(s){
     if(!Array.isArray(s.sessoes)) s.sessoes = [];
     if(!s.sessaoEmAndamento || typeof s.sessaoEmAndamento !== 'object') s.sessaoEmAndamento = null;
+    if(!Array.isArray(s.concursos) || !s.concursos.length) s.concursos = ['Transpetro', 'INEA'];
     return s;
   }
 
@@ -573,20 +575,39 @@
   const STATUS_CONTEUDO_LABEL = { nao_iniciado:'Não iniciado', estudado:'Em andamento', revisado:'Revisão', dominado:'Concluído' };
   const STATUS_CONTEUDO_COR = { nao_iniciado:'not-started', estudado:'in-progress', revisado:'review', dominado:'completed' };
   const STATUS_CONTEUDO_PCT = { nao_iniciado:0, estudado:33, revisado:67, dominado:100 };
-  const CONCURSO_ORDEM = ['ambos','transpetro','inea'];
-  const CONCURSO_LABEL = { ambos:'Transpetro + INEA', transpetro:'Transpetro', inea:'INEA' };
-
   function proximoStatusConteudo(atual){
     const i = STATUS_CONTEUDO_ORDEM.indexOf(atual);
     return STATUS_CONTEUDO_ORDEM[(i+1) % STATUS_CONTEUDO_ORDEM.length];
   }
-  function proximoConcurso(atual){
-    const i = CONCURSO_ORDEM.indexOf(atual);
-    return CONCURSO_ORDEM[(i+1) % CONCURSO_ORDEM.length];
+  function slugConcurso(nome){
+    return nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'');
   }
-  function concursosDoItem(concurso){
-    if(concurso === 'ambos') return ['Transpetro','INEA'];
-    return [CONCURSO_LABEL[concurso]];
+  function ordemConcursoDinamica(state){
+    return ['ambos', ...(state.concursos||[]).map(slugConcurso)];
+  }
+  function proximoConcurso(atual, ordem){
+    const i = ordem.indexOf(atual);
+    const seguro = i === -1 ? 0 : i;
+    return ordem[(seguro+1) % ordem.length];
+  }
+  function concursoLabel(state, valor){
+    if(valor === 'ambos') return 'Múltiplos';
+    const nome = (state.concursos||[]).find(n => slugConcurso(n) === valor);
+    return nome || valor;
+  }
+  function concursosDoItem(state, concurso){
+    if(concurso === 'ambos') return state.concursos && state.concursos.length ? state.concursos : ['Múltiplos'];
+    return [concursoLabel(state, concurso)];
+  }
+  function adicionarConcurso(state, nome){
+    const trimmed = (nome || '').trim();
+    if(!trimmed) return null;
+    if(!state.concursos) state.concursos = [];
+    const slug = slugConcurso(trimmed);
+    const existe = state.concursos.some(n => slugConcurso(n) === slug);
+    if(existe) return null;
+    state.concursos.push(trimmed);
+    return trimmed;
   }
   function iconePorAssunto(nome){
     const n = nome.toLowerCase();
@@ -656,10 +677,13 @@
           <span class="mapa-filtros-label">Filtrar por concurso</span>
           <div class="mapa-filtros-botoes">
             <button class="mapa-filtro-btn ${mapaFiltroConcurso==='todos'?'active':''}" data-filtro-concurso="todos">Todos</button>
-            <button class="mapa-filtro-btn ${mapaFiltroConcurso==='inea'?'active':''}" data-filtro-concurso="inea">INEA</button>
-            <button class="mapa-filtro-btn ${mapaFiltroConcurso==='transpetro'?'active':''}" data-filtro-concurso="transpetro">Transpetro</button>
-            <button class="mapa-filtro-btn ${mapaFiltroConcurso==='ambos'?'active':''}" data-filtro-concurso="ambos">Ambos</button>
+            ${(state.concursos||[]).map(nome => `<button class="mapa-filtro-btn ${mapaFiltroConcurso===slugConcurso(nome)?'active':''}" data-filtro-concurso="${slugConcurso(nome)}">${escapeHtml(nome)}</button>`).join('')}
+            <button class="mapa-filtro-btn ${mapaFiltroConcurso==='ambos'?'active':''}" data-filtro-concurso="ambos">Múltiplos</button>
           </div>
+          ${mapaConcursoAberto ? `
+            <input type="text" id="mapa-novo-concurso" placeholder="Nome do concurso" style="width:auto;flex:0 1 160px;min-height:32px;margin:0;">
+            <button class="primary" id="mapa-salvar-concurso" style="width:auto;min-height:32px;padding:0 12px;margin:0;">Adicionar</button>
+          ` : `<button class="card-link" id="mapa-abrir-concurso">+ Adicionar concurso</button>`}
           ${filtrosAtivos ? `<button class="card-link" id="mapa-limpar-filtros">Limpar filtros</button>` : ''}
         </div>
 
@@ -681,7 +705,7 @@
             <div class="mapa-card-nome">${escapeHtml(c.assunto)}</div>
             <div><button data-status-assunto="${escapeHtml(c.assunto)}" class="badge mapa-status-badge status-${STATUS_CONTEUDO_COR[c.status]}">${STATUS_CONTEUDO_LABEL[c.status]}</button></div>
             <div class="mapa-card-concursos">
-              ${concursosDoItem(c.concurso).map(nome => `<button data-concurso-assunto="${escapeHtml(c.assunto)}" class="badge mapa-concurso-badge">${escapeHtml(nome)}</button>`).join('')}
+              ${concursosDoItem(state, c.concurso).map(nome => `<button data-concurso-assunto="${escapeHtml(c.assunto)}" class="badge mapa-concurso-badge">${escapeHtml(nome)}</button>`).join('')}
             </div>
             <div class="mapa-card-pct">${STATUS_CONTEUDO_PCT[c.status]}%</div>
           </div>`).join('')}
@@ -717,7 +741,7 @@
       btn.addEventListener('click', () => {
         const c = state.conteudo.find(x => x.assunto === btn.dataset.concursoAssunto);
         if(!c) return;
-        c.concurso = proximoConcurso(c.concurso);
+        c.concurso = proximoConcurso(c.concurso, ordemConcursoDinamica(state));
         saveState(state);
         render();
       });
@@ -761,6 +785,22 @@
       }
       saveState(state);
       mapaAssuntoAberto = false;
+      render();
+    });
+    document.getElementById('mapa-abrir-concurso')?.addEventListener('click', () => {
+      mapaConcursoAberto = true;
+      render();
+      document.getElementById('mapa-novo-concurso')?.focus();
+    });
+    document.getElementById('mapa-salvar-concurso')?.addEventListener('click', () => {
+      const input = document.getElementById('mapa-novo-concurso');
+      const novo = adicionarConcurso(state, input.value);
+      if(!novo){
+        alert('Informe um nome válido (e diferente dos concursos já existentes).');
+        return;
+      }
+      saveState(state);
+      mapaConcursoAberto = false;
       render();
     });
   }
@@ -945,7 +985,7 @@
       : '- nenhum item atrasado');
     linhas.push('');
     linhas.push('## Mapa de conteúdo');
-    linhas.push(state.conteudo.map(c => `- ${c.assunto}: ${STATUS_CONTEUDO_LABEL[c.status]} (${CONCURSO_LABEL[c.concurso]})`).join('\n'));
+    linhas.push(state.conteudo.map(c => `- ${c.assunto}: ${STATUS_CONTEUDO_LABEL[c.status]} (${concursoLabel(state, c.concurso)})`).join('\n'));
     linhas.push('');
     linhas.push('## Desempenho por assunto');
     linhas.push(agregado.length
@@ -1354,6 +1394,7 @@
   let mapaFiltroConcurso = 'todos';
   let mapaBusca = '';
   let mapaAssuntoAberto = false;
+  let mapaConcursoAberto = false;
 
   function renderPreservandoFoco(){
     const ativo = document.activeElement;
@@ -1452,7 +1493,7 @@
       return {
         assunto, estado,
         statusLabel: item ? STATUS_CONTEUDO_LABEL[item.status] : null,
-        tag: item ? CONCURSO_LABEL[item.concurso] : null,
+        tag: item ? concursoLabel(state, item.concurso) : null,
         tipo: null, atividadeDiaId: null,
       };
     });
