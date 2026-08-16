@@ -18,6 +18,7 @@
     --text-xs:12px; --text-sm:13px; --text-base:14px; --text-lg:16px; --text-xl:20px; --text-2xl:28px;
     --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow:0 4px 16px rgba(0,0,0,.4);
     --tap:48px;
+    --hoje-border:#374151; --hoje-shadow-card:0 4px 12px rgba(0,0,0,.4); --hoje-text-secondary:#b0b9c6;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
@@ -219,6 +220,46 @@
   .combo-item{padding:10px 12px;cursor:pointer;font-size:var(--text-sm);}
   .combo-item:hover,.combo-item.highlight{background:var(--border);}
   .combo-empty{padding:10px 12px;font-size:var(--text-sm);}
+
+  /* === HOJE (polimento visual) === */
+  .hoje-screen .card{
+    border-color:var(--hoje-border);
+    box-shadow:var(--hoje-shadow-card);
+    padding:20px;
+  }
+  .hoje-screen .hero-card{border-color:var(--accent);}
+  .hoje-screen .modal-panel{border-color:var(--hoje-border);}
+  .hoje-screen .progress{height:6px;border-radius:4px;}
+  .hoje-screen .resumo-grid .stat-card{padding:16px;}
+  .hoje-screen .grid-hoje{gap:var(--space-6);}
+  .hoje-screen .hoje-closing{margin-top:var(--space-6);}
+
+  .hoje-screen .hero-subtitle,
+  .hoje-screen .hero-meta,
+  .hoje-screen .activity-meta,
+  .hoje-screen .revisao-meta{
+    color:var(--hoje-text-secondary);
+    font-size:var(--text-sm);
+    line-height:1.5;
+  }
+
+  .hoje-screen .status-pill{
+    padding:4px 12px;
+    border-radius:4px;
+    font-weight:600;
+  }
+  .hoje-screen .status-pill.pendente{background:#4b5563;color:#f3f4f6;}
+  .hoje-screen .status-pill.atrasada{background:var(--bad);color:var(--accent-fg);}
+  .hoje-screen .status-pill.concluida{background:var(--ok);color:var(--accent-fg);}
+  .hoje-screen .status-pill.andamento{background:var(--warn);color:var(--accent-fg);}
+
+  .hoje-screen .card-link{text-decoration:none;cursor:pointer;}
+  .hoje-screen .card-link:hover{text-decoration:underline;}
+
+  .hoje-screen .item-icon.tipo-questoes{background:rgba(79,157,222,.22);}
+  .hoje-screen .item-icon.tipo-teoria{background:rgba(224,168,62,.22);}
+  .hoje-screen .item-icon.tipo-revisao{background:rgba(62,207,142,.22);}
+  .hoje-screen .item-icon.tipo-anki{background:rgba(224,90,79,.22);}
 </style>
 </head>
 <body>
@@ -1275,7 +1316,7 @@
     ` : '';
 
     const fechamentoHtml = `
-      <div class="card">
+      <div class="card hoje-closing">
         <h3><span class="section-icon">🚩</span>Fechamento do dia</h3>
         <div class="fechamento-row">
           <p class="muted" style="margin:0;">Como foi seu estudo hoje?</p>
@@ -1306,18 +1347,20 @@
     `;
 
     return `
-      ${headerHtml}
-      <div class="grid-hoje">
-        <div>${state.sessaoEmAndamento ? timerHtml : heroHtml}</div>
-        <div>${resumoHtml}</div>
+      <div class="hoje-screen">
+        ${headerHtml}
+        <div class="grid-hoje">
+          <div>${state.sessaoEmAndamento ? timerHtml : heroHtml}</div>
+          <div>${resumoHtml}</div>
+        </div>
+        <div class="grid-hoje">
+          <div>${planoHtml}</div>
+          <div>${revisoesHtml}</div>
+        </div>
+        ${registroModalHtml}
+        ${iniciarModalHtml}
+        ${fechamentoHtml}
       </div>
-      <div class="grid-hoje">
-        <div>${planoHtml}</div>
-        <div>${revisoesHtml}</div>
-      </div>
-      ${registroModalHtml}
-      ${iniciarModalHtml}
-      ${fechamentoHtml}
     `;
   }
 
