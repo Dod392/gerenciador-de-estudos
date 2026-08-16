@@ -236,6 +236,58 @@
   .revisao-sessao-secao{margin-top:var(--space-3);}
   .revisao-sessao-secao p{margin-top:4px;}
 
+  /* === DESEMPENHO (redesign) === */
+  .desempenho-filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex:0 1 auto;}
+  .desempenho-filtros select{width:auto;min-height:36px;margin:0;padding:0 10px;font-size:var(--text-xs);}
+  .desempenho-filtros button{width:auto;min-height:36px;margin:0;padding:0 10px;font-size:var(--text-xs);}
+  .desempenho-novo-ciclo-form{display:flex;gap:8px;align-items:center;margin-top:var(--space-2);flex-wrap:wrap;}
+  .desempenho-novo-ciclo-form input{width:auto;min-height:36px;margin:0;flex:1 1 160px;}
+  .desempenho-novo-ciclo-form button{width:auto;min-height:36px;margin:0;padding:0 12px;}
+
+  .desempenho-kpi-card{position:relative;}
+  .desempenho-kpi-row{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:4px;}
+  .sparkline{flex-shrink:0;opacity:.9;}
+  .desempenho-kpi-delta{font-size:10px;color:var(--muted);margin-top:6px;}
+  .desempenho-kpi-delta.positivo{color:var(--ok);}
+  .desempenho-kpi-delta.negativo{color:var(--bad);}
+
+  .desempenho-disciplina-row{display:flex;align-items:center;gap:var(--space-3);padding:6px 0;}
+  .desempenho-disciplina-nome{flex:0 0 140px;font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .desempenho-disciplina-bar-track{flex:1;height:10px;border-radius:999px;background:var(--border);overflow:hidden;}
+  .desempenho-disciplina-bar-fill{height:100%;border-radius:999px;background:var(--accent);}
+  .desempenho-disciplina-pct{flex:0 0 40px;text-align:right;font-size:var(--text-sm);color:var(--muted);}
+
+  .desempenho-pizza-wrap{display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap;}
+  .desempenho-pizza-canvas-wrap{position:relative;width:140px;height:140px;flex-shrink:0;}
+  .desempenho-pizza-centro{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+  .desempenho-pizza-centro b{font-size:var(--text-lg);}
+  .desempenho-pizza-centro small{color:var(--muted);font-size:var(--text-xs);}
+  .desempenho-pizza-legend{flex:1;min-width:160px;}
+  .desempenho-pizza-legend-item{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:var(--text-sm);}
+  .desempenho-pizza-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .desempenho-pizza-legend-item span{flex:1;}
+
+  .desempenho-constancia-table{width:100%;border-collapse:collapse;font-size:var(--text-xs);}
+  .desempenho-constancia-table th,.desempenho-constancia-table td{padding:6px 4px;text-align:center;border-bottom:1px solid var(--border);}
+  .desempenho-constancia-table th:first-child,.desempenho-constancia-table td:first-child{text-align:left;color:var(--muted);}
+  .desempenho-constancia-aderencia{font-weight:600;}
+
+  .desempenho-assunto-row{padding:6px 0;}
+  .desempenho-assunto-row-top{display:flex;justify-content:space-between;font-size:var(--text-sm);margin-bottom:3px;}
+  .desempenho-assunto-bar-track{height:6px;border-radius:999px;background:var(--border);overflow:hidden;}
+  .desempenho-assunto-bar-fill{height:100%;border-radius:999px;}
+  .desempenho-assunto-bar-fill.boa{background:var(--ok);}
+  .desempenho-assunto-bar-fill.ruim{background:var(--bad);}
+
+  .desempenho-insight-card{background:linear-gradient(135deg, rgba(168,85,247,.14), rgba(79,157,222,.08));border-color:rgba(168,85,247,.3);}
+  .desempenho-insight-card p{margin:8px 0 12px;}
+
+  .desempenho-meta-valor{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+  .desempenho-meta-valor b{font-size:var(--text-2xl);}
+  .desempenho-meta-form{display:flex;gap:8px;align-items:center;margin-top:var(--space-2);}
+  .desempenho-meta-form input{width:auto;min-height:36px;margin:0;flex:0 0 100px;}
+  .desempenho-meta-form button{width:auto;min-height:36px;margin:0;padding:0 12px;}
+
   /* === HOJE (redesign) === */
   .hoje-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3);flex-wrap:wrap;}
   .hoje-header{display:flex;align-items:flex-start;gap:var(--space-3);}
@@ -454,6 +506,8 @@
       planejamento: [],
       sessoes: [],
       sessaoEmAndamento: null,
+      ciclos: [{ id: 'ciclo-1', nome: '1º Ciclo', inicio: hojeISO() }],
+      contadorRevisoes: 0,
     };
   }
 
@@ -566,6 +620,8 @@
     if(!Array.isArray(s.sessoes)) s.sessoes = [];
     if(!s.sessaoEmAndamento || typeof s.sessaoEmAndamento !== 'object') s.sessaoEmAndamento = null;
     if(!Array.isArray(s.concursos) || !s.concursos.length) s.concursos = ['Transpetro', 'INEA'];
+    if(!Array.isArray(s.ciclos) || !s.ciclos.length) s.ciclos = [{ id: 'ciclo-1', nome: '1º Ciclo', inicio: s.meta?.cicloInicio || hojeISO() }];
+    if(typeof s.contadorRevisoes !== 'number') s.contadorRevisoes = 0;
     return s;
   }
 
@@ -1237,6 +1293,139 @@
     return buckets;
   }
 
+  /* === DESEMPENHO (redesign) === */
+  function criarCiclo(state, nome, hojeIso){
+    const trimmed = (nome || '').trim();
+    if(!trimmed) return null;
+    if(!state.ciclos) state.ciclos = [];
+    const novo = { id: String(Date.now()) + Math.random().toString(36).slice(2,7), nome: trimmed, inicio: hojeIso };
+    state.ciclos.push(novo);
+    return novo;
+  }
+  function limitesCiclo(ciclos, cicloId, hojeIso){
+    const idx = ciclos.findIndex(c => c.id === cicloId);
+    if(idx === -1) return null;
+    const inicio = ciclos[idx].inicio;
+    const fim = idx < ciclos.length - 1 ? addDays(ciclos[idx+1].inicio, -1) : hojeIso;
+    return { inicio, fim };
+  }
+  function filtrarPorPeriodo(lista, inicio, fim){
+    return lista.filter(x => x.data >= inicio && x.data <= fim);
+  }
+  function periodoAnterior(inicio, fim){
+    const dias = diasAte(inicio, fim) + 1;
+    const fimAnterior = addDays(inicio, -1);
+    const inicioAnterior = addDays(fimAnterior, -(dias-1));
+    return { inicio: inicioAnterior, fim: fimAnterior };
+  }
+  function variacaoPct(atual, anterior){
+    if(!anterior) return atual ? null : 0;
+    return Math.round(((atual - anterior) / anterior) * 1000) / 10;
+  }
+  function incrementarContadorRevisoes(state){
+    state.contadorRevisoes = (state.contadorRevisoes || 0) + 1;
+    return state.contadorRevisoes;
+  }
+  function definirMetaAcerto(state, valor){
+    const n = Number(valor);
+    if(!Number.isFinite(n) || n <= 0 || n > 100) return null;
+    state.metaAcertoAlvo = n;
+    return n;
+  }
+  function distribuicaoTempoPorTipo(sessoes){
+    const acc = { teoria:0, questoes:0, revisao:0, anki:0 };
+    for(const s of sessoes){
+      if(acc[s.tipo] !== undefined) acc[s.tipo] += (s.minutos||0);
+    }
+    return acc;
+  }
+  function gerarInsightAutomatico(piores){
+    if(!piores.length) return null;
+    const nomes = piores.slice(0,2).map(p => p.assunto);
+    if(nomes.length === 1) return `${nomes[0]} está com acerto abaixo da média; priorize revisão nesta semana.`;
+    return `${nomes.join(' e ')} estão com acerto abaixo da média; priorize revisão nesta semana.`;
+  }
+  function bucketsSemanais(dataInicio, dataFim, calculadora){
+    const buckets = [];
+    let cursor = dataInicio;
+    while(cursor <= dataFim){
+      const fimBucket = addDays(cursor, 6) > dataFim ? dataFim : addDays(cursor, 6);
+      buckets.push(calculadora(cursor, fimBucket));
+      cursor = addDays(cursor, 7);
+    }
+    return buckets;
+  }
+  function revisoesNoPeriodo(erros, inicio, fim){
+    return erros.filter(e => e.ultimaRevisao && e.ultimaRevisao >= inicio && e.ultimaRevisao <= fim).length;
+  }
+  function tempoMedioPorSessao(sessoes){
+    if(!sessoes.length) return 0;
+    return Math.round(sessoes.reduce((s,x) => s + (x.minutos||0), 0) / sessoes.length);
+  }
+  function constanciaSemanaMinutos(checkins, sessoes, semanaId){
+    const dias = [];
+    for(let i=0;i<7;i++){
+      const dataIso = addDays(semanaId, i);
+      const c = checkins.find(x => x.data === dataIso);
+      const sessoesDoDia = sessoes.filter(s => s.data === dataIso);
+      dias.push(minutosNoDia(c, sessoesDoDia));
+    }
+    return dias;
+  }
+  function metaDiariaSemana(state, semanaId){
+    const plano = obterPlano(state, semanaId);
+    const dias = [];
+    for(let i=0;i<7;i++){
+      const dataIso = addDays(semanaId, i);
+      dias.push(planejadoMinutosHoje(plano, dataIso));
+    }
+    return dias;
+  }
+  function aderenciaSemana(minutosReais, minutosMeta){
+    const totalReal = minutosReais.reduce((s,x)=>s+x, 0);
+    const totalMeta = minutosMeta.reduce((s,x)=>s+x, 0);
+    if(!totalMeta) return 0;
+    return Math.min(100, Math.round((totalReal/totalMeta)*100));
+  }
+  function calcularRangeDesempenho(state, cicloId, periodo, hojeIso){
+    const ciclo = limitesCiclo(state.ciclos, cicloId, hojeIso);
+    if(!ciclo) return null;
+    if(periodo === 'ciclo') return ciclo;
+    const dias = Number(periodo);
+    const inicioJanela = addDays(hojeIso, -(dias-1));
+    const inicio = inicioJanela > ciclo.inicio ? inicioJanela : ciclo.inicio;
+    return { inicio, fim: ciclo.fim };
+  }
+  function assuntoPertenceAoConcurso(state, assunto, concursoFiltro){
+    if(concursoFiltro === 'todos') return true;
+    const item = state.conteudo.find(c => c.assunto === assunto);
+    if(!item) return true;
+    if(concursoFiltro === 'ambos') return item.concurso === 'ambos';
+    return item.concurso === concursoFiltro || item.concurso === 'ambos';
+  }
+  function filtrarPorConcurso(state, lista, concursoFiltro){
+    if(concursoFiltro === 'todos') return lista;
+    return lista.filter(x => x.assunto && assuntoPertenceAoConcurso(state, x.assunto, concursoFiltro));
+  }
+  function sparklineSvg(valores, cor){
+    if(!valores || !valores.length) return '';
+    const w = 80, h = 28, pad = 2;
+    const max = Math.max(...valores, 1);
+    const min = Math.min(...valores, 0);
+    const range = max - min || 1;
+    const pontos = valores.map((v,i) => {
+      const x = valores.length > 1 ? (i/(valores.length-1))*(w-pad*2)+pad : w/2;
+      const y = h - pad - ((v-min)/range)*(h-pad*2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="sparkline"><polyline points="${pontos}" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  function kpiDeltaHtml(delta, sufixo){
+    if(delta === null || delta === undefined) return '';
+    const sinal = delta > 0 ? '+' : '';
+    return `<div class="desempenho-kpi-delta ${delta>=0?'positivo':'negativo'}">${sinal}${delta}${sufixo} vs. período anterior</div>`;
+  }
+
   let chartInstances = {};
   function criarOuAtualizarChart(canvasId, config){
     const canvas = document.getElementById(canvasId);
@@ -1532,6 +1721,16 @@
   let erroMenuAberto = null;
   let errosOrdenacao = 'atrasado';
   let revisaoSessao = null; // { fila: [id,...], indice, revelado }
+  let desempenhoCicloId = null;
+  let desempenhoPeriodo = '90';
+  let desempenhoConcurso = 'todos';
+  let desempenhoNovoCicloAberto = false;
+  let desempenhoMetaAberto = false;
+  let desempenhoMostrarTodasDisciplinas = false;
+  let desempenhoMostrarTodosMelhores = false;
+  let desempenhoMostrarTodosPiores = false;
+  let desempenhoDetalheAberto = false;
+  let desempenhoConstanciaInfoAberto = false;
 
   function renderPreservandoFoco(){
     const ativo = document.activeElement;
@@ -2048,6 +2247,7 @@
       btn.addEventListener('click', () => {
         const e = state.erros.find(x => x.id === btn.dataset.acertei);
         graduarAcerto(e);
+        incrementarContadorRevisoes(state);
         saveState(state);
         render();
       });
@@ -2056,6 +2256,7 @@
       btn.addEventListener('click', () => {
         const e = state.erros.find(x => x.id === btn.dataset.errei);
         graduarErro(e);
+        incrementarContadorRevisoes(state);
         saveState(state);
         render();
       });
@@ -2498,7 +2699,7 @@
     app.querySelectorAll('button[data-acertei]').forEach(btn => {
       btn.addEventListener('click', () => {
         const e = state.erros.find(x => x.id === btn.dataset.acertei);
-        if(e) graduarAcerto(e);
+        if(e){ graduarAcerto(e); incrementarContadorRevisoes(state); }
         errosRevisando.delete(btn.dataset.acertei);
         saveState(state);
         render();
@@ -2507,7 +2708,7 @@
     app.querySelectorAll('button[data-errei]').forEach(btn => {
       btn.addEventListener('click', () => {
         const e = state.erros.find(x => x.id === btn.dataset.errei);
-        if(e) graduarErro(e);
+        if(e){ graduarErro(e); incrementarContadorRevisoes(state); }
         errosRevisando.delete(btn.dataset.errei);
         saveState(state);
         render();
@@ -2584,7 +2785,7 @@
     });
     document.getElementById('revisao-sessao-acertei')?.addEventListener('click', () => {
       const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
-      if(erroAtual) graduarAcerto(erroAtual);
+      if(erroAtual){ graduarAcerto(erroAtual); incrementarContadorRevisoes(state); }
       saveState(state);
       revisaoSessao.indice++;
       revisaoSessao.revelado = false;
@@ -2592,7 +2793,7 @@
     });
     document.getElementById('revisao-sessao-errei')?.addEventListener('click', () => {
       const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
-      if(erroAtual) graduarErro(erroAtual);
+      if(erroAtual){ graduarErro(erroAtual); incrementarContadorRevisoes(state); }
       saveState(state);
       revisaoSessao.indice++;
       revisaoSessao.revelado = false;
@@ -2881,71 +3082,361 @@
     });
   }
   function renderDesempenho(){
-    const agregado = agregarPorAssunto(state.checkins, state.sessoes);
-    const estudados = diasEstudados(state.checkins, state.sessoes);
-    const ciclo = diasDeCiclo(state.meta.cicloInicio, hojeISO());
-    const piores = piores5(agregado);
-    const melhores = melhores5(agregado);
-    return `
+    const hojeIso = hojeISO();
+    if(desempenhoCicloId === null) desempenhoCicloId = state.ciclos[state.ciclos.length-1].id;
+    const range = calcularRangeDesempenho(state, desempenhoCicloId, desempenhoPeriodo, hojeIso) || { inicio: hojeIso, fim: hojeIso };
+    const cicloBounds = limitesCiclo(state.ciclos, desempenhoCicloId, hojeIso) || range;
+    let rangeAntRaw = periodoAnterior(range.inicio, range.fim);
+    // "período anterior" never crosses into a different ciclo's data -- if the current range
+    // already starts at the ciclo's own beginning, there's nothing valid to compare against.
+    const rangeAnt = rangeAntRaw.fim < cicloBounds.inicio ? null
+      : { inicio: rangeAntRaw.inicio < cicloBounds.inicio ? cicloBounds.inicio : rangeAntRaw.inicio, fim: rangeAntRaw.fim };
+
+    const checkinsP = filtrarPorConcurso(state, filtrarPorPeriodo(state.checkins, range.inicio, range.fim), desempenhoConcurso);
+    const sessoesP = filtrarPorConcurso(state, filtrarPorPeriodo(state.sessoes, range.inicio, range.fim), desempenhoConcurso);
+    const checkinsAnt = rangeAnt ? filtrarPorConcurso(state, filtrarPorPeriodo(state.checkins, rangeAnt.inicio, rangeAnt.fim), desempenhoConcurso) : [];
+    const sessoesAnt = rangeAnt ? filtrarPorConcurso(state, filtrarPorPeriodo(state.sessoes, rangeAnt.inicio, rangeAnt.fim), desempenhoConcurso) : [];
+
+    const agregadoP = agregarPorAssunto(checkinsP, sessoesP);
+    const agregadoAnt = agregarPorAssunto(checkinsAnt, sessoesAnt);
+    const questoesP = agregadoP.reduce((s,a)=>s+a.questoes,0);
+    const acertosP = agregadoP.reduce((s,a)=>s+a.acertos,0);
+    const pctAcertoP = questoesP ? Math.round((acertosP/questoesP)*1000)/10 : 0;
+    const questoesAnt = agregadoAnt.reduce((s,a)=>s+a.questoes,0);
+    const acertosAnt = agregadoAnt.reduce((s,a)=>s+a.acertos,0);
+    const pctAcertoAnt = questoesAnt ? Math.round((acertosAnt/questoesAnt)*1000)/10 : 0;
+    const horasP = totalHorasEstudadas(checkinsP, sessoesP);
+    const horasAnt = totalHorasEstudadas(checkinsAnt, sessoesAnt);
+    const sequenciaAtual = calcularSequencia(state.checkins, state.sessoes, hojeIso);
+    const sequenciaAnt = calcularSequencia(state.checkins, state.sessoes, addDays(range.inicio,-1));
+    const revisoesP = revisoesNoPeriodo(state.erros, range.inicio, range.fim);
+    const revisoesAnt = rangeAnt ? revisoesNoPeriodo(state.erros, rangeAnt.inicio, rangeAnt.fim) : 0;
+    const tempoMedioP = tempoMedioPorSessao(sessoesP);
+    const tempoMedioAnt = tempoMedioPorSessao(sessoesAnt);
+
+    const sparkOpts = { state, concursoSel: desempenhoConcurso };
+    const bucket = (calc) => bucketsSemanais(range.inicio, range.fim, calc);
+    const sparkQuestoes = bucket((i,f) => {
+      const ag = agregarPorAssunto(filtrarPorConcurso(state, filtrarPorPeriodo(state.checkins,i,f), desempenhoConcurso), filtrarPorConcurso(state, filtrarPorPeriodo(state.sessoes,i,f), desempenhoConcurso));
+      return ag.reduce((s,a)=>s+a.questoes,0);
+    });
+    const sparkAcerto = bucket((i,f) => {
+      const ag = agregarPorAssunto(filtrarPorConcurso(state, filtrarPorPeriodo(state.checkins,i,f), desempenhoConcurso), filtrarPorConcurso(state, filtrarPorPeriodo(state.sessoes,i,f), desempenhoConcurso));
+      const q = ag.reduce((s,a)=>s+a.questoes,0), a = ag.reduce((s,x)=>s+x.acertos,0);
+      return q ? Math.round((a/q)*100) : 0;
+    });
+    const sparkHoras = bucket((i,f) => totalHorasEstudadas(filtrarPorConcurso(state, filtrarPorPeriodo(state.checkins,i,f), desempenhoConcurso), filtrarPorConcurso(state, filtrarPorPeriodo(state.sessoes,i,f), desempenhoConcurso)));
+    const sparkDias = bucket((i,f) => diasEstudados(filtrarPorPeriodo(state.checkins,i,f), filtrarPorPeriodo(state.sessoes,i,f)));
+    const sparkRevisoes = bucket((i,f) => revisoesNoPeriodo(state.erros, i, f));
+    const sparkTempoMedio = bucket((i,f) => tempoMedioPorSessao(filtrarPorConcurso(state, filtrarPorPeriodo(state.sessoes,i,f), desempenhoConcurso)));
+
+    const kpiCard = (label, valor, spark, cor, delta, sufixo) => `
+      <div class="card stat-card desempenho-kpi-card">
+        <div class="stat-label">${label}</div>
+        <div class="desempenho-kpi-row">
+          <div class="stat-value">${valor}</div>
+          ${sparklineSvg(spark, cor)}
+        </div>
+        ${kpiDeltaHtml(delta, sufixo)}
+      </div>`;
+
+    const headerHtml = `
       <div class="card">
-        <h2>Desempenho</h2>
-        <p>${estudados} de ${ciclo} dias do ciclo estudados</p>
+        <div class="erros-header-row">
+          <div class="planejamento-header">
+            <div class="hoje-header-icon">📈</div>
+            <div>
+              <h2>Desempenho</h2>
+              <small class="muted">Acompanhe sua evolução por ciclo, disciplina e consistência.</small>
+            </div>
+          </div>
+          <div class="desempenho-filtros">
+            <select id="desempenho-ciclo-select">
+              ${state.ciclos.map(c => `<option value="${c.id}" ${desempenhoCicloId===c.id?'selected':''}>${escapeHtml(c.nome)}</option>`).join('')}
+            </select>
+            <button id="desempenho-novo-ciclo-btn" title="Novo ciclo">+ Ciclo</button>
+            <select id="desempenho-periodo-select">
+              <option value="30" ${desempenhoPeriodo==='30'?'selected':''}>Últimos 30 dias</option>
+              <option value="60" ${desempenhoPeriodo==='60'?'selected':''}>Últimos 60 dias</option>
+              <option value="90" ${desempenhoPeriodo==='90'?'selected':''}>Últimos 90 dias</option>
+              <option value="ciclo" ${desempenhoPeriodo==='ciclo'?'selected':''}>Ciclo inteiro</option>
+            </select>
+            <select id="desempenho-concurso-select">
+              <option value="todos" ${desempenhoConcurso==='todos'?'selected':''}>Todos os concursos</option>
+              ${state.concursos.map(nome => `<option value="${slugConcurso(nome)}" ${desempenhoConcurso===slugConcurso(nome)?'selected':''}>${escapeHtml(nome)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        ${desempenhoNovoCicloAberto ? `
+          <div class="desempenho-novo-ciclo-form">
+            <input type="text" id="desempenho-novo-ciclo-nome" placeholder="Nome do novo ciclo (ex: 2º Ciclo)">
+            <button class="primary" id="desempenho-salvar-ciclo">Criar</button>
+            <button id="desempenho-cancelar-ciclo">Cancelar</button>
+          </div>` : ''}
       </div>
+
       <div class="kpi-grid">
-        <div class="card stat-card"><div class="stat-label">Total de questões</div><div class="stat-value">${totalQuestoes(state.checkins)}</div><div class="stat-icon">❓</div></div>
-        <div class="card stat-card"><div class="stat-label">Horas estudadas</div><div class="stat-value">${totalHorasEstudadas(state.checkins, state.sessoes)}h</div><div class="stat-icon">⏱️</div></div>
+        ${kpiCard('Questões respondidas', questoesP.toLocaleString('pt-BR'), sparkQuestoes, '#3b82f6', variacaoPct(questoesP, questoesAnt), '%')}
+        ${kpiCard('% de acerto geral', pctAcertoP+'%', sparkAcerto, '#10b981', questoesAnt ? Math.round((pctAcertoP-pctAcertoAnt)*10)/10 : null, ' p.p.')}
+        ${kpiCard('Horas estudadas', horasP+'h', sparkHoras, '#a855f7', variacaoPct(horasP, horasAnt), '%')}
+        ${kpiCard('Dias em sequência', sequenciaAtual, sparkDias, '#f59e0b', sequenciaAtual-sequenciaAnt, ' dias')}
+        ${kpiCard('Revisões concluídas', revisoesP.toLocaleString('pt-BR'), sparkRevisoes, '#06b6d4', variacaoPct(revisoesP, revisoesAnt), '%')}
+        ${kpiCard('Tempo médio por sessão', formatarDuracaoMin(tempoMedioP), sparkTempoMedio, '#fbbf24', sessoesAnt.length ? tempoMedioP-tempoMedioAnt : null, 'm')}
       </div>
+
       <div class="grid-2">
         <div class="card">
-          <h3>% de acerto por disciplina</h3>
-          ${agregado.length ? `<canvas id="chart-por-assunto" height="${Math.max(120, agregado.length*32)}"></canvas>` : '<p class="muted">Sem questões registradas ainda.</p>'}
+          <h3>Evolução do desempenho</h3>
+          ${agregadoP.length ? `<canvas id="chart-evolucao" height="200"></canvas>
+          <p class="muted" style="margin-top:8px;">${questoesAnt ? `${pctAcertoP >= pctAcertoAnt ? 'Sua média de acerto aumentou' : 'Sua média de acerto caiu'} ${Math.abs(Math.round((pctAcertoP-pctAcertoAnt)*10)/10)} p.p. no período selecionado.` : `Sua média de acerto no período foi ${pctAcertoP}%.`}</p>` : '<p class="muted">Sem questões registradas no período.</p>'}
         </div>
         <div class="card">
-          <h3>Evolução do desempenho</h3>
-          <canvas id="chart-evolucao" height="200"></canvas>
+          <h3>Desempenho por disciplina</h3>
+          ${agregadoP.length ? `
+            ${[...agregadoP].sort((a,b)=>b.pct-a.pct).slice(0, desempenhoMostrarTodasDisciplinas ? undefined : 6).map(a => `
+              <div class="desempenho-disciplina-row">
+                <div class="desempenho-disciplina-nome">${escapeHtml(a.assunto)}</div>
+                <div class="desempenho-disciplina-bar-track"><div class="desempenho-disciplina-bar-fill" style="width:${a.pct}%"></div></div>
+                <div class="desempenho-disciplina-pct">${a.pct}%</div>
+              </div>`).join('')}
+            ${agregadoP.length > 6 ? `<button class="card-link" id="desempenho-toggle-disciplinas">${desempenhoMostrarTodasDisciplinas ? 'Ver menos' : 'Ver todas as disciplinas'} →</button>` : ''}
+          ` : '<p class="muted">Sem questões registradas no período.</p>'}
         </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Distribuição do tempo de estudo</h3>
+          ${(() => {
+            const dist = distribuicaoTempoPorTipo(sessoesP);
+            const totalMin = dist.teoria+dist.questoes+dist.revisao+dist.anki;
+            if(!totalMin) return '<p class="muted">Sem sessões registradas no período.</p>';
+            const cores = { teoria:'#3b82f6', questoes:'#10b981', revisao:'#fbbf24', anki:'#a855f7' };
+            const labels = { teoria:'Teoria', questoes:'Questões', revisao:'Revisão', anki:'Anki' };
+            return `
+              <div class="desempenho-pizza-wrap">
+                <div class="desempenho-pizza-canvas-wrap">
+                  <canvas id="chart-distribuicao-tempo" width="140" height="140"></canvas>
+                  <div class="desempenho-pizza-centro"><b>${formatarDuracaoMin(totalMin)}</b><small>Total</small></div>
+                </div>
+                <div class="desempenho-pizza-legend">
+                  ${Object.keys(dist).map(k => `
+                    <div class="desempenho-pizza-legend-item">
+                      <span class="desempenho-pizza-dot" style="background:${cores[k]}"></span>
+                      <span>${labels[k]}</span>
+                      <b>${formatarDuracaoMin(dist[k])}</b>
+                      <small class="muted">${totalMin ? Math.round((dist[k]/totalMin)*1000)/10 : 0}%</small>
+                    </div>`).join('')}
+                </div>
+              </div>
+              <button class="card-link" id="desempenho-toggle-detalhe">${desempenhoDetalheAberto ? 'Ocultar' : 'Ver detalhes'} →</button>
+              ${desempenhoDetalheAberto ? `<p class="muted" style="margin-top:8px;">Somando todas as sessões registradas de ${range.inicio} a ${range.fim}, incluindo teoria, questões, revisão e Anki.</p>` : ''}
+            `;
+          })()}
+        </div>
+        <div class="card">
+          <h3>Constância semanal</h3>
+          ${(() => {
+            const semanaAtual = semanaAtualId();
+            const minutosEsta = constanciaSemanaMinutos(state.checkins, state.sessoes, semanaAtual);
+            const meta = metaDiariaSemana(state, semanaAtual);
+            const semanas4 = [1,2,3,4].map(n => addDays(semanaAtual, -7*n));
+            const minutosPorSemana4 = semanas4.map(sid => constanciaSemanaMinutos(state.checkins, state.sessoes, sid));
+            const media4 = [0,1,2,3,4,5,6].map(dia => Math.round(minutosPorSemana4.reduce((s,arr)=>s+arr[dia],0) / 4));
+            const aderEsta = aderenciaSemana(minutosEsta, meta);
+            const ader4 = aderenciaSemana(media4, meta);
+            const aderMeta = 100;
+            return `
+              <div style="overflow-x:auto;">
+                <table class="desempenho-constancia-table">
+                  <thead><tr><th></th>${DIAS_SEMANA_LABEL.map(d=>`<th>${d}</th>`).join('')}<th>Aderência</th></tr></thead>
+                  <tbody>
+                    <tr><td>Esta semana</td>${minutosEsta.map(m=>`<td>${m}</td>`).join('')}<td class="desempenho-constancia-aderencia" style="color:${aderEsta>=80?'var(--ok)':aderEsta>=50?'var(--warn)':'var(--bad)'}">${aderEsta}%</td></tr>
+                    <tr><td>Média últ. 4 sem.</td>${media4.map(m=>`<td>${m}</td>`).join('')}<td class="desempenho-constancia-aderencia" style="color:${ader4>=80?'var(--ok)':ader4>=50?'var(--warn)':'var(--bad)'}">${ader4}%</td></tr>
+                    <tr><td>Meta diária</td>${meta.map(m=>`<td>${m}</td>`).join('')}<td class="desempenho-constancia-aderencia">${aderMeta}%</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <button class="card-link" id="desempenho-toggle-constancia">${desempenhoConstanciaInfoAberto ? 'Ocultar' : 'Entenda sua constância'} →</button>
+              ${desempenhoConstanciaInfoAberto ? '<p class="muted" style="margin-top:8px;">Aderência compara os minutos estudados de cada linha com a meta diária configurada em Planejamento. Se nenhuma meta foi definida, a aderência fica em 0%.</p>' : ''}
+            `;
+          })()}
+        </div>
+      </div>
+
+      <div class="grid-2">
         <div class="card">
           <h3>Melhores assuntos</h3>
-          ${melhores.length ? melhores.map(p=>`<p>${escapeHtml(p.assunto)} — ${p.pct}%</p>`).join('') : '<p class="muted">Sem dados suficientes.</p>'}
+          ${(() => {
+            const melhores = melhores5(agregadoP);
+            const todos = [...agregadoP].filter(a=>a.questoes>0).sort((a,b)=>b.pct-a.pct);
+            const lista = desempenhoMostrarTodosMelhores ? todos : melhores;
+            if(!lista.length) return '<p class="muted">Sem dados suficientes no período.</p>';
+            return lista.map(p => `
+              <div class="desempenho-assunto-row">
+                <div class="desempenho-assunto-row-top"><span>${escapeHtml(p.assunto)}</span><b>${p.pct}%</b></div>
+                <div class="desempenho-assunto-bar-track"><div class="desempenho-assunto-bar-fill boa" style="width:${p.pct}%"></div></div>
+              </div>`).join('') + (todos.length > 5 ? `<button class="card-link" id="desempenho-toggle-melhores">${desempenhoMostrarTodosMelhores?'Ver menos':'Ver todos os assuntos'} →</button>` : '');
+          })()}
         </div>
         <div class="card">
-          <h3>Piores assuntos</h3>
-          ${piores.length ? piores.map(p=>`<p>${escapeHtml(p.assunto)} — ${p.pct}%</p>`).join('') : '<p class="muted">Sem dados suficientes.</p>'}
+          <h3>Assuntos que precisam de atenção</h3>
+          ${(() => {
+            const piores = piores5(agregadoP);
+            const todos = [...agregadoP].filter(a=>a.questoes>0).sort((a,b)=>a.pct-b.pct);
+            const lista = desempenhoMostrarTodosPiores ? todos : piores;
+            if(!lista.length) return '<p class="muted">Sem dados suficientes no período.</p>';
+            return lista.map(p => `
+              <div class="desempenho-assunto-row">
+                <div class="desempenho-assunto-row-top"><span>${escapeHtml(p.assunto)}</span><b>${p.pct}%</b></div>
+                <div class="desempenho-assunto-bar-track"><div class="desempenho-assunto-bar-fill ruim" style="width:${p.pct}%"></div></div>
+              </div>`).join('') + (todos.length > 5 ? `<button class="card-link" id="desempenho-toggle-piores">${desempenhoMostrarTodosPiores?'Ver menos':'Ver todos os assuntos'} →</button>` : '');
+          })()}
+        </div>
+      </div>
+
+      <div class="grid-2">
+        ${(() => {
+          const piores = piores5(agregadoP);
+          const insight = gerarInsightAutomatico(piores);
+          return `
+            <div class="card desempenho-insight-card">
+              <h3><span class="section-icon">✨</span>Insight automático</h3>
+              ${insight ? `<p>${escapeHtml(insight)}</p><button class="primary" data-ir-planejamento>Ver plano sugerido</button>` : '<p class="muted">Registre mais questões no período pra receber um insight.</p>'}
+            </div>`;
+        })()}
+        <div class="card">
+          <h3>Meta do ciclo</h3>
+          ${state.metaAcertoAlvo ? `
+            <div class="desempenho-meta-valor"><span class="muted">% de acerto alvo</span><b>${pctAcertoP}%</b><span class="muted">${state.metaAcertoAlvo}%</span></div>
+            <div class="progress"><i style="width:${Math.min(100, Math.round((pctAcertoP/state.metaAcertoAlvo)*100))}%;background:#a855f7"></i></div>
+            <p class="muted" style="margin-top:6px;">${pctAcertoP >= state.metaAcertoAlvo ? 'Meta atingida! 🎉' : `Faltam ${Math.round((state.metaAcertoAlvo-pctAcertoP)*10)/10} p.p. para sua meta`}</p>
+          ` : '<p class="muted">Nenhuma meta de acerto definida ainda.</p>'}
+          ${desempenhoMetaAberto ? `
+            <div class="desempenho-meta-form">
+              <input type="number" id="desempenho-meta-input" min="1" max="100" value="${state.metaAcertoAlvo||75}">
+              <button class="primary" id="desempenho-salvar-meta">Salvar</button>
+              <button id="desempenho-cancelar-meta">Cancelar</button>
+            </div>` : `<button class="card-link" id="desempenho-abrir-meta">Editar meta →</button>`}
         </div>
       </div>
     `;
+
+    return `<div class="erros-screen">${headerHtml}</div>`;
   }
 
   function attachDesempenhoHandlers(){
-    const agregado = agregarPorAssunto(state.checkins, state.sessoes);
-    if(agregado.length){
-      criarOuAtualizarChart('chart-por-assunto', {
-        type: 'bar',
-        data: { labels: agregado.map(a=>a.assunto), datasets:[{ data: agregado.map(a=>a.pct), backgroundColor: corAccent() }] },
+    const hojeIso = hojeISO();
+    document.getElementById('desempenho-ciclo-select')?.addEventListener('change', (e) => {
+      desempenhoCicloId = e.target.value;
+      render();
+    });
+    document.getElementById('desempenho-periodo-select')?.addEventListener('change', (e) => {
+      desempenhoPeriodo = e.target.value;
+      render();
+    });
+    document.getElementById('desempenho-concurso-select')?.addEventListener('change', (e) => {
+      desempenhoConcurso = e.target.value;
+      render();
+    });
+    document.getElementById('desempenho-novo-ciclo-btn')?.addEventListener('click', () => {
+      desempenhoNovoCicloAberto = true;
+      render();
+    });
+    document.getElementById('desempenho-cancelar-ciclo')?.addEventListener('click', () => {
+      desempenhoNovoCicloAberto = false;
+      render();
+    });
+    document.getElementById('desempenho-salvar-ciclo')?.addEventListener('click', () => {
+      const nome = document.getElementById('desempenho-novo-ciclo-nome').value;
+      const novo = criarCiclo(state, nome, hojeIso);
+      if(!novo){ alert('Informe um nome pro novo ciclo.'); return; }
+      saveState(state);
+      desempenhoCicloId = novo.id;
+      desempenhoNovoCicloAberto = false;
+      render();
+    });
+    document.getElementById('desempenho-toggle-disciplinas')?.addEventListener('click', () => {
+      desempenhoMostrarTodasDisciplinas = !desempenhoMostrarTodasDisciplinas;
+      render();
+    });
+    document.getElementById('desempenho-toggle-melhores')?.addEventListener('click', () => {
+      desempenhoMostrarTodosMelhores = !desempenhoMostrarTodosMelhores;
+      render();
+    });
+    document.getElementById('desempenho-toggle-piores')?.addEventListener('click', () => {
+      desempenhoMostrarTodosPiores = !desempenhoMostrarTodosPiores;
+      render();
+    });
+    document.getElementById('desempenho-toggle-detalhe')?.addEventListener('click', () => {
+      desempenhoDetalheAberto = !desempenhoDetalheAberto;
+      render();
+    });
+    document.getElementById('desempenho-toggle-constancia')?.addEventListener('click', () => {
+      desempenhoConstanciaInfoAberto = !desempenhoConstanciaInfoAberto;
+      render();
+    });
+    document.getElementById('desempenho-abrir-meta')?.addEventListener('click', () => {
+      desempenhoMetaAberto = true;
+      render();
+    });
+    document.getElementById('desempenho-cancelar-meta')?.addEventListener('click', () => {
+      desempenhoMetaAberto = false;
+      render();
+    });
+    document.getElementById('desempenho-salvar-meta')?.addEventListener('click', () => {
+      const valor = document.getElementById('desempenho-meta-input').value;
+      const ok = definirMetaAcerto(state, valor);
+      if(!ok){ alert('Informe um valor entre 1 e 100.'); return; }
+      saveState(state);
+      desempenhoMetaAberto = false;
+      render();
+    });
+    document.querySelectorAll('[data-ir-planejamento]').forEach(btn => {
+      btn.addEventListener('click', () => { currentTab = 'planejamento'; render(); });
+    });
+
+    if(desempenhoCicloId === null) desempenhoCicloId = state.ciclos[state.ciclos.length-1].id;
+    const range = calcularRangeDesempenho(state, desempenhoCicloId, desempenhoPeriodo, hojeIso) || { inicio: hojeIso, fim: hojeIso };
+    const checkinsP = filtrarPorConcurso(state, filtrarPorPeriodo(state.checkins, range.inicio, range.fim), desempenhoConcurso);
+    const sessoesP = filtrarPorConcurso(state, filtrarPorPeriodo(state.sessoes, range.inicio, range.fim), desempenhoConcurso);
+    const agregadoP = agregarPorAssunto(checkinsP, sessoesP);
+
+    if(agregadoP.length){
+      const dias = Math.max(1, Math.ceil((diasAte(range.inicio, range.fim)+1)/7));
+      const evolucao = evolucaoSemanal(
+        filtrarPorConcurso(state, state.checkins, desempenhoConcurso),
+        filtrarPorConcurso(state, state.sessoes, desempenhoConcurso),
+        hojeIso, dias
+      );
+      criarOuAtualizarChart('chart-evolucao', {
+        type: 'line',
+        data: {
+          labels: evolucao.map(b => b.semanaId.slice(5)),
+          datasets: [{ data: evolucao.map(b => b.pct), spanGaps:false, borderColor: corAccent(), backgroundColor:'transparent', tension:.3, pointRadius:3 }]
+        },
         options: {
-          indexAxis:'y', responsive:true, plugins:{legend:{display:false}},
+          responsive:true, plugins:{legend:{display:false}},
           scales:{
-            x:{min:0,max:100, ticks:{color:'#9aa0a6'}, grid:{color:'#2a2f3a'}},
-            y:{ticks:{color:'#9aa0a6'}, grid:{display:false}}
+            y:{min:0,max:100, ticks:{color:'#9aa0a6'}, grid:{color:'#2a2f3a'}},
+            x:{ticks:{color:'#9aa0a6'}, grid:{display:false}}
           }
         }
       });
     }
-    const evolucao = evolucaoSemanal(state.checkins, state.sessoes, hojeISO(), 12);
-    criarOuAtualizarChart('chart-evolucao', {
-      type: 'line',
-      data: {
-        labels: evolucao.map(b => b.semanaId.slice(5)),
-        datasets: [{ data: evolucao.map(b => b.pct), spanGaps:false, borderColor: corAccent(), backgroundColor:'transparent', tension:.3 }]
-      },
-      options: {
-        responsive:true, plugins:{legend:{display:false}},
-        scales:{
-          y:{min:0,max:100, ticks:{color:'#9aa0a6'}, grid:{color:'#2a2f3a'}},
-          x:{ticks:{color:'#9aa0a6'}, grid:{display:false}}
-        }
-      }
-    });
+
+    const dist = distribuicaoTempoPorTipo(sessoesP);
+    const totalMin = dist.teoria+dist.questoes+dist.revisao+dist.anki;
+    if(totalMin){
+      criarOuAtualizarChart('chart-distribuicao-tempo', {
+        type: 'doughnut',
+        data: {
+          labels: ['Teoria','Questões','Revisão','Anki'],
+          datasets: [{ data: [dist.teoria, dist.questoes, dist.revisao, dist.anki], backgroundColor: ['#3b82f6','#10b981','#fbbf24','#a855f7'], borderWidth:0 }]
+        },
+        options: { responsive:true, cutout:'70%', plugins:{legend:{display:false}} }
+      });
+    }
   }
 
   function renderScreen(){
