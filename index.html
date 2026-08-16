@@ -115,6 +115,7 @@
   .dia-card-header{text-align:center;padding-bottom:4px;border-bottom:1px solid var(--border);}
   .dia-card-label{font-size:var(--text-xs);color:var(--muted);font-weight:650;}
   .dia-card-date{font-size:var(--text-sm);font-weight:650;}
+  .dia-card-total{font-size:10px;color:var(--muted);}
   .dia-card-atividades{display:flex;flex-direction:column;gap:4px;flex:1;}
   .dia-atividade{display:flex;align-items:flex-start;gap:4px;background:var(--card);border-radius:var(--radius-sm);padding:4px;}
   .dia-atividade.concluida .dia-atividade-assunto{text-decoration:line-through;color:var(--muted);}
@@ -1271,6 +1272,25 @@
       .filter(a => !doDia.some(d => d.assunto === a.assunto));
     return [...doDia, ...daSemana];
   }
+  function planejadoMinutosHoje(plano, hojeIso){
+    if(!plano) return 150;
+    const atividadesHoje = plano.atividadesPorDia?.[hojeIso];
+    if(atividadesHoje && atividadesHoje.length){
+      return atividadesHoje.reduce((s,a) => s + (a.minutos||0), 0);
+    }
+    if(plano.horasAlvo && plano.diasAlvo){
+      return Math.round((plano.horasAlvo * 60) / plano.diasAlvo);
+    }
+    return 150;
+  }
+  function concluirAtividadeDiaPorAssunto(state, semanaId, dataIso, assunto){
+    if(!assunto) return null;
+    const lista = obterPlano(state, semanaId)?.atividadesPorDia?.[dataIso];
+    const item = lista?.find(a => a.assunto === assunto && !a.concluida);
+    if(!item) return null;
+    item.concluida = true;
+    return item;
+  }
   function proximaAtividadeDoDia(atividades, filaErros){
     const atrasada = atividades.find(a => a.estado === 'atrasada');
     if(atrasada) return {origem:'conteudo', ...atrasada};
@@ -1308,7 +1328,7 @@
     const proxima = proximaAtividadeDoDia(atividades, fila);
     const sessoesDeHoje = state.sessoes.filter(s => s.data === hojeIso);
     const minutosHoje = minutosNoDia(ci, sessoesDeHoje);
-    const planejadoMin = 150;
+    const planejadoMin = planejadoMinutosHoje(plano, hojeIso);
     const pctDia = Math.min(100, Math.round((minutosHoje/planejadoMin)*100));
     const concluidas = atividades.filter(a=>a.estado==='concluida').length;
     const questoesHoje = (ci?.questoes || 0) + state.sessoes.filter(s => s.data===hojeIso && s.tipo==='questoes').reduce((s,x)=>s+(x.questoes||0),0);
@@ -1732,6 +1752,7 @@
         dados.cartoes = Number(document.getElementById('registro-cartoes').value) || null;
       }
       registrarSessao(state, hojeISO(), dados);
+      concluirAtividadeDiaPorAssunto(state, semanaAtualId(), hojeISO(), dados.assunto);
       saveState(state);
       registroAberto = null;
       render();
@@ -1930,11 +1951,13 @@
     const diaCardHtml = (label, dataIso) => {
       const atividades = atividadesPorDia[dataIso] || [];
       const ehHoje = dataIso === hoje;
+      const totalMin = atividades.reduce((s,a) => s + (a.minutos||0), 0);
       return `
         <div class="dia-card ${ehHoje ? 'hoje' : ''}">
           <div class="dia-card-header">
             <div class="dia-card-label">${label}</div>
             <div class="dia-card-date">${dataIso.slice(8,10)}</div>
+            ${totalMin ? `<div class="dia-card-total">${totalMin} min</div>` : ''}
           </div>
           <div class="dia-card-atividades">
             ${atividades.map(a => `
