@@ -278,12 +278,14 @@
 
   function renderMapa(){
     return `<div class="card"><h2>Mapa de Conteúdo</h2><small class="muted">Toque no status pra avançar; toque no concurso pra trocar.</small></div>` +
+      `<div class="card-grid">` +
       state.conteudo.map((c, i) => `
         <div class="card">
           <b>${escapeHtml(c.assunto)}</b><br>
           <button data-status-idx="${i}" class="badge">${STATUS_CONTEUDO_LABEL[c.status]}</button>
           <button data-concurso-idx="${i}" class="badge">${CONCURSO_LABEL[c.concurso]}</button>
-        </div>`).join('');
+        </div>`).join('') +
+      `</div>`;
   }
 
   function attachMapaHandlers(){
@@ -640,8 +642,49 @@
   }
 
   /* === CONFIG (redesign, Tarefa 6) === */
-  function renderConfig(){ return '<div class="card"><h2>Configurações</h2><p class="muted">Em construção.</p></div>'; }
-  function attachConfigHandlers(){}
+  function renderConfig(){
+    return `
+      <div class="card"><h2>Configurações</h2></div>
+      <div class="card">
+        <h3>Dados e Backup</h3>
+        <small class="muted">Dados salvos só neste aparelho — use uma das opções abaixo pra levar pro celular ou fazer backup.</small>
+        <button id="btn-export-md">Exportar Markdown</button>
+        <button id="btn-export-json">Exportar JSON (arquivo)</button>
+        <button id="btn-copy-json">Copiar JSON (área de transferência)</button>
+        <label>Importar JSON (arquivo)</label>
+        <input type="file" id="input-import-json" accept="application/json">
+        <label>ou colar JSON aqui</label>
+        <textarea id="input-import-paste" placeholder="Cole aqui o JSON exportado"></textarea>
+        <button id="btn-import-paste">Importar JSON colado</button>
+      </div>
+    `;
+  }
+
+  function attachConfigHandlers(){
+    document.getElementById('btn-export-md')?.addEventListener('click', exportarMarkdown);
+    document.getElementById('btn-export-json')?.addEventListener('click', exportarJSON);
+    document.getElementById('btn-copy-json')?.addEventListener('click', () => {
+      copiarTexto(JSON.stringify(state, null, 2));
+    });
+    document.getElementById('input-import-json')?.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if(!tentarImportar(reader.result)) e.target.value = '';
+      };
+      reader.readAsText(file);
+    });
+    const btnImportPaste = document.getElementById('btn-import-paste');
+    if(btnImportPaste){
+      btnImportPaste.addEventListener('click', () => {
+        const textarea = document.getElementById('input-import-paste');
+        const texto = textarea.value.trim();
+        if(!texto) return;
+        if(tentarImportar(texto)) textarea.value = '';
+      });
+    }
+  }
 
   /* === RENDER === */
   const NAV_ITEMS = [
@@ -813,7 +856,7 @@
           <button id="erro-salvar" class="primary">Adicionar</button>
         </details>
       </div>
-      ${lista.map(cardErro).join('') || '<p class="muted">Nenhum item ainda.</p>'}
+      <div class="card-grid">${lista.map(cardErro).join('') || '<p class="muted">Nenhum item ainda.</p>'}</div>
     `;
   }
 
