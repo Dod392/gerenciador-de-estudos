@@ -109,7 +109,7 @@
   .hoje-header{display:flex;align-items:flex-start;gap:var(--space-3);}
   .hoje-header .hoje-header-icon{width:44px;height:44px;border-radius:var(--radius-sm);background:var(--surface);
     display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
-  .hoje-header h2{margin:0;text-transform:capitalize;}
+  .hoje-header h2{margin:0;}
   .hoje-header small{display:block;margin-top:2px;}
   .hoje-progress-label{display:flex;justify-content:space-between;align-items:baseline;margin-top:var(--space-3);font-size:var(--text-sm);}
   .hoje-progress-label b{font-size:var(--text-lg);}
@@ -126,11 +126,11 @@
   .status-pill.concluida{background:var(--ok);color:var(--accent-fg);}
 
   .activity-list{display:flex;flex-direction:column;}
-  .activity-item{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:1px solid var(--border);}
+  .activity-item{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:1px solid var(--border);}
   .activity-item:last-child{border-bottom:none;}
   .activity-item.concluida{opacity:.6;}
   .activity-item .activity-info{flex:1;min-width:0;}
-  .activity-item .activity-title{font-weight:600;}
+  .activity-item .activity-title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .activity-item.concluida .activity-title{text-decoration:line-through;}
   .activity-item .activity-meta{font-size:var(--text-xs);color:var(--muted);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
   .activity-item .activity-action{flex-shrink:0;width:auto;min-height:44px;padding:0 14px;margin:0;}
@@ -278,19 +278,9 @@
       criadoEm: new Date().toISOString(),
     };
   }
-  function acumularMinutosHoje(state, hojeIso, minutos){
-    let ci = state.checkins.find(c => c.data === hojeIso);
-    if(!ci){
-      ci = { data: hojeIso, status: null, minutos: 0, assunto: null, questoes: null, acertos: null, obs: '' };
-      state.checkins.push(ci);
-    }
-    ci.minutos = (ci.minutos || 0) + minutos;
-    return ci;
-  }
   function registrarSessao(state, hojeIso, dados){
     const sessao = criarSessao({data: hojeIso, ...dados});
     state.sessoes.push(sessao);
-    acumularMinutosHoje(state, hojeIso, sessao.minutos);
     return sessao;
   }
   function iniciarSessaoEmAndamento(state, {assunto, tipo, origem}){
@@ -437,14 +427,22 @@
     return dataIso >= semanaId && dataIso <= addDays(semanaId, 6);
   }
 
-  function diasRealizadosNaSemana(checkins, semanaId){
-    return checkins.filter(c => c.status !== 'nao' && dentroDaSemana(c.data, semanaId)).length;
+  function diasRealizadosNaSemana(checkins, sessoes, semanaId){
+    const diasComCheckin = checkins.filter(c => c.status !== 'nao' && dentroDaSemana(c.data, semanaId)).map(c => c.data);
+    const diasComSessao = sessoes.filter(s => dentroDaSemana(s.data, semanaId)).map(s => s.data);
+    return new Set([...diasComCheckin, ...diasComSessao]).size;
   }
 
-  function horasRealizadasNaSemana(checkins, semanaId){
-    const minutos = checkins
-      .filter(c => dentroDaSemana(c.data, semanaId))
-      .reduce((soma, c) => soma + (c.minutos ?? (c.status === 'base' ? 150 : 0)), 0);
+  function horasRealizadasNaSemana(checkins, sessoes, semanaId){
+    const diasComDados = new Set([
+      ...checkins.filter(c => dentroDaSemana(c.data, semanaId)).map(c => c.data),
+      ...sessoes.filter(s => dentroDaSemana(s.data, semanaId)).map(s => s.data),
+    ]);
+    const minutos = [...diasComDados].reduce((soma, data) => {
+      const c = checkins.find(x => x.data === data);
+      const sessoesDoDia = sessoes.filter(s => s.data === data);
+      return soma + minutosNoDia(c, sessoesDoDia);
+    }, 0);
     return Math.round((minutos / 60) * 10) / 10;
   }
 
@@ -485,8 +483,10 @@
     return [...map.values()].map(x => ({...x, pct: x.questoes ? Math.round((x.acertos/x.questoes)*100) : 0}));
   }
 
-  function diasEstudados(checkins){
-    return checkins.filter(c => c.status !== 'nao').length;
+  function diasEstudados(checkins, sessoes){
+    const diasComCheckin = checkins.filter(c => c.status !== 'nao').map(c => c.data);
+    const diasComSessao = sessoes.map(s => s.data);
+    return new Set([...diasComCheckin, ...diasComSessao]).size;
   }
 
   function diasDeCiclo(cicloInicioIso, hojeIso){
@@ -500,22 +500,27 @@
   }
 
   function totalQuestoes(checkins){ return checkins.reduce((s,c) => s + (c.questoes||0), 0); }
-  function totalHorasEstudadas(checkins){
-    const minutos = checkins.reduce((s,c) => s + (c.minutos ?? (c.status === 'base' ? 150 : 0)), 0);
+  function totalHorasEstudadas(checkins, sessoes){
+    const diasComDados = new Set([...checkins.map(c => c.data), ...sessoes.map(s => s.data)]);
+    const minutos = [...diasComDados].reduce((soma, data) => {
+      const c = checkins.find(x => x.data === data);
+      const sessoesDoDia = sessoes.filter(s => s.data === data);
+      return soma + minutosNoDia(c, sessoesDoDia);
+    }, 0);
     return Math.round((minutos/60)*10)/10;
   }
 
   /* === EXPORT (Tarefa 9) === */
   function gerarMarkdownSnapshot(state, hojeIso){
     const agregado = agregarPorAssunto(state.checkins, state.sessoes);
-    const estudados = diasEstudados(state.checkins);
+    const estudados = diasEstudados(state.checkins, state.sessoes);
     const ciclo = diasDeCiclo(state.meta.cicloInicio, hojeIso);
     const piores = piores5(agregado);
     const atrasados = filaRevisao(state.erros, hojeIso);
     const semanaId = semanaAtualId();
     const plano = obterPlano(state, semanaId);
-    const diasSemana = diasRealizadosNaSemana(state.checkins, semanaId);
-    const horasSemana = horasRealizadasNaSemana(state.checkins, semanaId);
+    const diasSemana = diasRealizadosNaSemana(state.checkins, state.sessoes, semanaId);
+    const horasSemana = horasRealizadasNaSemana(state.checkins, state.sessoes, semanaId);
     const tocadosSemana = assuntosTocadosNaSemana(state, semanaId);
     const atrasadosSemana = plano ? assuntosAtrasadosNaSemana(plano.assuntosAlvo, tocadosSemana) : [];
 
@@ -615,8 +620,10 @@
   }
 
   /* === DASHBOARD (redesign, Tarefa 2) === */
-  function calcularSequencia(checkins, hojeIso){
-    const estudados = new Set(checkins.filter(c => c.status !== 'nao').map(c => c.data));
+  function calcularSequencia(checkins, sessoes, hojeIso){
+    const diasComCheckin = checkins.filter(c => c.status !== 'nao').map(c => c.data);
+    const diasComSessao = sessoes.map(s => s.data);
+    const estudados = new Set([...diasComCheckin, ...diasComSessao]);
     let dia = hojeIso;
     if(!estudados.has(dia)) dia = addDays(dia, -1);
     let sequencia = 0;
@@ -628,15 +635,19 @@
     const tocados = conteudo.filter(c => c.status !== 'nao_iniciado').length;
     return Math.round((tocados / conteudo.length) * 100);
   }
-  function horasNoDia(checkins, dataIso){
+  function minutosNoDia(checkin, sessoesDoDia){
+    if(sessoesDoDia.length) return sessoesDoDia.reduce((s,x) => s + (x.minutos||0), 0);
+    return checkin ? (checkin.minutos ?? (checkin.status === 'base' ? 150 : 0)) : 0;
+  }
+  function horasNoDia(checkins, sessoes, dataIso){
     const c = checkins.find(x => x.data === dataIso);
-    if(!c) return 0;
-    const minutos = c.minutos ?? (c.status === 'base' ? 150 : 0);
+    const sessoesDoDia = sessoes.filter(s => s.data === dataIso);
+    const minutos = minutosNoDia(c, sessoesDoDia);
     return Math.round((minutos/60)*10)/10;
   }
-  function horasPorDiaDaSemana(checkins, semanaId){
+  function horasPorDiaDaSemana(checkins, sessoes, semanaId){
     const dias = [];
-    for(let i=0;i<7;i++) dias.push(horasNoDia(checkins, addDays(semanaId, i)));
+    for(let i=0;i<7;i++) dias.push(horasNoDia(checkins, sessoes, addDays(semanaId, i)));
     return dias;
   }
   function melhores5(agregado){
@@ -680,12 +691,12 @@
     return `
       <div class="card"><h2>${dias} dias até a prova</h2></div>
       <div class="kpi-grid">
-        <div class="card stat-card"><div class="stat-label">Horas hoje</div><div class="stat-value">${horasNoDia(state.checkins, hojeIso)}h</div><div class="stat-icon">⏱️</div></div>
-        <div class="card stat-card"><div class="stat-label">Horas na semana</div><div class="stat-value">${horasRealizadasNaSemana(state.checkins, semanaId)}h</div><div class="stat-icon">🗓️</div></div>
+        <div class="card stat-card"><div class="stat-label">Horas hoje</div><div class="stat-value">${horasNoDia(state.checkins, state.sessoes, hojeIso)}h</div><div class="stat-icon">⏱️</div></div>
+        <div class="card stat-card"><div class="stat-label">Horas na semana</div><div class="stat-value">${horasRealizadasNaSemana(state.checkins, state.sessoes, semanaId)}h</div><div class="stat-icon">🗓️</div></div>
         <div class="card stat-card"><div class="stat-label">Questões feitas</div><div class="stat-value">${agregado.reduce((s,a)=>s+a.questoes,0)}</div><div class="stat-icon">❓</div></div>
         <div class="card stat-card"><div class="stat-label">% de acerto</div><div class="stat-value">${agregado.length ? Math.round(agregado.reduce((s,a)=>s+a.acertos,0)/Math.max(1,agregado.reduce((s,a)=>s+a.questoes,0))*100) : 0}%</div><div class="stat-icon">✅</div></div>
         <div class="card stat-card"><div class="stat-label">Revisões pendentes</div><div class="stat-value">${fila.length}</div><div class="stat-icon">🔁</div></div>
-        <div class="card stat-card"><div class="stat-label">Dias em sequência</div><div class="stat-value">${calcularSequencia(state.checkins, hojeIso)}</div><div class="stat-icon">🔥</div></div>
+        <div class="card stat-card"><div class="stat-label">Dias em sequência</div><div class="stat-value">${calcularSequencia(state.checkins, state.sessoes, hojeIso)}</div><div class="stat-icon">🔥</div></div>
         <div class="card stat-card"><div class="stat-label">% do cronograma</div><div class="stat-value">${pctCronograma(state.conteudo)}%</div><div class="stat-icon">📘</div></div>
       </div>
       <div class="grid-2">
@@ -742,7 +753,7 @@
       type: 'bar',
       data: {
         labels: ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'],
-        datasets: [{ data: horasPorDiaDaSemana(state.checkins, semanaAtualId()), backgroundColor: corAccent() }]
+        datasets: [{ data: horasPorDiaDaSemana(state.checkins, state.sessoes, semanaAtualId()), backgroundColor: corAccent() }]
       },
       options: {
         responsive:true, plugins:{ legend:{ display:false } },
@@ -925,7 +936,7 @@
     const atividades = atividadesPlanoDoDia(plano, state.conteudo, state.checkins, state.sessoes, hojeIso);
     const fila = filaRevisao(state.erros, hojeIso);
     const proxima = proximaAtividadeDoDia(atividades, fila);
-    const estudadoHoje = horasNoDia(state.checkins, hojeIso);
+    const estudadoHoje = horasNoDia(state.checkins, state.sessoes, hojeIso);
     const planejadoHoje = 2.5;
     const pctDia = Math.min(100, Math.round((estudadoHoje/planejadoHoje)*100));
     const concluidas = atividades.filter(a=>a.estado==='concluida').length;
@@ -937,7 +948,7 @@
         <div class="hoje-header">
           <div class="hoje-header-icon">📅</div>
           <div>
-            <h2>Hoje, ${formatarDataExtenso(hojeIso)}</h2>
+            <h2>Hoje, ${formatarDataExtenso(hojeIso).replace(/^./, c => c.toUpperCase())}</h2>
             <small class="muted">${diasTexto}</small>
           </div>
         </div>
@@ -950,7 +961,7 @@
       <div class="card hero-card">
         <div class="hero-eyebrow">Sessão em andamento</div>
         <h3>${escapeHtml(state.sessaoEmAndamento.assunto || 'Estudo livre')}</h3>
-        <div class="timer-display" id="timer-elapsed" data-inicio="${state.sessaoEmAndamento.inicioEm}">00:00</div>
+        <div class="timer-display" id="timer-elapsed" data-inicio="${escapeHtml(state.sessaoEmAndamento.inicioEm)}">00:00</div>
         <button class="primary" id="timer-finalizar">Finalizar</button>
       </div>
     ` : '';
@@ -1068,7 +1079,7 @@
         <div data-tipo-fields="teoria">
           <label>Páginas lidas (opcional)</label>
           <input type="number" id="registro-paginas">
-          <label><input type="checkbox" id="registro-concluida" style="width:auto;min-height:auto;display:inline-block;vertical-align:middle;margin-right:6px;"> Atividade/aula concluída</label>
+          <label style="display:flex;align-items:center;min-height:44px;gap:8px;"><input type="checkbox" id="registro-concluida" style="width:auto;min-height:auto;flex-shrink:0;"> Atividade/aula concluída</label>
         </div>
         <div data-tipo-fields="revisao">
           <label>Dificuldade (opcional)</label>
@@ -1102,7 +1113,7 @@
         <details>
           <summary>+ detalhar (opcional)</summary>
           <label>Minutos</label>
-          <input type="number" id="hoje-minutos" value="${ci?.minutos ?? ''}">
+          <input type="number" id="hoje-minutos" value="${escapeHtml(ci?.minutos ?? '')}">
           <label>Assunto</label>
           <select id="hoje-assunto">
             <option value="">—</option>
@@ -1252,11 +1263,14 @@
     });
     app.querySelectorAll('[data-iniciar-timer]').forEach(btn => {
       btn.addEventListener('click', () => {
+        if(state.sessaoEmAndamento && !confirm('Já existe uma sessão em andamento. Descartar e iniciar outra?')) return;
         iniciarSessaoEmAndamento(state, { assunto: btn.dataset.iniciarTimer || null, tipo: btn.dataset.tipoSugerido || null, origem: btn.dataset.origem || null });
         saveState(state);
         render();
       });
     });
+
+    if(registroAberto) document.getElementById('registro-form')?.scrollIntoView({block:'center', behavior:'smooth'});
   }
 
   function atualizarCamposPorTipo(tipo){
@@ -1369,8 +1383,8 @@
       `;
     }
 
-    const diasFeitos = diasRealizadosNaSemana(state.checkins, semanaId);
-    const horasFeitas = horasRealizadasNaSemana(state.checkins, semanaId);
+    const diasFeitos = diasRealizadosNaSemana(state.checkins, state.sessoes, semanaId);
+    const horasFeitas = horasRealizadasNaSemana(state.checkins, state.sessoes, semanaId);
     const tocados = assuntosTocadosNaSemana(state, semanaId);
     const atrasados = assuntosAtrasadosNaSemana(plano.assuntosAlvo, tocados);
 
@@ -1418,7 +1432,7 @@
   }
   function renderDesempenho(){
     const agregado = agregarPorAssunto(state.checkins, state.sessoes);
-    const estudados = diasEstudados(state.checkins);
+    const estudados = diasEstudados(state.checkins, state.sessoes);
     const ciclo = diasDeCiclo(state.meta.cicloInicio, hojeISO());
     const piores = piores5(agregado);
     const melhores = melhores5(agregado);
@@ -1429,7 +1443,7 @@
       </div>
       <div class="kpi-grid">
         <div class="card stat-card"><div class="stat-label">Total de questões</div><div class="stat-value">${totalQuestoes(state.checkins)}</div><div class="stat-icon">❓</div></div>
-        <div class="card stat-card"><div class="stat-label">Horas estudadas</div><div class="stat-value">${totalHorasEstudadas(state.checkins)}h</div><div class="stat-icon">⏱️</div></div>
+        <div class="card stat-card"><div class="stat-label">Horas estudadas</div><div class="stat-value">${totalHorasEstudadas(state.checkins, state.sessoes)}h</div><div class="stat-icon">⏱️</div></div>
       </div>
       <div class="grid-2">
         <div class="card">
