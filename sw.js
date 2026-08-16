@@ -3,14 +3,16 @@
 // icons/manifest/Chart.js from going stale.
 const CACHE_VERSION = 'v2';
 const CACHE = 'estudos-' + CACHE_VERSION;
-const ARQUIVOS = [
+const LOCAIS = [
   './', './index.html', './manifest.json',
   './icons/icon-192.png', './icons/icon-512.png',
-  'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
 ];
+const CDN = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS)));
+  event.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(LOCAIS).then(() => c.add(CDN).catch(() => {})))
+  );
   self.skipWaiting();
 });
 
@@ -29,7 +31,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then(resp => {
-          caches.open(CACHE).then(c => c.put(event.request, resp.clone()));
+          if(resp.ok){ caches.open(CACHE).then(c => c.put(event.request, resp.clone())); }
           return resp;
         })
         .catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))

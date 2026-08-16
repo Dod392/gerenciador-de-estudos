@@ -547,7 +547,7 @@
   let chartInstances = {};
   function criarOuAtualizarChart(canvasId, config){
     const canvas = document.getElementById(canvasId);
-    if(!canvas) return;
+    if(!canvas || typeof Chart === 'undefined') return;
     if(chartInstances[canvasId]) chartInstances[canvasId].destroy();
     chartInstances[canvasId] = new Chart(canvas, config);
   }
@@ -1079,8 +1079,6 @@
   attachTabsHandlers();
 
   /* === INIT === */
-  render();
-
   if('serviceWorker' in navigator){
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js')
@@ -1088,6 +1086,8 @@
         .catch(err => console.warn('SW falhou:', err));
     });
   }
+
+  render();
   </script>
 </body>
 </html>
