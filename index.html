@@ -812,6 +812,8 @@
   const MOBILE_PRIMARY = ['hoje', 'planejamento', 'desempenho'];
   let currentTab = (window.matchMedia && window.matchMedia('(min-width:900px)').matches) ? 'dashboard' : 'hoje';
   let sidebarCollapsed = false;
+  let registroAberto = null;
+  let timerIntervalId = null;
 
   function renderSidebar(){
     const nav = document.getElementById('sidebar-nav');
@@ -877,20 +879,208 @@
     });
   }
 
+  function atividadesPlanoDoDia(plano, conteudo, checkins, sessoes, hojeIso){
+    if(!plano || !plano.assuntosAlvo || !plano.assuntosAlvo.length) return [];
+    const semanaId = segundaFeiraDaSemana(hojeIso);
+    const tocadosSemana = assuntosTocadosNaSemana({checkins, conteudo, sessoes}, semanaId);
+    const atrasados = assuntosAtrasadosNaSemana(plano.assuntosAlvo, tocadosSemana);
+    const checkinHoje = checkins.find(c => c.data === hojeIso);
+    const sessoesHoje = sessoes.filter(s => s.data === hojeIso);
+    return plano.assuntosAlvo.map(assunto => {
+      const item = conteudo.find(c => c.assunto === assunto) || null;
+      const tocadoHoje = (item && item.atualizadoEm === hojeIso && item.status !== 'nao_iniciado')
+        || (checkinHoje && checkinHoje.assunto === assunto)
+        || sessoesHoje.some(s => s.assunto === assunto);
+      const estado = tocadoHoje ? 'concluida' : (atrasados.includes(assunto) ? 'atrasada' : 'pendente');
+      return {
+        assunto, estado,
+        statusLabel: item ? STATUS_CONTEUDO_LABEL[item.status] : null,
+        tag: item ? CONCURSO_LABEL[item.concurso] : null,
+      };
+    });
+  }
+  function proximaAtividadeDoDia(atividades, filaErros){
+    const atrasada = atividades.find(a => a.estado === 'atrasada');
+    if(atrasada) return {origem:'conteudo', ...atrasada};
+    const pendente = atividades.find(a => a.estado === 'pendente');
+    if(pendente) return {origem:'conteudo', ...pendente};
+    if(filaErros.length) return {origem:'erro', erro: filaErros[0]};
+    return null;
+  }
+  function formatarDataExtenso(iso){
+    const d = new Date(iso + 'T00:00:00');
+    const weekday = d.toLocaleDateString('pt-BR', {weekday:'long'});
+    const day = d.getDate();
+    const month = d.toLocaleDateString('pt-BR', {month:'long'});
+    return `${weekday} ${day} de ${month}`;
+  }
+
   function renderHoje(){
-    const dias = diasAte(hojeISO(), state.meta.provaData);
+    const hojeIso = hojeISO();
+    const dias = diasAte(hojeIso, state.meta.provaData);
     const ci = checkinDeHoje();
     const statusAtivo = ci ? ci.status : null;
-    return `
+    const semanaId = semanaAtualId();
+    const plano = obterPlano(state, semanaId);
+    const atividades = atividadesPlanoDoDia(plano, state.conteudo, state.checkins, state.sessoes, hojeIso);
+    const fila = filaRevisao(state.erros, hojeIso);
+    const proxima = proximaAtividadeDoDia(atividades, fila);
+    const estudadoHoje = horasNoDia(state.checkins, hojeIso);
+    const planejadoHoje = 2.5;
+    const pctDia = Math.min(100, Math.round((estudadoHoje/planejadoHoje)*100));
+    const concluidas = atividades.filter(a=>a.estado==='concluida').length;
+    const questoesHoje = (ci?.questoes || 0) + state.sessoes.filter(s => s.data===hojeIso && s.tipo==='questoes').reduce((s,x)=>s+(x.questoes||0),0);
+    const diasTexto = dias > 0 ? `${dias} dias para a prova` : dias === 0 ? 'A prova é hoje!' : `Prova foi há ${Math.abs(dias)} dias`;
+
+    const headerHtml = `
       <div class="card">
-        <h2>${dias} dias até a prova</h2>
-        <small class="muted">Dados salvos só neste aparelho — veja Configurações → Dados e Backup pra levar pro celular ou fazer backup.</small>
+        <div class="hoje-header">
+          <div class="hoje-header-icon">📅</div>
+          <div>
+            <h2>Hoje, ${formatarDataExtenso(hojeIso)}</h2>
+            <small class="muted">${diasTexto}</small>
+          </div>
+        </div>
+        <div class="hoje-progress-label"><span class="muted">Estudo de hoje</span><b>${estudadoHoje}h / ${planejadoHoje}h</b></div>
+        <div class="progress"><i style="width:${pctDia}%"></i></div>
       </div>
+    `;
+
+    const heroHtml = proxima ? (
+      proxima.origem === 'conteudo' ? `
+        <div class="card hero-card">
+          <div class="hero-eyebrow">Próxima atividade</div>
+          <h3>${escapeHtml(proxima.assunto)}</h3>
+          <div class="hero-meta">
+            ${proxima.statusLabel ? `<span class="muted">${escapeHtml(proxima.statusLabel)}</span>` : ''}
+            ${proxima.tag ? `<span class="badge">${escapeHtml(proxima.tag)}</span>` : ''}
+            ${proxima.estado==='atrasada' ? `<span class="status-pill atrasada">Atrasada</span>` : ''}
+          </div>
+          <button class="primary" data-abrir-registro="${escapeHtml(proxima.assunto)}" data-tipo-sugerido="questoes">Registrar</button>
+        </div>
+      ` : `
+        <div class="card hero-card">
+          <div class="hero-eyebrow">Próxima atividade</div>
+          <h3>${escapeHtml(proxima.erro.assunto)}</h3>
+          <div class="hero-meta">
+            <span class="muted">Revisão — ${GRAU_LABEL[proxima.erro.grau]}</span>
+            <span class="status-pill ${proxima.erro.proximaRevisao < hojeIso ? 'atrasada' : 'pendente'}">${proxima.erro.proximaRevisao < hojeIso ? 'Atrasada' : 'Pendente'}</span>
+          </div>
+          <button class="primary" data-abrir-registro="${escapeHtml(proxima.erro.assunto)}" data-tipo-sugerido="revisao">Registrar</button>
+        </div>
+      `
+    ) : (atividades.length ? `
+        <div class="card hero-card"><div class="empty-state"><div class="empty-state-icon">🎉</div><b>Tudo em dia por aqui</b><p class="muted">Você concluiu tudo que planejou pra hoje.</p></div></div>
+      ` : '');
+
+    const planoHtml = `
       <div class="card">
-        <h3>Como foi hoje?</h3>
-        <button data-checkin="base" class="${statusAtivo==='base'?'primary':''}">Base 2h30 ${statusAtivo==='base'?'✓':''}</button>
-        <button data-checkin="minimo" class="${statusAtivo==='minimo'?'primary':''}">Mínimo ${statusAtivo==='minimo'?'✓':''}</button>
-        <button data-checkin="nao" class="${statusAtivo==='nao'?'primary':''}">Não estudei ${statusAtivo==='nao'?'✓':''}</button>
+        <h3>Plano de hoje</h3>
+        ${atividades.length ? `<div class="activity-list">
+          ${atividades.map(a => `
+            <div class="activity-item ${a.estado}">
+              <div class="activity-info">
+                <div class="activity-title">${escapeHtml(a.assunto)}</div>
+                <div class="activity-meta">
+                  ${a.statusLabel ? `<span>${escapeHtml(a.statusLabel)}</span>` : ''}
+                  ${a.tag ? `<span class="badge">${escapeHtml(a.tag)}</span>` : ''}
+                </div>
+              </div>
+              <span class="status-pill ${a.estado}">${a.estado==='concluida'?'Concluída':a.estado==='atrasada'?'Atrasada':'Pendente'}</span>
+              ${a.estado!=='concluida' ? `<button class="activity-action" data-abrir-registro="${escapeHtml(a.assunto)}" data-tipo-sugerido="questoes">Registrar</button>` : ''}
+            </div>`).join('')}
+        </div>` : `
+        <div class="empty-state">
+          <div class="empty-state-icon">🗓️</div>
+          <p><b>Nenhum estudo planejado para hoje</b></p>
+          <button data-ir-planejamento>Ir para Planejamento</button>
+        </div>`}
+      </div>
+    `;
+
+    const revisoesHtml = `
+      <div class="card">
+        <h3>Revisões de hoje</h3>
+        ${fila.length ? fila.map(cardErro).join('') : `
+        <div class="empty-state">
+          <div class="empty-state-icon">✅</div>
+          <p><b>Nenhuma revisão pendente para hoje</b></p>
+        </div>`}
+      </div>
+    `;
+
+    const resumoHtml = `
+      <div class="card">
+        <h3>Resumo do dia</h3>
+        <div class="summary-strip">
+          <div class="summary-item"><div class="summary-value">${planejadoHoje}h</div><div class="summary-label">Planejado</div></div>
+          <div class="summary-item"><div class="summary-value">${estudadoHoje}h</div><div class="summary-label">Estudado</div></div>
+          <div class="summary-item"><div class="summary-value">${concluidas}/${atividades.length}</div><div class="summary-label">Atividades</div></div>
+          <div class="summary-item"><div class="summary-value">${questoesHoje}</div><div class="summary-label">Questões</div></div>
+        </div>
+      </div>
+    `;
+
+    const registroFormHtml = registroAberto ? `
+      <div class="card" id="registro-form">
+        <h3>Registrar estudo</h3>
+        ${registroAberto.assunto ? `<p><b>${escapeHtml(registroAberto.assunto)}</b></p>` : `
+          <label>Assunto</label>
+          <select id="registro-assunto">
+            <option value="">—</option>
+            ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}">${escapeHtml(c.assunto)}</option>`).join('')}
+          </select>
+        `}
+        <label>Tipo</label>
+        <select id="registro-tipo">
+          <option value="questoes" ${registroAberto.tipo==='questoes'?'selected':''}>Questões</option>
+          <option value="teoria" ${registroAberto.tipo==='teoria'?'selected':''}>Teoria</option>
+          <option value="revisao" ${registroAberto.tipo==='revisao'?'selected':''}>Revisão</option>
+          <option value="anki" ${registroAberto.tipo==='anki'?'selected':''}>Anki</option>
+        </select>
+        <label>Minutos estudados</label>
+        <input type="number" id="registro-minutos" value="${registroAberto.minutosPreenchidos ?? ''}">
+        <div data-tipo-fields="questoes">
+          <div class="row">
+            <div><label>Questões</label><input type="number" id="registro-questoes"></div>
+            <div><label>Acertos</label><input type="number" id="registro-acertos"></div>
+          </div>
+          <small class="muted" id="registro-calculo">Preencha questões pra calcular</small>
+        </div>
+        <div data-tipo-fields="teoria">
+          <label>Páginas lidas (opcional)</label>
+          <input type="number" id="registro-paginas">
+          <label><input type="checkbox" id="registro-concluida" style="width:auto;min-height:auto;display:inline-block;vertical-align:middle;margin-right:6px;"> Atividade/aula concluída</label>
+        </div>
+        <div data-tipo-fields="revisao">
+          <label>Dificuldade (opcional)</label>
+          <select id="registro-dificuldade">
+            <option value="">—</option>
+            <option value="facil">Fácil</option>
+            <option value="media">Média</option>
+            <option value="dificil">Difícil</option>
+          </select>
+        </div>
+        <div data-tipo-fields="anki">
+          <label>Cartões revisados (opcional)</label>
+          <input type="number" id="registro-cartoes">
+        </div>
+        <label>Observação (opcional)</label>
+        <textarea id="registro-obs"></textarea>
+        <div class="row">
+          <button id="registro-cancelar">Cancelar</button>
+          <button id="registro-salvar" class="primary">Salvar registro</button>
+        </div>
+      </div>
+    ` : '';
+
+    const fechamentoHtml = `
+      <div class="card">
+        <h3>Fechamento do dia</h3>
+        <p class="muted">Como foi seu estudo hoje?</p>
+        <button data-checkin="base" class="${statusAtivo==='base'?'primary':''}">Meta cumprida ${statusAtivo==='base'?'✓':''}</button>
+        <button data-checkin="minimo" class="${statusAtivo==='minimo'?'primary':''}">Fiz o mínimo ${statusAtivo==='minimo'?'✓':''}</button>
+        <button data-checkin="nao" class="${statusAtivo==='nao'?'primary':''}">Não consegui estudar ${statusAtivo==='nao'?'✓':''}</button>
         <details>
           <summary>+ detalhar (opcional)</summary>
           <label>Minutos</label>
@@ -909,8 +1099,25 @@
           <button id="hoje-salvar-detalhe" class="primary">Salvar detalhe</button>
         </details>
       </div>
-      <div class="card"><h3>Revisar hoje</h3></div>
-      ${filaRevisao(state.erros, hojeISO()).map(cardErro).join('') || '<p class="muted">Nada atrasado — bom sinal.</p>'}
+    `;
+
+    return `
+      ${headerHtml}
+      <div class="grid-hoje">
+        <div>
+          ${heroHtml}
+          ${planoHtml}
+        </div>
+        <div>
+          ${revisoesHtml}
+          ${resumoHtml}
+        </div>
+      </div>
+      <div class="card">
+        <button data-abrir-registro-global data-tipo-sugerido="questoes">+ Registrar estudo</button>
+      </div>
+      ${registroFormHtml}
+      ${fechamentoHtml}
     `;
   }
 
@@ -952,6 +1159,70 @@
         render();
       });
     });
+
+    app.querySelectorAll('[data-abrir-registro]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        registroAberto = { assunto: btn.dataset.abrirRegistro, tipo: btn.dataset.tipoSugerido || 'questoes', minutosPreenchidos: null };
+        render();
+      });
+    });
+    document.querySelector('[data-abrir-registro-global]')?.addEventListener('click', () => {
+      registroAberto = { assunto: null, tipo: 'questoes', minutosPreenchidos: null };
+      render();
+    });
+    document.getElementById('registro-cancelar')?.addEventListener('click', () => {
+      registroAberto = null;
+      render();
+    });
+    document.querySelectorAll('[data-ir-planejamento]').forEach(btn => {
+      btn.addEventListener('click', () => { currentTab = 'planejamento'; render(); });
+    });
+
+    const selTipo = document.getElementById('registro-tipo');
+    if(selTipo){
+      atualizarCamposPorTipo(selTipo.value);
+      selTipo.addEventListener('change', () => atualizarCamposPorTipo(selTipo.value));
+    }
+    document.getElementById('registro-questoes')?.addEventListener('input', atualizarCalculoQuestoes);
+    document.getElementById('registro-acertos')?.addEventListener('input', atualizarCalculoQuestoes);
+    if(document.getElementById('registro-calculo')) atualizarCalculoQuestoes();
+
+    document.getElementById('registro-salvar')?.addEventListener('click', () => {
+      const tipo = document.getElementById('registro-tipo').value;
+      const assuntoSel = document.getElementById('registro-assunto');
+      const assunto = registroAberto.assunto || (assuntoSel ? (assuntoSel.value || null) : null);
+      const minutos = Number(document.getElementById('registro-minutos').value) || 0;
+      if(minutos <= 0){ alert('Informe os minutos estudados.'); return; }
+      const dados = { tipo, assunto, minutos, obs: document.getElementById('registro-obs').value };
+      if(tipo === 'questoes'){
+        dados.questoes = Number(document.getElementById('registro-questoes').value) || 0;
+        dados.acertos = Number(document.getElementById('registro-acertos').value) || 0;
+      } else if(tipo === 'teoria'){
+        dados.paginas = Number(document.getElementById('registro-paginas').value) || null;
+        dados.concluida = document.getElementById('registro-concluida').checked;
+      } else if(tipo === 'revisao'){
+        dados.dificuldade = document.getElementById('registro-dificuldade').value || null;
+      } else if(tipo === 'anki'){
+        dados.cartoes = Number(document.getElementById('registro-cartoes').value) || null;
+      }
+      registrarSessao(state, hojeISO(), dados);
+      saveState(state);
+      registroAberto = null;
+      render();
+    });
+  }
+
+  function atualizarCamposPorTipo(tipo){
+    document.querySelectorAll('#registro-form [data-tipo-fields]').forEach(el => {
+      el.style.display = el.dataset.tipoFields === tipo ? '' : 'none';
+    });
+  }
+  function atualizarCalculoQuestoes(){
+    const q = Number(document.getElementById('registro-questoes')?.value) || 0;
+    const a = Number(document.getElementById('registro-acertos')?.value) || 0;
+    const el = document.getElementById('registro-calculo');
+    if(!el) return;
+    el.textContent = q ? `Erros: ${calcularErros(q,a)} · Aproveitamento: ${calcularAproveitamento(q,a)}%` : 'Preencha questões pra calcular';
   }
   function renderErros(){
     const lista = ordenarErrosPorRevisao(state.erros);
