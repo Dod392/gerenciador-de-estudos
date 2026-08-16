@@ -180,6 +180,15 @@
   .revisao-item .revisao-actions{display:flex;gap:4px;flex-shrink:0;}
   .revisao-item .revisao-actions button{width:auto;min-height:36px;min-width:36px;padding:0 10px;margin:0;font-size:var(--text-sm);}
 
+  .sessao-list{display:flex;flex-direction:column;}
+  .sessao-item{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .sessao-item:last-child{border-bottom:none;}
+  .sessao-info{flex:1 1 200px;min-width:200px;}
+  .sessao-title{font-weight:600;font-size:var(--text-sm);}
+  .sessao-meta{font-size:var(--text-xs);color:var(--muted);margin-top:2px;}
+  .sessao-actions{display:flex;gap:6px;flex-shrink:0;margin-left:auto;}
+  .sessao-actions button{width:auto;min-height:36px;padding:0 12px;margin:0;font-size:var(--text-sm);}
+
   .empty-state{text-align:center;padding:var(--space-4) var(--space-3);color:var(--muted);}
   .empty-state .empty-state-icon{font-size:24px;margin-bottom:6px;}
   .empty-state button{width:auto;margin:var(--space-3) auto 0;padding:0 20px;}
@@ -404,6 +413,22 @@
     const minutos = Math.max(1, Math.round((Date.now() - new Date(sessao.inicioEm).getTime()) / 60000));
     state.sessaoEmAndamento = null;
     return { assunto: sessao.assunto, tipo: sessao.tipo, origem: sessao.origem, minutos };
+  }
+  function atualizarSessao(state, id, dados){
+    const idx = state.sessoes.findIndex(s => s.id === id);
+    if(idx === -1) return null;
+    const original = state.sessoes[idx];
+    const atualizado = criarSessao({data: original.data, ...dados});
+    atualizado.id = original.id;
+    atualizado.criadoEm = original.criadoEm;
+    state.sessoes[idx] = atualizado;
+    return atualizado;
+  }
+  function excluirSessao(state, id){
+    const idx = state.sessoes.findIndex(s => s.id === id);
+    if(idx === -1) return false;
+    state.sessoes.splice(idx, 1);
+    return true;
   }
   function normalizarCamposNovos(s){
     if(!Array.isArray(s.sessoes)) s.sessoes = [];
@@ -879,6 +904,79 @@
 
   /* === CONFIG (redesign, Tarefa 6) === */
   function renderConfig(){
+    const sessoesOrdenadas = [...state.sessoes].sort((a,b) => (b.data+b.criadoEm).localeCompare(a.data+a.criadoEm));
+    const sessoesHtml = `
+      <div class="card">
+        <h3>Sessões registradas</h3>
+        <small class="muted">Corrija ou remova uma sessão registrada por engano — a mudança já reflete em Hoje, Dashboard e Desempenho.</small>
+        ${sessoesOrdenadas.length ? `<div class="sessao-list">
+          ${sessoesOrdenadas.map(s => `
+            <div class="sessao-item">
+              <div class="sessao-info">
+                <div class="sessao-title">${escapeHtml(s.assunto || 'Estudo livre')}</div>
+                <div class="sessao-meta">${s.data} · ${escapeHtml(TIPO_LABEL[s.tipo] || s.tipo)} · ${s.minutos} min${s.tipo==='questoes' && s.questoes ? ` · ${s.questoes} questões (${calcularAproveitamento(s.questoes, s.acertos)}%)` : ''}</div>
+              </div>
+              <div class="sessao-actions">
+                <button data-editar-sessao="${s.id}">Editar</button>
+                <button class="bad" data-excluir-sessao="${s.id}">Excluir</button>
+              </div>
+            </div>`).join('')}
+        </div>` : '<p class="muted">Nenhuma sessão registrada ainda.</p>'}
+      </div>
+    `;
+    const editarSessaoModalHtml = sessaoEditando ? `
+      <div class="modal-backdrop" id="editar-sessao-backdrop">
+        <div class="modal-panel" id="editar-sessao-form">
+          <h3>Editar sessão</h3>
+          <label>Assunto</label>
+          <div class="combo">
+            <input type="text" id="editar-assunto-busca" placeholder="Buscar assunto..." autocomplete="off" value="${escapeHtml(sessaoEditando.assunto || '')}">
+            <input type="hidden" id="editar-assunto" value="${escapeHtml(sessaoEditando.assunto || '')}">
+            <div class="combo-results" id="editar-assunto-resultados"></div>
+          </div>
+          <label>Tipo</label>
+          <select id="editar-tipo">
+            <option value="questoes" ${sessaoEditando.tipo==='questoes'?'selected':''}>Questões</option>
+            <option value="teoria" ${sessaoEditando.tipo==='teoria'?'selected':''}>Teoria</option>
+            <option value="revisao" ${sessaoEditando.tipo==='revisao'?'selected':''}>Revisão</option>
+            <option value="anki" ${sessaoEditando.tipo==='anki'?'selected':''}>Anki</option>
+          </select>
+          <label>Minutos estudados</label>
+          <input type="number" id="editar-minutos" value="${sessaoEditando.minutos ?? ''}">
+          <div data-tipo-fields="questoes">
+            <div class="row">
+              <div><label>Questões</label><input type="number" id="editar-questoes" value="${sessaoEditando.questoes ?? ''}"></div>
+              <div><label>Acertos</label><input type="number" id="editar-acertos" value="${sessaoEditando.acertos ?? ''}"></div>
+            </div>
+            <small class="muted" id="editar-calculo">Preencha questões pra calcular</small>
+          </div>
+          <div data-tipo-fields="teoria">
+            <label>Páginas lidas (opcional)</label>
+            <input type="number" id="editar-paginas" value="${sessaoEditando.paginas ?? ''}">
+            <label style="display:flex;align-items:center;min-height:44px;gap:8px;"><input type="checkbox" id="editar-concluida" style="width:auto;min-height:auto;flex-shrink:0;" ${sessaoEditando.concluida?'checked':''}> Atividade/aula concluída</label>
+          </div>
+          <div data-tipo-fields="revisao">
+            <label>Dificuldade (opcional)</label>
+            <select id="editar-dificuldade">
+              <option value="">—</option>
+              <option value="facil" ${sessaoEditando.dificuldade==='facil'?'selected':''}>Fácil</option>
+              <option value="media" ${sessaoEditando.dificuldade==='media'?'selected':''}>Média</option>
+              <option value="dificil" ${sessaoEditando.dificuldade==='dificil'?'selected':''}>Difícil</option>
+            </select>
+          </div>
+          <div data-tipo-fields="anki">
+            <label>Cartões revisados (opcional)</label>
+            <input type="number" id="editar-cartoes" value="${sessaoEditando.cartoes ?? ''}">
+          </div>
+          <label>Observação (opcional)</label>
+          <textarea id="editar-obs">${escapeHtml(sessaoEditando.obs ?? '')}</textarea>
+          <div class="row">
+            <button id="editar-sessao-cancelar">Cancelar</button>
+            <button id="editar-sessao-salvar" class="primary">Salvar alterações</button>
+          </div>
+        </div>
+      </div>
+    ` : '';
     return `
       <div class="card"><h2>Configurações</h2></div>
       <div class="card">
@@ -893,6 +991,8 @@
         <textarea id="input-import-paste" placeholder="Cole aqui o JSON exportado"></textarea>
         <button id="btn-import-paste">Importar JSON colado</button>
       </div>
+      ${sessoesHtml}
+      ${editarSessaoModalHtml}
     `;
   }
 
@@ -920,6 +1020,62 @@
         if(tentarImportar(texto)) textarea.value = '';
       });
     }
+
+    document.querySelectorAll('[data-editar-sessao]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const s = state.sessoes.find(x => x.id === btn.dataset.editarSessao);
+        if(!s) return;
+        sessaoEditando = s;
+        render();
+      });
+    });
+    document.querySelectorAll('[data-excluir-sessao]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if(!confirm('Excluir esta sessão registrada? Essa ação não pode ser desfeita.')) return;
+        excluirSessao(state, btn.dataset.excluirSessao);
+        saveState(state);
+        render();
+      });
+    });
+    document.getElementById('editar-sessao-cancelar')?.addEventListener('click', () => {
+      sessaoEditando = null;
+      render();
+    });
+    document.getElementById('editar-sessao-backdrop')?.addEventListener('click', (e) => {
+      if(e.target.id === 'editar-sessao-backdrop'){ sessaoEditando = null; render(); }
+    });
+    const editarTipoSel = document.getElementById('editar-tipo');
+    if(editarTipoSel){
+      atualizarCamposPorTipo(editarTipoSel.value, 'editar-sessao-form');
+      editarTipoSel.addEventListener('change', () => atualizarCamposPorTipo(editarTipoSel.value, 'editar-sessao-form'));
+    }
+    document.getElementById('editar-questoes')?.addEventListener('input', () => atualizarCalculoQuestoes('editar'));
+    document.getElementById('editar-acertos')?.addEventListener('input', () => atualizarCalculoQuestoes('editar'));
+    if(document.getElementById('editar-calculo')) atualizarCalculoQuestoes('editar');
+    attachComboBusca('editar-assunto-busca', 'editar-assunto', 'editar-assunto-resultados');
+
+    document.getElementById('editar-sessao-salvar')?.addEventListener('click', () => {
+      const tipo = document.getElementById('editar-tipo').value;
+      const assunto = resolverAssuntoBusca('editar-assunto-busca', 'editar-assunto');
+      const minutos = Number(document.getElementById('editar-minutos').value) || 0;
+      if(minutos <= 0){ alert('Informe os minutos estudados.'); return; }
+      const dados = { tipo, assunto, minutos, obs: document.getElementById('editar-obs').value };
+      if(tipo === 'questoes'){
+        dados.questoes = Number(document.getElementById('editar-questoes').value) || 0;
+        dados.acertos = Number(document.getElementById('editar-acertos').value) || 0;
+      } else if(tipo === 'teoria'){
+        dados.paginas = Number(document.getElementById('editar-paginas').value) || null;
+        dados.concluida = document.getElementById('editar-concluida').checked;
+      } else if(tipo === 'revisao'){
+        dados.dificuldade = document.getElementById('editar-dificuldade').value || null;
+      } else if(tipo === 'anki'){
+        dados.cartoes = Number(document.getElementById('editar-cartoes').value) || null;
+      }
+      atualizarSessao(state, sessaoEditando.id, dados);
+      saveState(state);
+      sessaoEditando = null;
+      render();
+    });
   }
 
   /* === RENDER === */
@@ -938,6 +1094,8 @@
   let registroAberto = null;
   let iniciarAberto = null;
   let timerIntervalId = null;
+  let sessaoEditando = null;
+  const TIPO_LABEL = { questoes:'Questões', teoria:'Teoria', revisao:'Revisão', anki:'Anki' };
 
   function renderSidebar(){
     const nav = document.getElementById('sidebar-nav');
@@ -1556,15 +1714,17 @@
     return match ? match.assunto : null;
   }
 
-  function atualizarCamposPorTipo(tipo){
-    document.querySelectorAll('#registro-form [data-tipo-fields]').forEach(el => {
+  function atualizarCamposPorTipo(tipo, containerId){
+    const container = containerId || 'registro-form';
+    document.querySelectorAll(`#${container} [data-tipo-fields]`).forEach(el => {
       el.style.display = el.dataset.tipoFields === tipo ? '' : 'none';
     });
   }
-  function atualizarCalculoQuestoes(){
-    const q = Number(document.getElementById('registro-questoes')?.value) || 0;
-    const a = Number(document.getElementById('registro-acertos')?.value) || 0;
-    const el = document.getElementById('registro-calculo');
+  function atualizarCalculoQuestoes(prefix){
+    const p = prefix || 'registro';
+    const q = Number(document.getElementById(`${p}-questoes`)?.value) || 0;
+    const a = Number(document.getElementById(`${p}-acertos`)?.value) || 0;
+    const el = document.getElementById(`${p}-calculo`);
     if(!el) return;
     el.textContent = q ? `Erros: ${calcularErros(q,a)} · Aproveitamento: ${calcularAproveitamento(q,a)}%` : 'Preencha questões pra calcular';
   }
