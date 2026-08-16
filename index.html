@@ -727,17 +727,7 @@
     return `
       <div class="card">
         <h2>${dias} dias até a prova</h2>
-        <small class="muted">Dados salvos só neste aparelho — use Exportar/Importar JSON pra levar pro celular ou fazer backup.</small>
-      </div>
-      <div class="card">
-        <button id="btn-export-md">Exportar Markdown</button>
-        <button id="btn-export-json">Exportar JSON (arquivo)</button>
-        <button id="btn-copy-json">Copiar JSON (área de transferência)</button>
-        <label>Importar JSON (arquivo)</label>
-        <input type="file" id="input-import-json" accept="application/json">
-        <label>ou colar JSON aqui</label>
-        <textarea id="input-import-paste" placeholder="Cole aqui o JSON exportado"></textarea>
-        <button id="btn-import-paste">Importar JSON colado</button>
+        <small class="muted">Dados salvos só neste aparelho — veja Configurações → Dados e Backup pra levar pro celular ou fazer backup.</small>
       </div>
       <div class="card">
         <h3>Como foi hoje?</h3>
@@ -805,29 +795,6 @@
         render();
       });
     });
-    document.getElementById('btn-export-md')?.addEventListener('click', exportarMarkdown);
-    document.getElementById('btn-export-json')?.addEventListener('click', exportarJSON);
-    document.getElementById('btn-copy-json')?.addEventListener('click', () => {
-      copiarTexto(JSON.stringify(state, null, 2));
-    });
-    document.getElementById('input-import-json')?.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        if(!tentarImportar(reader.result)) e.target.value = '';
-      };
-      reader.readAsText(file);
-    });
-    const btnImportPaste = document.getElementById('btn-import-paste');
-    if(btnImportPaste){
-      btnImportPaste.addEventListener('click', () => {
-        const textarea = document.getElementById('input-import-paste');
-        const texto = textarea.value.trim();
-        if(!texto) return;
-        if(tentarImportar(texto)) textarea.value = '';
-      });
-    }
   }
   function renderErros(){
     const lista = ordenarErrosPorRevisao(state.erros);
