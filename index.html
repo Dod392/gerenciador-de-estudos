@@ -96,15 +96,54 @@
     .grid-2{grid-template-columns:1fr 1fr;}
   }
 
-  .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
-  .week-day{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
-    padding:8px 4px;text-align:center;}
-  .week-day.feito{border-color:var(--ok);}
-  .week-day-label{font-size:var(--text-xs);color:var(--muted);}
-  .week-day-date{font-weight:650;font-size:var(--text-sm);margin:2px 0;}
-  .week-day-badge{font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .week-day-badge.ok{color:var(--ok);}
-  @media(max-width:480px){.week-grid{gap:4px;} .week-day{padding:6px 2px;}}
+  /* === PLANEJAMENTO (redesign) === */
+  .planejamento-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3);}
+  .planejamento-header{display:flex;align-items:flex-start;gap:var(--space-3);}
+  .planejamento-nav{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin-top:2px;}
+  .planejamento-nav b{font-size:var(--text-sm);font-weight:600;color:var(--muted);}
+  .planejamento-badges{margin-top:var(--space-3);}
+  .planejamento-progresso{margin-top:var(--space-3);}
+  .planejamento-progresso-label{display:flex;justify-content:space-between;font-size:var(--text-sm);margin-top:var(--space-2);}
+  .planejamento-progresso-label span{color:var(--muted);}
+
+  .dia-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--space-2);}
+  @media(max-width:900px){.dia-grid{grid-template-columns:repeat(3,1fr);}}
+  @media(max-width:560px){.dia-grid{grid-template-columns:repeat(2,1fr);}}
+  .dia-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+    box-shadow:var(--shadow-sm);padding:var(--space-2);display:flex;flex-direction:column;gap:var(--space-1);min-height:120px;}
+  .dia-card.hoje{border-color:var(--accent);}
+  .dia-card-header{text-align:center;padding-bottom:4px;border-bottom:1px solid var(--border);}
+  .dia-card-label{font-size:var(--text-xs);color:var(--muted);font-weight:650;}
+  .dia-card-date{font-size:var(--text-sm);font-weight:650;}
+  .dia-card-atividades{display:flex;flex-direction:column;gap:4px;flex:1;}
+  .dia-atividade{display:flex;align-items:flex-start;gap:4px;background:var(--card);border-radius:var(--radius-sm);padding:4px;}
+  .dia-atividade.concluida .dia-atividade-assunto{text-decoration:line-through;color:var(--muted);}
+  .dia-atividade-check{width:20px;height:20px;min-height:20px;flex-shrink:0;padding:0;margin:2px 0 0;
+    border-radius:50%;font-size:11px;line-height:1;color:var(--ok);border-color:var(--ok);}
+  .dia-atividade-info{flex:1;min-width:0;}
+  .dia-atividade-assunto{font-size:var(--text-xs);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dia-atividade-meta{font-size:10px;color:var(--muted);}
+  .dia-atividade-remover{width:18px;height:18px;min-height:18px;flex-shrink:0;padding:0;margin:2px 0 0;
+    border:none;background:transparent;color:var(--muted);font-size:14px;line-height:1;}
+  .dia-card-add{width:100%;min-height:32px;font-size:var(--text-xs);background:transparent;color:var(--accent);
+    border:1px dashed var(--border);margin:0;padding:0;}
+
+  .assunto-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:var(--space-2);}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);
+    border-radius:999px;padding:4px 6px 4px 12px;font-size:var(--text-sm);}
+  .chip.atrasado{border-color:var(--warn);}
+  .chip button{width:20px;height:20px;min-height:20px;flex-shrink:0;padding:0;margin:0;border:none;
+    background:var(--border);border-radius:50%;font-size:13px;line-height:1;color:var(--fg);}
+
+  .dias-checkbox-row{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-2);}
+  .dia-checkbox{display:flex;align-items:center;gap:6px;width:auto;font-size:var(--text-sm);color:var(--fg);margin:0;}
+  .dia-checkbox input{width:auto;min-height:auto;flex-shrink:0;}
+  .meta-opcionais{margin:var(--space-3) 0;border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);}
+  .meta-opcionais summary{cursor:pointer;font-size:var(--text-sm);color:var(--muted);}
+
+  .resumo-meta-item{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) 0;border-bottom:1px solid var(--border);}
+  .resumo-meta-item:last-child{border-bottom:none;}
+  .resumo-meta-item .stat-icon{font-size:20px;opacity:.8;}
 
   /* === HOJE (redesign) === */
   .hoje-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3);flex-wrap:wrap;}
@@ -546,17 +585,53 @@
     return state.planejamento.find(p => p.semanaId === semanaId);
   }
 
-  function salvarPlano(state, semanaId, {assuntosAlvo, diasAlvo, horasAlvo}){
+  function salvarPlano(state, semanaId, {assuntosAlvo, diasAlvo, horasAlvo, diasDisponiveis, horario, concursosPrioritarios}){
     const existente = obterPlano(state, semanaId);
     if(existente){
       existente.assuntosAlvo = assuntosAlvo;
       existente.diasAlvo = diasAlvo;
       existente.horasAlvo = horasAlvo;
+      existente.diasDisponiveis = diasDisponiveis || [];
+      existente.horario = horario || '';
+      existente.concursosPrioritarios = concursosPrioritarios || [];
       return existente;
     }
-    const novo = { semanaId, assuntosAlvo, diasAlvo, horasAlvo };
+    const novo = { semanaId, assuntosAlvo, diasAlvo, horasAlvo,
+      diasDisponiveis: diasDisponiveis || [], horario: horario || '', concursosPrioritarios: concursosPrioritarios || [],
+      atividadesPorDia: {} };
     state.planejamento.push(novo);
     return novo;
+  }
+
+  const ATIVIDADE_DIA_TIPO_LABEL = { teoria:'Teoria', questoes:'Questões', revisao:'Revisão' };
+
+  function adicionarAtividadeDia(state, semanaId, dataIso, {assunto, tipo, minutos}){
+    let plano = obterPlano(state, semanaId);
+    if(!plano){
+      plano = { semanaId, assuntosAlvo: [], diasAlvo: 0, horasAlvo: 0, diasDisponiveis: [], horario: '', concursosPrioritarios: [], atividadesPorDia: {} };
+      state.planejamento.push(plano);
+    }
+    if(!plano.atividadesPorDia) plano.atividadesPorDia = {};
+    if(!plano.atividadesPorDia[dataIso]) plano.atividadesPorDia[dataIso] = [];
+    const atividade = { id: String(Date.now()) + Math.random().toString(36).slice(2,7), assunto: assunto || null, tipo, minutos: Number(minutos) || 0, concluida: false };
+    plano.atividadesPorDia[dataIso].push(atividade);
+    return atividade;
+  }
+
+  function removerAtividadeDia(state, semanaId, dataIso, atividadeId){
+    const lista = obterPlano(state, semanaId)?.atividadesPorDia?.[dataIso];
+    if(!lista) return false;
+    const idx = lista.findIndex(a => a.id === atividadeId);
+    if(idx === -1) return false;
+    lista.splice(idx, 1);
+    return true;
+  }
+
+  function alternarConcluidaAtividadeDia(state, semanaId, dataIso, atividadeId){
+    const item = obterPlano(state, semanaId)?.atividadesPorDia?.[dataIso]?.find(a => a.id === atividadeId);
+    if(!item) return null;
+    item.concluida = !item.concluida;
+    return item;
   }
 
   function dentroDaSemana(dataIso, semanaId){
@@ -1096,6 +1171,8 @@
   let timerIntervalId = null;
   let sessaoEditando = null;
   const TIPO_LABEL = { questoes:'Questões', teoria:'Teoria', revisao:'Revisão', anki:'Anki' };
+  let semanaVisualizada = null;
+  let atividadeDiaAberta = null;
 
   function renderSidebar(){
     const nav = document.getElementById('sidebar-nav');
@@ -1779,98 +1856,260 @@
       });
     });
   }
+  const DIAS_SEMANA_LABEL = ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'];
+  const DIAS_SEMANA_KEY = ['seg','ter','qua','qui','sex','sab','dom'];
+  let metaAssuntosDraft = null;
+
   function renderPlanejamento(){
-    const semanaId = semanaAtualId();
+    if(semanaVisualizada === null) semanaVisualizada = semanaAtualId();
+    const semanaId = semanaVisualizada;
     const plano = obterPlano(state, semanaId);
     const fimSemana = addDays(semanaId, 6);
+    const hoje = hojeISO();
+    const atividadesPorDia = plano?.atividadesPorDia || {};
+    const assuntosAtuais = metaAssuntosDraft !== null ? metaAssuntosDraft : (plano?.assuntosAlvo || []);
+    const diasAlvoAtual = plano?.diasAlvo ?? 0;
+    const horasAlvoAtual = plano?.horasAlvo ?? 0;
+    const diasDisponiveisAtual = plano?.diasDisponiveis || [];
+    const concursosPrioritariosAtual = plano?.concursosPrioritarios || [];
+    const tocados = assuntosTocadosNaSemana(state, semanaId);
+    const atrasados = plano ? assuntosAtrasadosNaSemana(plano.assuntosAlvo, tocados) : [];
+    const diasFeitos = diasRealizadosNaSemana(state.checkins, state.sessoes, semanaId);
+    const horasFeitas = horasRealizadasNaSemana(state.checkins, state.sessoes, semanaId);
 
-    const DIAS_LABEL = ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'];
-    const grade = DIAS_LABEL.map((label, i) => {
-      const dataIso = addDays(semanaId, i);
-      const c = state.checkins.find(x => x.data === dataIso);
-      const feito = c && c.status !== 'nao';
-      return { label, dataIso, feito, assunto: c?.assunto || null };
-    });
-    const gradeHtml = `
+    const headerHtml = `
       <div class="card">
-        <h3>Semana</h3>
-        <div class="week-grid">
-          ${grade.map(d => `
-            <div class="week-day ${d.feito?'feito':''}">
-              <div class="week-day-label">${d.label}</div>
-              <div class="week-day-date">${d.dataIso.slice(8,10)}</div>
-              <div class="week-day-badge ${d.feito?'ok':''}">${d.feito ? `✓${d.assunto?` ${escapeHtml(d.assunto.slice(0,14))}`:''}` : '—'}</div>
-            </div>`).join('')}
+        <div class="planejamento-header-row">
+          <div class="planejamento-header">
+            <div class="hoje-header-icon">📅</div>
+            <div>
+              <h2>Planejamento</h2>
+              <div class="planejamento-nav">
+                <button class="card-link" id="semana-anterior">‹ Semana anterior</button>
+                <b>Semana de ${semanaId} a ${fimSemana}</b>
+                <button class="card-link" id="semana-proxima">Próxima semana ›</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="resumo-grid planejamento-badges">
+          <div class="card stat-card"><div class="stat-label">Dias planejados</div><div class="stat-value">${diasAlvoAtual}/7</div><div class="stat-icon">📅</div></div>
+          <div class="card stat-card"><div class="stat-label">Horas planejadas</div><div class="stat-value">${horasAlvoAtual}h</div><div class="stat-icon">⏱️</div></div>
+          <div class="card stat-card"><div class="stat-label">Assuntos selecionados</div><div class="stat-value">${assuntosAtuais.length}</div><div class="stat-icon">📚</div></div>
+        </div>
+        <div class="planejamento-progresso">
+          <div class="planejamento-progresso-label"><span>Progresso da semana — dias</span><b>${diasFeitos}/${diasAlvoAtual}</b></div>
+          <div class="progress"><i style="width:${Math.min(100, diasAlvoAtual ? Math.round(diasFeitos/diasAlvoAtual*100) : 0)}%"></i></div>
+          <div class="planejamento-progresso-label"><span>Progresso da semana — horas</span><b>${horasFeitas}h/${horasAlvoAtual}h</b></div>
+          <div class="progress"><i style="width:${Math.min(100, horasAlvoAtual ? Math.round(horasFeitas/horasAlvoAtual*100) : 0)}%"></i></div>
         </div>
       </div>`;
 
-    if(!plano){
+    const diaCardHtml = (label, dataIso) => {
+      const atividades = atividadesPorDia[dataIso] || [];
+      const ehHoje = dataIso === hoje;
       return `
-        <div class="card">
-          <h2>Semana de ${semanaId} a ${fimSemana}</h2>
-          <p class="muted">Nenhuma meta definida ainda.</p>
-        </div>
-        ${gradeHtml}
-        <div class="card">
-          <h3>Definir meta da semana</h3>
-          <label>Assuntos-alvo</label>
-          <select id="semana-assuntos" multiple size="6">
-            ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}">${escapeHtml(c.assunto)}</option>`).join('')}
-          </select>
-          <label>Dias-alvo</label>
-          <input type="number" id="semana-dias" value="5">
-          <label>Horas-alvo</label>
-          <input type="number" id="semana-horas" value="12">
-          <button id="semana-salvar" class="primary">Salvar meta</button>
-        </div>
-      `;
-    }
+        <div class="dia-card ${ehHoje ? 'hoje' : ''}">
+          <div class="dia-card-header">
+            <div class="dia-card-label">${label}</div>
+            <div class="dia-card-date">${dataIso.slice(8,10)}</div>
+          </div>
+          <div class="dia-card-atividades">
+            ${atividades.map(a => `
+              <div class="dia-atividade ${a.concluida?'concluida':''}">
+                <button class="dia-atividade-check" data-toggle-atividade="${a.id}" data-toggle-data="${dataIso}" title="${a.concluida?'Marcar como pendente':'Marcar como concluída'}">${a.concluida?'✓':''}</button>
+                <div class="dia-atividade-info">
+                  <div class="dia-atividade-assunto">${escapeHtml(a.assunto || 'Estudo livre')}</div>
+                  <div class="dia-atividade-meta">${escapeHtml(ATIVIDADE_DIA_TIPO_LABEL[a.tipo] || a.tipo)} · ${a.minutos} min</div>
+                </div>
+                <button class="dia-atividade-remover" data-remover-atividade="${a.id}" data-remover-data="${dataIso}" title="Remover">×</button>
+              </div>`).join('')}
+          </div>
+          <button class="dia-card-add" data-add-atividade="${dataIso}">+ Adicionar</button>
+        </div>`;
+    };
 
-    const diasFeitos = diasRealizadosNaSemana(state.checkins, state.sessoes, semanaId);
-    const horasFeitas = horasRealizadasNaSemana(state.checkins, state.sessoes, semanaId);
-    const tocados = assuntosTocadosNaSemana(state, semanaId);
-    const atrasados = assuntosAtrasadosNaSemana(plano.assuntosAlvo, tocados);
+    const gradeHtml = `
+      <div class="card planejamento-grade">
+        <div class="dia-grid">
+          ${DIAS_SEMANA_LABEL.map((label, i) => diaCardHtml(label, addDays(semanaId, i))).join('')}
+        </div>
+      </div>`;
+
+    const addAtividadeModalHtml = atividadeDiaAberta ? `
+      <div class="modal-backdrop" id="add-atividade-backdrop">
+        <div class="modal-panel" id="add-atividade-form">
+          <h3>Adicionar atividade — ${atividadeDiaAberta.slice(8,10)}/${atividadeDiaAberta.slice(5,7)}</h3>
+          <label>Assunto</label>
+          <div class="combo">
+            <input type="text" id="atividade-assunto-busca" placeholder="Buscar assunto..." autocomplete="off">
+            <input type="hidden" id="atividade-assunto">
+            <div class="combo-results" id="atividade-assunto-resultados"></div>
+          </div>
+          <label>Tipo</label>
+          <select id="atividade-tipo">
+            <option value="teoria">Teoria</option>
+            <option value="questoes">Questões</option>
+            <option value="revisao">Revisão</option>
+          </select>
+          <label>Duração (min)</label>
+          <input type="number" id="atividade-minutos" value="30">
+          <div class="row">
+            <button id="atividade-cancelar">Cancelar</button>
+            <button id="atividade-salvar" class="primary">Adicionar</button>
+          </div>
+        </div>
+      </div>` : '';
+
+    const chipsHtml = assuntosAtuais.map(a => `
+      <span class="chip ${atrasados.includes(a)?'atrasado':''}">${escapeHtml(a)} <button type="button" data-remover-assunto="${escapeHtml(a)}" title="Remover">×</button></span>
+    `).join('');
+
+    const metaFormHtml = `
+      <div class="card">
+        <h3>Definir meta da semana</h3>
+        <small class="muted">Selecione os assuntos e defina sua meta de estudo para esta semana.</small>
+
+        <label>Assuntos-alvo</label>
+        <div class="assunto-chips" id="meta-assuntos-chips">${chipsHtml || '<span class="muted">Nenhum assunto selecionado ainda.</span>'}</div>
+        <div class="combo">
+          <input type="text" id="meta-assunto-busca" placeholder="Adicionar assunto..." autocomplete="off">
+          <input type="hidden" id="meta-assunto-hidden">
+          <div class="combo-results" id="meta-assunto-resultados"></div>
+        </div>
+        <button type="button" id="meta-assunto-adicionar">+ Adicionar assunto</button>
+
+        <div class="row">
+          <div>
+            <label>Dias-alvo</label>
+            <input type="number" id="meta-dias-alvo" value="${diasAlvoAtual}">
+          </div>
+          <div>
+            <label>Horas disponíveis</label>
+            <input type="number" id="meta-horas" value="${horasAlvoAtual}">
+          </div>
+        </div>
+
+        <details class="meta-opcionais">
+          <summary>Mais opções (opcional)</summary>
+          <label>Dias disponíveis</label>
+          <div class="dias-checkbox-row">
+            ${DIAS_SEMANA_KEY.map((k,i) => `<label class="dia-checkbox"><input type="checkbox" id="meta-dia-${k}" ${diasDisponiveisAtual.includes(k)?'checked':''}> ${DIAS_SEMANA_LABEL[i]}</label>`).join('')}
+          </div>
+          <label>Horário (opcional)</label>
+          <input type="text" id="meta-horario" placeholder="ex: 14h - 18h" value="${escapeHtml(plano?.horario || '')}">
+          <label>Concursos prioritários (opcional)</label>
+          <div class="dias-checkbox-row">
+            <label class="dia-checkbox"><input type="checkbox" id="meta-concurso-transpetro" ${concursosPrioritariosAtual.includes('transpetro')?'checked':''}> Transpetro</label>
+            <label class="dia-checkbox"><input type="checkbox" id="meta-concurso-inea" ${concursosPrioritariosAtual.includes('inea')?'checked':''}> INEA</label>
+          </div>
+        </details>
+
+        <button id="semana-salvar" class="primary">Salvar meta</button>
+      </div>`;
+
+    const resumoMetaHtml = `
+      <div class="card">
+        <h3>Resumo da meta</h3>
+        <div class="resumo-meta-item"><span class="stat-icon">📅</span><div><b>${diasAlvoAtual}</b><br><small class="muted">de 7 dias da semana</small></div></div>
+        <div class="resumo-meta-item"><span class="stat-icon">⏱️</span><div><b>${horasAlvoAtual}h</b><br><small class="muted">de estudo na semana</small></div></div>
+        <div class="resumo-meta-item"><span class="stat-icon">📚</span><div><b>${assuntosAtuais.length}</b><br><small class="muted">assuntos-alvo</small></div></div>
+      </div>`;
 
     return `
-      <div class="card">
-        <h2>Semana de ${semanaId} a ${fimSemana}</h2>
-        <p>Dias: ${diasFeitos}/${plano.diasAlvo}</p>
-        <div class="progress"><i style="width:${Math.min(100, plano.diasAlvo ? Math.round(diasFeitos/plano.diasAlvo*100) : 0)}%"></i></div>
-        <p>Horas: ${horasFeitas}h/${plano.horasAlvo}h</p>
-        <div class="progress"><i style="width:${Math.min(100, plano.horasAlvo ? Math.round(horasFeitas/plano.horasAlvo*100) : 0)}%"></i></div>
+      <div class="planejamento-screen">
+        ${headerHtml}
+        ${gradeHtml}
+        <div class="grid-2">
+          ${metaFormHtml}
+          ${resumoMetaHtml}
+        </div>
       </div>
-      ${gradeHtml}
-      <div class="card">
-        <h3>Assuntos-alvo</h3>
-        ${plano.assuntosAlvo.map(a => `<p>${atrasados.includes(a) ? '⏳' : '✅'} ${escapeHtml(a)}</p>`).join('')}
-      </div>
-      <div class="card">
-        <details>
-          <summary>Editar meta</summary>
-          <label>Assuntos-alvo</label>
-          <select id="semana-assuntos" multiple size="6">
-            ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}" ${plano.assuntosAlvo.includes(c.assunto)?'selected':''}>${escapeHtml(c.assunto)}</option>`).join('')}
-          </select>
-          <label>Dias-alvo</label>
-          <input type="number" id="semana-dias" value="${plano.diasAlvo}">
-          <label>Horas-alvo</label>
-          <input type="number" id="semana-horas" value="${plano.horasAlvo}">
-          <button id="semana-salvar" class="primary">Salvar meta</button>
-        </details>
-      </div>
+      ${addAtividadeModalHtml}
     `;
   }
 
   function attachPlanejamentoHandlers(){
-    const salvar = document.getElementById('semana-salvar');
-    if(!salvar) return;
-    salvar.addEventListener('click', () => {
-      const assuntosAlvo = [...document.getElementById('semana-assuntos').selectedOptions].map(o => o.value);
-      const diasAlvo = Number(document.getElementById('semana-dias').value) || 0;
-      const horasAlvo = Number(document.getElementById('semana-horas').value) || 0;
-      salvarPlano(state, semanaAtualId(), { assuntosAlvo, diasAlvo, horasAlvo });
-      saveState(state);
+    document.getElementById('semana-anterior')?.addEventListener('click', () => {
+      semanaVisualizada = addDays(semanaVisualizada, -7);
+      metaAssuntosDraft = null;
       render();
+    });
+    document.getElementById('semana-proxima')?.addEventListener('click', () => {
+      semanaVisualizada = addDays(semanaVisualizada, 7);
+      metaAssuntosDraft = null;
+      render();
+    });
+
+    document.querySelectorAll('[data-remover-assunto]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plano = obterPlano(state, semanaVisualizada);
+        if(metaAssuntosDraft === null) metaAssuntosDraft = [...(plano?.assuntosAlvo || [])];
+        metaAssuntosDraft = metaAssuntosDraft.filter(a => a !== btn.dataset.removerAssunto);
+        render();
+      });
+    });
+    attachComboBusca('meta-assunto-busca', 'meta-assunto-hidden', 'meta-assunto-resultados');
+    document.getElementById('meta-assunto-adicionar')?.addEventListener('click', () => {
+      const assunto = resolverAssuntoBusca('meta-assunto-busca', 'meta-assunto-hidden');
+      if(!assunto) return;
+      const plano = obterPlano(state, semanaVisualizada);
+      if(metaAssuntosDraft === null) metaAssuntosDraft = [...(plano?.assuntosAlvo || [])];
+      if(!metaAssuntosDraft.includes(assunto)) metaAssuntosDraft.push(assunto);
+      render();
+    });
+
+    document.getElementById('semana-salvar')?.addEventListener('click', () => {
+      const plano = obterPlano(state, semanaVisualizada);
+      const assuntosAlvo = metaAssuntosDraft !== null ? metaAssuntosDraft : (plano?.assuntosAlvo || []);
+      const diasAlvo = Number(document.getElementById('meta-dias-alvo').value) || 0;
+      const horasAlvo = Number(document.getElementById('meta-horas').value) || 0;
+      const diasDisponiveis = DIAS_SEMANA_KEY.filter(k => document.getElementById(`meta-dia-${k}`)?.checked);
+      const horario = document.getElementById('meta-horario').value.trim();
+      const concursosPrioritarios = ['transpetro','inea'].filter(c => document.getElementById(`meta-concurso-${c}`)?.checked);
+      salvarPlano(state, semanaVisualizada, { assuntosAlvo, diasAlvo, horasAlvo, diasDisponiveis, horario, concursosPrioritarios });
+      saveState(state);
+      metaAssuntosDraft = null;
+      render();
+    });
+
+    document.querySelectorAll('[data-add-atividade]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        atividadeDiaAberta = btn.dataset.addAtividade;
+        render();
+      });
+    });
+    document.getElementById('atividade-cancelar')?.addEventListener('click', () => {
+      atividadeDiaAberta = null;
+      render();
+    });
+    document.getElementById('add-atividade-backdrop')?.addEventListener('click', (e) => {
+      if(e.target.id === 'add-atividade-backdrop'){ atividadeDiaAberta = null; render(); }
+    });
+    attachComboBusca('atividade-assunto-busca', 'atividade-assunto', 'atividade-assunto-resultados');
+    document.getElementById('atividade-salvar')?.addEventListener('click', () => {
+      const assunto = resolverAssuntoBusca('atividade-assunto-busca', 'atividade-assunto');
+      const tipo = document.getElementById('atividade-tipo').value;
+      const minutos = Number(document.getElementById('atividade-minutos').value) || 0;
+      adicionarAtividadeDia(state, semanaVisualizada, atividadeDiaAberta, { assunto, tipo, minutos });
+      saveState(state);
+      atividadeDiaAberta = null;
+      render();
+    });
+
+    document.querySelectorAll('[data-toggle-atividade]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        alternarConcluidaAtividadeDia(state, semanaVisualizada, btn.dataset.toggleData, btn.dataset.toggleAtividade);
+        saveState(state);
+        render();
+      });
+    });
+    document.querySelectorAll('[data-remover-atividade]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        removerAtividadeDia(state, semanaVisualizada, btn.dataset.removerData, btn.dataset.removerAtividade);
+        saveState(state);
+        render();
+      });
     });
   }
   function renderDesempenho(){
