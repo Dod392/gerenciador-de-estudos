@@ -20,6 +20,7 @@
     --tap:48px;
     --hoje-border:#374151; --hoje-shadow-card:0 4px 12px rgba(0,0,0,.4); --hoje-text-secondary:#b0b9c6;
     --status-not-started:#6b7280; --status-in-progress:#f59e0b; --status-review:#a855f7; --status-completed:#10b981;
+    --status-pending:#f59e0b; --status-reviewed:#10b981; --status-high-priority:#ef4444;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
@@ -183,6 +184,52 @@
   .mapa-card-concursos{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
   .mapa-concurso-badge{background:rgba(79,157,222,.18);color:var(--accent);border:none;}
   .mapa-card-pct{position:absolute;bottom:var(--space-3);right:var(--space-3);font-size:var(--text-xs);color:var(--muted);}
+
+  /* === ERROS (redesign) === */
+  .erros-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3);}
+  .erros-header-actions{display:flex;gap:var(--space-2);flex-wrap:wrap;flex:0 1 420px;}
+  .erros-header-actions input{margin:0;flex:1 1 220px;}
+  .erros-header-actions button{width:auto;min-height:44px;margin:0;padding:0 16px;flex:0 0 auto;white-space:nowrap;}
+  .erros-assunto-select{width:auto;min-height:32px;margin:0;padding:0 10px;font-size:var(--text-xs);flex:0 0 auto;margin-left:auto;}
+  .erros-stat-delta{font-size:10px;color:var(--muted);margin-top:2px;}
+  .erros-stat-delta.positivo{color:var(--ok);}
+  .erros-stat-delta.negativo{color:var(--bad);}
+
+  .erros-lista{display:flex;flex-direction:column;gap:var(--space-3);}
+  .erro-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .erro-card-header{display:flex;align-items:flex-start;gap:var(--space-3);padding:var(--space-3);cursor:pointer;}
+  .erro-card-titulo{flex:1 1 200px;min-width:0;}
+  .erro-card-assunto-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .erro-card-preview{font-size:var(--text-sm);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .erro-card.expandido .erro-card-preview{display:none;}
+  .erro-card-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:0 0 auto;}
+  .erro-prioridade-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:var(--text-xs);font-weight:600;white-space:nowrap;}
+  .erro-prioridade-badge.prioridade-alta{background:var(--status-high-priority);color:#fff;}
+  .erro-prioridade-badge.prioridade-media{background:var(--status-pending);color:#1a1206;}
+  .erro-prioridade-badge.prioridade-baixa{background:var(--border);color:var(--muted);}
+  .erro-card-data{font-size:var(--text-xs);color:var(--muted);white-space:nowrap;}
+  .erro-card-chevron{width:auto;min-height:auto;padding:2px 6px;margin:0;background:transparent;border:none;color:var(--muted);flex:0 0 auto;}
+
+  .erro-card-body{display:grid;grid-template-columns:1fr;gap:var(--space-3);padding:0 var(--space-3) var(--space-3);}
+  @media(min-width:700px){.erro-card-body{grid-template-columns:1fr 1fr;}}
+  .erro-card-col-titulo{font-size:var(--text-sm);font-weight:600;margin-bottom:4px;}
+  .erro-col-bad{color:var(--bad);}
+  .erro-col-ok{color:var(--ok);}
+  .erro-card-footer{display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);flex-wrap:wrap;
+    padding:var(--space-2) var(--space-3);border-top:1px solid var(--border);}
+  .erro-card-footer-info{font-size:var(--text-xs);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .erro-card-footer-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .erro-card-footer-actions button{width:auto;min-height:36px;margin:0;padding:0 14px;font-size:var(--text-sm);}
+  .erro-menu-wrap{position:relative;}
+  .erro-menu-wrap>button{min-height:36px;min-width:36px;padding:0;}
+  .erro-menu-dropdown{position:absolute;right:0;top:calc(100% + 4px);background:var(--card);border:1px solid var(--border);
+    border-radius:var(--radius-sm);box-shadow:var(--shadow);z-index:5;min-width:120px;}
+  .erro-menu-dropdown button{width:100%;margin:0;border:none;border-radius:0;}
+
+  .erros-dica{padding:var(--space-2) 0;border-bottom:1px solid var(--border);}
+  .erros-dica:last-child{border-bottom:none;}
+  .erros-dica b{font-size:var(--text-sm);}
+  .erros-dica p{margin:2px 0 0;font-size:var(--text-xs);}
 
   /* === HOJE (redesign) === */
   .hoje-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3);flex-wrap:wrap;}
@@ -522,13 +569,15 @@
   const GRAU_DIAS = { deficiencia:1, erro_novo:2, reforcado:7, corrigido:21 };
   const GRAU_LABEL = { deficiencia:'deficiência confirmada', erro_novo:'erro novo', reforcado:'reforçado', corrigido:'corrigido' };
 
-  function criarErro(state, {assunto, oQueErrei, regraCorreta}){
+  function criarErro(state, {assunto, oQueErrei, regraCorreta, origemQuestao}){
     const hoje = hojeISO();
     const erro = {
       id: String(Date.now()) + Math.random().toString(36).slice(2,7),
       assunto, oQueErrei, regraCorreta,
+      origemQuestao: !!origemQuestao,
       grau: 'erro_novo',
       proximaRevisao: addDays(hoje, GRAU_DIAS.erro_novo),
+      ultimaRevisao: null,
       criadoEm: hoje,
     };
     state.erros.push(erro);
@@ -540,13 +589,76 @@
     const novoGrau = i < GRAU_ORDEM.length - 1 ? GRAU_ORDEM[i+1] : erro.grau;
     erro.grau = novoGrau;
     erro.proximaRevisao = addDays(hojeISO(), GRAU_DIAS[novoGrau]);
+    erro.ultimaRevisao = hojeISO();
     return erro;
   }
 
   function graduarErro(erro){
     erro.grau = 'deficiencia';
     erro.proximaRevisao = addDays(hojeISO(), GRAU_DIAS.deficiencia);
+    erro.ultimaRevisao = hojeISO();
     return erro;
+  }
+
+  function atualizarErro(state, id, dados){
+    const erro = state.erros.find(e => e.id === id);
+    if(!erro) return null;
+    erro.assunto = dados.assunto;
+    erro.oQueErrei = dados.oQueErrei;
+    erro.regraCorreta = dados.regraCorreta;
+    erro.origemQuestao = !!dados.origemQuestao;
+    return erro;
+  }
+
+  function excluirErro(state, id){
+    const idx = state.erros.findIndex(e => e.id === id);
+    if(idx === -1) return false;
+    state.erros.splice(idx, 1);
+    return true;
+  }
+
+  function categoriaPorAssunto(nome){
+    const n = nome.toLowerCase();
+    if(n.includes('resolução') || n.includes('resolucao') || n.includes('conama') || n.includes('nbr')) return 'Resolução';
+    if(n.includes('lei') || n.includes('lc ') || n.includes('pn') || n.includes('constituição') || n.includes('constituicao')) return 'Legislação';
+    return 'Geral';
+  }
+
+  const PRIORIDADE_POR_GRAU = { deficiencia:'alta', erro_novo:'media', reforcado:'baixa', corrigido:'baixa' };
+  const PRIORIDADE_LABEL = { alta:'Alta prioridade', media:'Média prioridade', baixa:'Baixa prioridade' };
+  function prioridadeErro(erro){
+    return PRIORIDADE_POR_GRAU[erro.grau] || 'baixa';
+  }
+
+  function filtrarErros(erros, { filtro, assunto, busca, hojeIso }){
+    return erros.filter(e => {
+      if(filtro === 'pendentes' && e.proximaRevisao > hojeIso) return false;
+      if(filtro === 'revisados' && !e.ultimaRevisao) return false;
+      if(filtro === 'alta_prioridade' && prioridadeErro(e) !== 'alta') return false;
+      if(assunto && assunto !== 'todos' && e.assunto !== assunto) return false;
+      if(busca){
+        const termo = busca.toLowerCase();
+        if(!e.assunto.toLowerCase().includes(termo) && !e.oQueErrei.toLowerCase().includes(termo)) return false;
+      }
+      return true;
+    });
+  }
+
+  function statsErros(erros, hojeIso){
+    const total = erros.length;
+    const pendentes = erros.filter(e => e.proximaRevisao <= hojeIso).length;
+    const seteDiasAtras = addDays(hojeIso, -7);
+    const catorzeDiasAtras = addDays(hojeIso, -14);
+    const criadosUltimos7Dias = erros.filter(e => e.criadoEm >= seteDiasAtras).length;
+    const revisadosEstaSemana = erros.filter(e => e.ultimaRevisao && e.ultimaRevisao >= seteDiasAtras).length;
+    const revisadosSemanaAnterior = erros.filter(e => e.ultimaRevisao && e.ultimaRevisao >= catorzeDiasAtras && e.ultimaRevisao < seteDiasAtras).length;
+    const revisoesHoje = erros.filter(e => e.ultimaRevisao === hojeIso).length;
+    const taxaRevisao = total ? Math.round((erros.filter(e => e.ultimaRevisao).length / total) * 100) : 0;
+    const porAssunto = {};
+    erros.forEach(e => { porAssunto[e.assunto] = (porAssunto[e.assunto]||0) + 1; });
+    let assuntoMaisFrequente = null, maxCount = 0;
+    Object.entries(porAssunto).forEach(([nome, count]) => { if(count > maxCount){ maxCount = count; assuntoMaisFrequente = nome; } });
+    return { total, pendentes, criadosUltimos7Dias, revisadosEstaSemana, deltaRevisados: revisadosEstaSemana - revisadosSemanaAnterior, revisoesHoje, taxaRevisao, assuntoMaisFrequente, assuntoMaisFrequenteCount: maxCount };
   }
 
   function ordenarErrosPorRevisao(erros){
@@ -557,19 +669,6 @@
     return ordenarErrosPorRevisao(erros.filter(e => e.proximaRevisao <= hojeIso));
   }
 
-  function cardErro(e){
-    const atrasado = e.proximaRevisao <= hojeISO();
-    return `
-      <div class="card" data-erro-id="${e.id}">
-        <b>${escapeHtml(e.assunto)}</b>
-        <span class="badge ${atrasado?'atrasado':''}">${GRAU_LABEL[e.grau]} — próx. ${e.proximaRevisao}</span>
-        <p><small class="muted">${escapeHtml(e.oQueErrei)}</small></p>
-        <div class="row">
-          <button class="ok" data-acertei="${e.id}">Acertei</button>
-          <button class="bad" data-errei="${e.id}">Errei</button>
-        </div>
-      </div>`;
-  }
   /* === MAPA (Tarefa 6) === */
   const STATUS_CONTEUDO_ORDEM = ['nao_iniciado','estudado','revisado','dominado'];
   const STATUS_CONTEUDO_LABEL = { nao_iniciado:'Não iniciado', estudado:'Em andamento', revisado:'Revisão', dominado:'Concluído' };
@@ -1395,6 +1494,13 @@
   let mapaBusca = '';
   let mapaAssuntoAberto = false;
   let mapaConcursoAberto = false;
+  let errosFiltro = 'todos';
+  let errosFiltroAssunto = 'todos';
+  let errosBusca = '';
+  const errosExpandidos = new Set();
+  const errosRevisando = new Set();
+  let erroModalAberto = null; // { modo: 'novo' } | { modo: 'editar', id }
+  let erroMenuAberto = null;
 
   function renderPreservandoFoco(){
     const ativo = document.activeElement;
@@ -2100,43 +2206,216 @@
     el.textContent = q ? `Erros: ${calcularErros(q,a)} · Aproveitamento: ${calcularAproveitamento(q,a)}%` : 'Preencha questões pra calcular';
   }
   function renderErros(){
-    const lista = ordenarErrosPorRevisao(state.erros);
-    return `
+    const hojeIso = hojeISO();
+    const stats = statsErros(state.erros, hojeIso);
+    const listaFiltrada = ordenarErrosPorRevisao(filtrarErros(state.erros, { filtro: errosFiltro, assunto: errosFiltroAssunto, busca: errosBusca, hojeIso }));
+    const assuntosComErro = [...new Set(state.erros.map(e => e.assunto))].sort();
+
+    const headerHtml = `
       <div class="card">
-        <h2>Caderno de Erros</h2>
-        <details>
-          <summary>+ novo item</summary>
-          <label>Assunto</label>
-          <select id="erro-assunto">${state.conteudo.map(c=>`<option value="${escapeHtml(c.assunto)}">${escapeHtml(c.assunto)}</option>`).join('')}</select>
-          <label>O que errei</label>
-          <textarea id="erro-oque"></textarea>
-          <label>Regra correta</label>
-          <textarea id="erro-regra"></textarea>
-          <button id="erro-salvar" class="primary">Adicionar</button>
-        </details>
-      </div>
-      <div class="card-grid">${lista.map(cardErro).join('') || '<p class="muted">Nenhum item ainda.</p>'}</div>
-    `;
+        <div class="erros-header-row">
+          <div class="planejamento-header">
+            <div class="hoje-header-icon">📓</div>
+            <div>
+              <h2>Caderno de Erros</h2>
+              <small class="muted">Registre seus erros, revise as regras corretas e acompanhe os assuntos que mais derrubam seu desempenho.</small>
+            </div>
+          </div>
+          <div class="erros-header-actions">
+            <input type="text" id="erros-busca-input" placeholder="Buscar erro ou assunto..." value="${escapeHtml(errosBusca)}">
+            <button class="primary" id="erros-novo-btn">+ Novo erro</button>
+          </div>
+        </div>
+
+        <div class="mapa-filtros-row">
+          <div class="mapa-filtros-botoes">
+            <button class="mapa-filtro-btn ${errosFiltro==='todos'?'active':''}" data-erros-filtro="todos">Todos</button>
+            <button class="mapa-filtro-btn ${errosFiltro==='pendentes'?'active':''}" data-erros-filtro="pendentes"><i class="mapa-dot" style="color:var(--status-pending)"></i>Pendentes</button>
+            <button class="mapa-filtro-btn ${errosFiltro==='revisados'?'active':''}" data-erros-filtro="revisados"><i class="mapa-dot" style="color:var(--status-reviewed)"></i>Revisados</button>
+            <button class="mapa-filtro-btn ${errosFiltro==='alta_prioridade'?'active':''}" data-erros-filtro="alta_prioridade"><i class="mapa-dot" style="color:var(--status-high-priority)"></i>Alta prioridade</button>
+          </div>
+          <select id="erros-assunto-select" class="erros-assunto-select">
+            <option value="todos">Todos os assuntos</option>
+            ${assuntosComErro.map(a => `<option value="${escapeHtml(a)}" ${errosFiltroAssunto===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="kpi-grid mapa-resumo-grid">
+          <div class="card stat-card">
+            <div class="stat-label">Total de erros</div>
+            <div class="stat-value">${stats.total}</div>
+            <div class="stat-icon">📚</div>
+            ${stats.criadosUltimos7Dias ? `<div class="erros-stat-delta positivo">+${stats.criadosUltimos7Dias} desde a semana passada</div>` : ''}
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Pendentes de revisão</div>
+            <div class="stat-value">${stats.pendentes}</div>
+            <div class="stat-icon" style="color:var(--status-pending)">⏱️</div>
+            <div class="erros-stat-delta">${stats.total ? Math.round(stats.pendentes/stats.total*100) : 0}% do total</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Revisados esta semana</div>
+            <div class="stat-value">${stats.revisadosEstaSemana}</div>
+            <div class="stat-icon" style="color:var(--status-reviewed)">✅</div>
+            ${stats.deltaRevisados ? `<div class="erros-stat-delta ${stats.deltaRevisados>0?'positivo':'negativo'}">${stats.deltaRevisados>0?'+':''}${stats.deltaRevisados} desde a semana passada</div>` : ''}
+          </div>
+          <div class="card stat-card">
+            <div class="stat-label">Assunto mais crítico</div>
+            <div class="stat-value" style="font-size:var(--text-lg);">${stats.assuntoMaisFrequente ? escapeHtml(stats.assuntoMaisFrequente) : '—'}</div>
+            <div class="stat-icon">⚠️</div>
+            ${stats.assuntoMaisFrequente ? `<div class="erros-stat-delta">${stats.assuntoMaisFrequenteCount} erro${stats.assuntoMaisFrequenteCount===1?'':'s'} registrado${stats.assuntoMaisFrequenteCount===1?'':'s'}</div>` : ''}
+          </div>
+        </div>
+      </div>`;
+
+    const cardHtml = (e) => {
+      const expandido = errosExpandidos.has(e.id);
+      const revisando = errosRevisando.has(e.id);
+      const prioridade = prioridadeErro(e);
+      const categoria = categoriaPorAssunto(e.assunto);
+      const atrasado = e.proximaRevisao <= hojeIso;
+      return `
+        <div class="erro-card ${expandido?'expandido':''}">
+          <div class="erro-card-header" data-toggle-erro="${e.id}">
+            <div class="item-icon tipo-teoria">${iconePorAssunto(e.assunto)}</div>
+            <div class="erro-card-titulo">
+              <div class="erro-card-assunto-row">
+                <b>${escapeHtml(e.assunto)}</b>
+                <span class="badge">${escapeHtml(categoria)}</span>
+              </div>
+              <div class="erro-card-preview muted">${escapeHtml(e.oQueErrei.length > 90 ? e.oQueErrei.slice(0,90)+'…' : e.oQueErrei)}</div>
+            </div>
+            <div class="erro-card-meta">
+              <span class="erro-prioridade-badge prioridade-${prioridade}">${PRIORIDADE_LABEL[prioridade]}</span>
+              <span class="erro-card-data">📅 ${atrasado?'Atrasada':'Próxima'} ${e.proximaRevisao}</span>
+            </div>
+            <button class="erro-card-chevron" aria-label="Expandir">${expandido?'▲':'▼'}</button>
+          </div>
+          ${expandido ? `
+            <div class="erro-card-body">
+              <div class="erro-card-col">
+                <div class="erro-card-col-titulo erro-col-bad">✗ O que errei</div>
+                <p class="muted">${escapeHtml(e.oQueErrei)}</p>
+              </div>
+              <div class="erro-card-col">
+                <div class="erro-card-col-titulo erro-col-ok">✓ Regra correta</div>
+                <p class="muted">${escapeHtml(e.regraCorreta)}</p>
+              </div>
+            </div>
+            <div class="erro-card-footer">
+              <div class="erro-card-footer-info muted">
+                Registrado em ${escapeHtml(e.criadoEm)}
+                ${e.origemQuestao ? '<span class="badge">Questão de prova</span>' : ''}
+              </div>
+              <div class="erro-card-footer-actions">
+                ${revisando ? `
+                  <button class="ok" data-acertei="${e.id}">✓ Acertei</button>
+                  <button class="bad" data-errei="${e.id}">✗ Errei</button>
+                ` : `<button class="primary" data-revisar-agora="${e.id}">Revisar agora</button>`}
+                <button data-editar-erro="${e.id}">Editar</button>
+                <div class="erro-menu-wrap">
+                  <button data-erro-menu="${e.id}">⋯</button>
+                  ${erroMenuAberto === e.id ? `<div class="erro-menu-dropdown"><button class="bad" data-excluir-erro="${e.id}">Excluir</button></div>` : ''}
+                </div>
+              </div>
+            </div>
+          ` : ''}
+        </div>`;
+    };
+
+    const listaHtml = `
+      <div class="erros-lista">
+        ${listaFiltrada.length ? listaFiltrada.map(cardHtml).join('') : `<div class="card"><div class="empty-state"><div class="empty-state-icon">🔍</div><p class="muted">Nenhum erro encontrado com esses filtros.</p></div></div>`}
+        <button class="add-activity-row" id="erros-novo-rodape">+ Adicionar novo erro</button>
+        <p class="muted" style="text-align:center;font-size:var(--text-sm);margin-top:-8px;">Registre um erro para acompanhar e não repetir mais.</p>
+      </div>`;
+
+    const sidebarHtml = `
+      <div>
+        <div class="card">
+          <h3><span class="section-icon">🔗</span>Resumo rápido</h3>
+          <div class="resumo-meta-item"><div><b>${stats.pendentes}</b><br><small class="muted">Total pendentes</small></div></div>
+          <div class="resumo-meta-item"><div><b>${stats.revisoesHoje}</b><br><small class="muted">Revisões hoje</small></div></div>
+          <div class="resumo-meta-item"><div><b>${stats.revisadosEstaSemana}</b><br><small class="muted">Revisados esta semana</small></div></div>
+          <div class="resumo-meta-item"><div><b>${stats.taxaRevisao}%</b><br><small class="muted">Taxa de revisão</small></div></div>
+          ${stats.assuntoMaisFrequente ? `<div class="resumo-meta-item"><div><b>${escapeHtml(stats.assuntoMaisFrequente)}</b><br><small class="muted">Assunto mais frequente — ${stats.assuntoMaisFrequenteCount} erros</small></div></div>` : ''}
+        </div>
+        <div class="card">
+          <h3><span class="section-icon">🎓</span>Como registrar um bom erro</h3>
+          <div class="erros-dica"><b>Seja específico</b><p class="muted">Descreva exatamente o que errou e onde teve dúvida.</p></div>
+          <div class="erros-dica"><b>Explique o porquê</b><p class="muted">Entenda e registre a regra correta com suas próprias palavras.</p></div>
+          <div class="erros-dica"><b>Revise com espaçamento</b><p class="muted">Agende revisões para fixar e evitar repetir o erro.</p></div>
+          <div class="erros-dica"><b>Foque no aprendizado</b><p class="muted">Use os erros como oportunidade de evolução constante.</p></div>
+        </div>
+      </div>`;
+
+    const erroModalHtml = erroModalAberto ? (() => {
+      const editando = erroModalAberto.modo === 'editar';
+      const erro = editando ? state.erros.find(e => e.id === erroModalAberto.id) : null;
+      return `
+        <div class="modal-backdrop" id="erro-modal-backdrop">
+          <div class="modal-panel">
+            <h3>${editando ? 'Editar erro' : 'Novo erro'}</h3>
+            <label>Assunto</label>
+            <select id="erro-form-assunto">
+              ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}" ${(erro?.assunto||'')===c.assunto?'selected':''}>${escapeHtml(c.assunto)}</option>`).join('')}
+            </select>
+            <label>O que errei</label>
+            <textarea id="erro-form-oque">${editando ? escapeHtml(erro.oQueErrei) : ''}</textarea>
+            <label>Regra correta</label>
+            <textarea id="erro-form-regra">${editando ? escapeHtml(erro.regraCorreta) : ''}</textarea>
+            <label style="display:flex;align-items:center;min-height:44px;gap:8px;">
+              <input type="checkbox" id="erro-form-questao" style="width:auto;min-height:auto;flex-shrink:0;" ${erro?.origemQuestao?'checked':''}>
+              Veio de uma questão de prova
+            </label>
+            <div class="row">
+              <button id="erro-form-cancelar">Cancelar</button>
+              <button class="primary" id="erro-form-salvar">${editando ? 'Salvar alterações' : 'Adicionar'}</button>
+            </div>
+          </div>
+        </div>`;
+    })() : '';
+
+    return `<div class="erros-screen">${headerHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}</div>`;
   }
 
   function attachErrosHandlers(){
     const app = document.getElementById('app');
-    const salvar = document.getElementById('erro-salvar');
-    if(salvar){
-      salvar.addEventListener('click', () => {
-        const assunto = document.getElementById('erro-assunto').value;
-        const oQueErrei = document.getElementById('erro-oque').value.trim();
-        const regraCorreta = document.getElementById('erro-regra').value.trim();
-        if(!oQueErrei || !regraCorreta) return;
-        criarErro(state, {assunto, oQueErrei, regraCorreta});
-        saveState(state);
-        render();
+
+    document.querySelectorAll('[data-erros-filtro]').forEach(btn => {
+      btn.addEventListener('click', () => { errosFiltro = btn.dataset.errosFiltro; render(); });
+    });
+    document.getElementById('erros-assunto-select')?.addEventListener('change', (e) => {
+      errosFiltroAssunto = e.target.value;
+      render();
+    });
+    const buscaInput = document.getElementById('erros-busca-input');
+    if(buscaInput){
+      buscaInput.addEventListener('input', () => {
+        errosBusca = buscaInput.value;
+        renderPreservandoFoco();
       });
     }
+
+    document.querySelectorAll('[data-toggle-erro]').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.toggleErro;
+        if(errosExpandidos.has(id)) errosExpandidos.delete(id); else errosExpandidos.add(id);
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-revisar-agora]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        errosRevisando.add(btn.dataset.revisarAgora);
+        render();
+      });
+    });
     app.querySelectorAll('button[data-acertei]').forEach(btn => {
       btn.addEventListener('click', () => {
         const e = state.erros.find(x => x.id === btn.dataset.acertei);
-        graduarAcerto(e);
+        if(e) graduarAcerto(e);
+        errosRevisando.delete(btn.dataset.acertei);
         saveState(state);
         render();
       });
@@ -2144,10 +2423,64 @@
     app.querySelectorAll('button[data-errei]').forEach(btn => {
       btn.addEventListener('click', () => {
         const e = state.erros.find(x => x.id === btn.dataset.errei);
-        graduarErro(e);
+        if(e) graduarErro(e);
+        errosRevisando.delete(btn.dataset.errei);
         saveState(state);
         render();
       });
+    });
+
+    document.querySelectorAll('[data-editar-erro]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        erroModalAberto = { modo:'editar', id: btn.dataset.editarErro };
+        render();
+      });
+    });
+    document.querySelectorAll('[data-erro-menu]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        erroMenuAberto = erroMenuAberto === btn.dataset.erroMenu ? null : btn.dataset.erroMenu;
+        render();
+      });
+    });
+    document.querySelectorAll('[data-excluir-erro]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if(!confirm('Excluir este erro registrado? Essa ação não pode ser desfeita.')) return;
+        excluirErro(state, btn.dataset.excluirErro);
+        erroMenuAberto = null;
+        saveState(state);
+        render();
+      });
+    });
+
+    document.getElementById('erros-novo-btn')?.addEventListener('click', () => {
+      erroModalAberto = { modo:'novo' };
+      render();
+    });
+    document.getElementById('erros-novo-rodape')?.addEventListener('click', () => {
+      erroModalAberto = { modo:'novo' };
+      render();
+    });
+    document.getElementById('erro-form-cancelar')?.addEventListener('click', () => {
+      erroModalAberto = null;
+      render();
+    });
+    document.getElementById('erro-modal-backdrop')?.addEventListener('click', (e) => {
+      if(e.target.id === 'erro-modal-backdrop'){ erroModalAberto = null; render(); }
+    });
+    document.getElementById('erro-form-salvar')?.addEventListener('click', () => {
+      const assunto = document.getElementById('erro-form-assunto').value;
+      const oQueErrei = document.getElementById('erro-form-oque').value.trim();
+      const regraCorreta = document.getElementById('erro-form-regra').value.trim();
+      const origemQuestao = document.getElementById('erro-form-questao').checked;
+      if(!oQueErrei || !regraCorreta){ alert('Preencha "o que errei" e a "regra correta".'); return; }
+      if(erroModalAberto.modo === 'editar'){
+        atualizarErro(state, erroModalAberto.id, { assunto, oQueErrei, regraCorreta, origemQuestao });
+      } else {
+        criarErro(state, { assunto, oQueErrei, regraCorreta, origemQuestao });
+      }
+      saveState(state);
+      erroModalAberto = null;
+      render();
     });
   }
   const DIAS_SEMANA_LABEL = ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'];
