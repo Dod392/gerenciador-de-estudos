@@ -116,6 +116,9 @@
   .dia-card-label{font-size:var(--text-xs);color:var(--muted);font-weight:650;}
   .dia-card-date{font-size:var(--text-sm);font-weight:650;}
   .dia-card-total{font-size:10px;color:var(--muted);}
+  .dia-card-meta-row{margin:2px 0;}
+  .dia-card-meta-input{width:100%;min-height:26px;height:26px;padding:0 6px;font-size:10px;
+    border-radius:6px;text-align:center;}
   .dia-card-atividades{display:flex;flex-direction:column;gap:4px;flex:1;}
   .dia-atividade{display:flex;align-items:flex-start;gap:4px;background:var(--card);border-radius:var(--radius-sm);padding:4px;}
   .dia-atividade.concluida .dia-atividade-assunto{text-decoration:line-through;color:var(--muted);}
@@ -1274,6 +1277,8 @@
   }
   function planejadoMinutosHoje(plano, hojeIso){
     if(!plano) return 150;
+    const metaDireta = plano.metaMinutosPorDia?.[hojeIso];
+    if(metaDireta) return metaDireta;
     const atividadesHoje = plano.atividadesPorDia?.[hojeIso];
     if(atividadesHoje && atividadesHoje.length){
       return atividadesHoje.reduce((s,a) => s + (a.minutos||0), 0);
@@ -1290,6 +1295,18 @@
     if(!item) return null;
     item.concluida = true;
     return item;
+  }
+  function definirMetaMinutosDia(state, semanaId, dataIso, minutos){
+    let plano = obterPlano(state, semanaId);
+    if(!plano){
+      plano = { semanaId, assuntosAlvo: [], diasAlvo: 0, horasAlvo: 0, diasDisponiveis: [], horario: '', concursosPrioritarios: [], atividadesPorDia: {}, metaMinutosPorDia: {} };
+      state.planejamento.push(plano);
+    }
+    if(!plano.metaMinutosPorDia) plano.metaMinutosPorDia = {};
+    const min = Number(minutos) || 0;
+    if(min > 0) plano.metaMinutosPorDia[dataIso] = min;
+    else delete plano.metaMinutosPorDia[dataIso];
+    return plano.metaMinutosPorDia[dataIso] ?? null;
   }
   function proximaAtividadeDoDia(atividades, filaErros){
     const atrasada = atividades.find(a => a.estado === 'atrasada');
@@ -1948,17 +1965,22 @@
         </div>
       </div>`;
 
+    const metaMinutosPorDia = plano?.metaMinutosPorDia || {};
     const diaCardHtml = (label, dataIso) => {
       const atividades = atividadesPorDia[dataIso] || [];
       const ehHoje = dataIso === hoje;
       const totalMin = atividades.reduce((s,a) => s + (a.minutos||0), 0);
+      const metaDia = metaMinutosPorDia[dataIso] ?? '';
       return `
         <div class="dia-card ${ehHoje ? 'hoje' : ''}">
           <div class="dia-card-header">
             <div class="dia-card-label">${label}</div>
             <div class="dia-card-date">${dataIso.slice(8,10)}</div>
-            ${totalMin ? `<div class="dia-card-total">${totalMin} min</div>` : ''}
           </div>
+          <div class="dia-card-meta-row">
+            <input type="number" class="dia-card-meta-input" data-meta-dia="${dataIso}" placeholder="meta min" value="${metaDia}" title="Meta de minutos pra este dia">
+          </div>
+          ${totalMin ? `<div class="dia-card-total">${totalMin} min planejados</div>` : ''}
           <div class="dia-card-atividades">
             ${atividades.map(a => `
               <div class="dia-atividade ${a.concluida?'concluida':''}">
@@ -2152,6 +2174,13 @@
     document.querySelectorAll('[data-remover-atividade]').forEach(btn => {
       btn.addEventListener('click', () => {
         removerAtividadeDia(state, semanaVisualizada, btn.dataset.removerData, btn.dataset.removerAtividade);
+        saveState(state);
+        render();
+      });
+    });
+    document.querySelectorAll('[data-meta-dia]').forEach(input => {
+      input.addEventListener('change', () => {
+        definirMetaMinutosDia(state, semanaVisualizada, input.dataset.metaDia, input.value);
         saveState(state);
         render();
       });
