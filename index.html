@@ -455,7 +455,10 @@
     const doMapa = state.conteudo
       .filter(c => c.atualizadoEm && dentroDaSemana(c.atualizadoEm, semanaId))
       .map(c => c.assunto);
-    return [...new Set([...doCheckin, ...doMapa])];
+    const doSessoes = (state.sessoes || [])
+      .filter(s => dentroDaSemana(s.data, semanaId) && s.assunto)
+      .map(s => s.assunto);
+    return [...new Set([...doCheckin, ...doMapa, ...doSessoes])];
   }
 
   function assuntosAtrasadosNaSemana(assuntosAlvo, tocados){
@@ -463,7 +466,7 @@
   }
 
   /* === DESEMPENHO (Tarefa 8) === */
-  function agregarPorAssunto(checkins){
+  function agregarPorAssunto(checkins, sessoes = []){
     const map = new Map();
     for(const c of checkins){
       if(!c.assunto || !c.questoes) continue;
@@ -471,6 +474,13 @@
       cur.questoes += c.questoes;
       cur.acertos += c.acertos || 0;
       map.set(c.assunto, cur);
+    }
+    for(const s of sessoes){
+      if(s.tipo !== 'questoes' || !s.assunto || !s.questoes) continue;
+      const cur = map.get(s.assunto) || {assunto:s.assunto, questoes:0, acertos:0};
+      cur.questoes += s.questoes;
+      cur.acertos += s.acertos || 0;
+      map.set(s.assunto, cur);
     }
     return [...map.values()].map(x => ({...x, pct: x.questoes ? Math.round((x.acertos/x.questoes)*100) : 0}));
   }
@@ -497,7 +507,7 @@
 
   /* === EXPORT (Tarefa 9) === */
   function gerarMarkdownSnapshot(state, hojeIso){
-    const agregado = agregarPorAssunto(state.checkins);
+    const agregado = agregarPorAssunto(state.checkins, state.sessoes);
     const estudados = diasEstudados(state.checkins);
     const ciclo = diasDeCiclo(state.meta.cicloInicio, hojeIso);
     const piores = piores5(agregado);
@@ -632,15 +642,16 @@
   function melhores5(agregado){
     return [...agregado].filter(a => a.questoes > 0).sort((a,b) => b.pct - a.pct).slice(0,5);
   }
-  function evolucaoSemanal(checkins, hojeIso, numSemanas){
+  function evolucaoSemanal(checkins, sessoes = [], hojeIso, numSemanas){
     const semanaFim = segundaFeiraDaSemana(hojeIso);
     const buckets = [];
     for(let i = numSemanas - 1; i >= 0; i--){
       const semanaId = addDays(semanaFim, -7*i);
       const fimSemana = addDays(semanaId, 6);
-      const doSemana = checkins.filter(c => c.data >= semanaId && c.data <= fimSemana && c.questoes);
-      const questoes = doSemana.reduce((s,c) => s + c.questoes, 0);
-      const acertos = doSemana.reduce((s,c) => s + (c.acertos||0), 0);
+      const doSemanaCheckins = checkins.filter(c => c.data >= semanaId && c.data <= fimSemana && c.questoes);
+      const doSemanaSessoes = sessoes.filter(s => s.tipo === 'questoes' && s.data >= semanaId && s.data <= fimSemana && s.questoes);
+      const questoes = doSemanaCheckins.reduce((s,c) => s + c.questoes, 0) + doSemanaSessoes.reduce((s,x) => s + x.questoes, 0);
+      const acertos = doSemanaCheckins.reduce((s,c) => s + (c.acertos||0), 0) + doSemanaSessoes.reduce((s,x) => s + (x.acertos||0), 0);
       buckets.push({ semanaId, pct: questoes ? Math.round((acertos/questoes)*100) : null });
     }
     return buckets;
@@ -661,7 +672,7 @@
     const hojeIso = hojeISO();
     const semanaId = semanaAtualId();
     const dias = diasAte(hojeIso, state.meta.provaData);
-    const agregado = agregarPorAssunto(state.checkins);
+    const agregado = agregarPorAssunto(state.checkins, state.sessoes);
     const piores = piores5(agregado);
     const fila = filaRevisao(state.erros, hojeIso);
     const ci = checkinDeHoje();
@@ -1088,7 +1099,7 @@
     });
   }
   function renderDesempenho(){
-    const agregado = agregarPorAssunto(state.checkins);
+    const agregado = agregarPorAssunto(state.checkins, state.sessoes);
     const estudados = diasEstudados(state.checkins);
     const ciclo = diasDeCiclo(state.meta.cicloInicio, hojeISO());
     const piores = piores5(agregado);
@@ -1124,7 +1135,7 @@
   }
 
   function attachDesempenhoHandlers(){
-    const agregado = agregarPorAssunto(state.checkins);
+    const agregado = agregarPorAssunto(state.checkins, state.sessoes);
     if(agregado.length){
       criarOuAtualizarChart('chart-por-assunto', {
         type: 'bar',
@@ -1138,7 +1149,7 @@
         }
       });
     }
-    const evolucao = evolucaoSemanal(state.checkins, hojeISO(), 12);
+    const evolucao = evolucaoSemanal(state.checkins, state.sessoes, hojeISO(), 12);
     criarOuAtualizarChart('chart-evolucao', {
       type: 'line',
       data: {
