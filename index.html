@@ -385,19 +385,10 @@
     return [...agregado].filter(a => a.questoes > 0).sort((a,b) => a.pct - b.pct).slice(0,5);
   }
 
-  function barrasSVG(dados){
-    const largura = 300, altoLinha = 28, esquerda = 130;
-    const altura = dados.length * altoLinha + 10;
-    const barras = dados.map((d,i) => {
-      const y = i * altoLinha + 4;
-      const w = Math.max(2, (largura - esquerda) * (d.pct/100));
-      return `
-        <text x="0" y="${y+14}" font-size="11" fill="var(--fg)">${escapeHtml(d.assunto.slice(0,18))}</text>
-        <rect x="${esquerda}" y="${y}" width="${w}" height="16" rx="3" fill="var(--accent)"></rect>
-        <text x="${esquerda + w + 6}" y="${y+13}" font-size="11" fill="var(--muted)">${d.pct}%</text>
-      `;
-    }).join('');
-    return `<svg viewBox="0 0 ${largura} ${altura}" width="100%" height="${altura}">${barras}</svg>`;
+  function totalQuestoes(checkins){ return checkins.reduce((s,c) => s + (c.questoes||0), 0); }
+  function totalHorasEstudadas(checkins){
+    const minutos = checkins.reduce((s,c) => s + (c.minutos ?? (c.status === 'base' ? 150 : 0)), 0);
+    return Math.round((minutos/60)*10)/10;
   }
 
   /* === EXPORT (Tarefa 9) === */
@@ -956,20 +947,67 @@
     const estudados = diasEstudados(state.checkins);
     const ciclo = diasDeCiclo(state.meta.cicloInicio, hojeISO());
     const piores = piores5(agregado);
+    const melhores = melhores5(agregado);
     return `
       <div class="card">
         <h2>Desempenho</h2>
         <p>${estudados} de ${ciclo} dias do ciclo estudados</p>
       </div>
-      <div class="card">
-        <h3>% de acerto por assunto</h3>
-        ${agregado.length ? barrasSVG(agregado) : '<p class="muted">Sem questões registradas ainda.</p>'}
+      <div class="kpi-grid">
+        <div class="card stat-card"><div class="stat-label">Total de questões</div><div class="stat-value">${totalQuestoes(state.checkins)}</div><div class="stat-icon">❓</div></div>
+        <div class="card stat-card"><div class="stat-label">Horas estudadas</div><div class="stat-value">${totalHorasEstudadas(state.checkins)}h</div><div class="stat-icon">⏱️</div></div>
       </div>
-      <div class="card">
-        <h3>5 piores assuntos</h3>
-        ${piores.length ? piores.map(p=>`<p>${escapeHtml(p.assunto)} — ${p.pct}%</p>`).join('') : '<p class="muted">Sem dados suficientes.</p>'}
+      <div class="grid-2">
+        <div class="card">
+          <h3>% de acerto por disciplina</h3>
+          ${agregado.length ? `<canvas id="chart-por-assunto" height="${Math.max(120, agregado.length*32)}"></canvas>` : '<p class="muted">Sem questões registradas ainda.</p>'}
+        </div>
+        <div class="card">
+          <h3>Evolução do desempenho</h3>
+          <canvas id="chart-evolucao" height="200"></canvas>
+        </div>
+        <div class="card">
+          <h3>Melhores assuntos</h3>
+          ${melhores.length ? melhores.map(p=>`<p>${escapeHtml(p.assunto)} — ${p.pct}%</p>`).join('') : '<p class="muted">Sem dados suficientes.</p>'}
+        </div>
+        <div class="card">
+          <h3>Piores assuntos</h3>
+          ${piores.length ? piores.map(p=>`<p>${escapeHtml(p.assunto)} — ${p.pct}%</p>`).join('') : '<p class="muted">Sem dados suficientes.</p>'}
+        </div>
       </div>
     `;
+  }
+
+  function attachDesempenhoHandlers(){
+    const agregado = agregarPorAssunto(state.checkins);
+    if(agregado.length){
+      criarOuAtualizarChart('chart-por-assunto', {
+        type: 'bar',
+        data: { labels: agregado.map(a=>a.assunto), datasets:[{ data: agregado.map(a=>a.pct), backgroundColor: corAccent() }] },
+        options: {
+          indexAxis:'y', responsive:true, plugins:{legend:{display:false}},
+          scales:{
+            x:{min:0,max:100, ticks:{color:'#9aa0a6'}, grid:{color:'#2a2f3a'}},
+            y:{ticks:{color:'#9aa0a6'}, grid:{display:false}}
+          }
+        }
+      });
+    }
+    const evolucao = evolucaoSemanal(state.checkins, hojeISO(), 12);
+    criarOuAtualizarChart('chart-evolucao', {
+      type: 'line',
+      data: {
+        labels: evolucao.map(b => b.semanaId.slice(5)),
+        datasets: [{ data: evolucao.map(b => b.pct), spanGaps:false, borderColor: corAccent(), backgroundColor:'transparent', tension:.3 }]
+      },
+      options: {
+        responsive:true, plugins:{legend:{display:false}},
+        scales:{
+          y:{min:0,max:100, ticks:{color:'#9aa0a6'}, grid:{color:'#2a2f3a'}},
+          x:{ticks:{color:'#9aa0a6'}, grid:{display:false}}
+        }
+      }
+    });
   }
 
   function renderScreen(){
@@ -986,6 +1024,7 @@
     if(currentTab==='dashboard') attachDashboardHandlers();
     if(currentTab==='config') attachConfigHandlers();
     if(currentTab==='planejamento') attachPlanejamentoHandlers();
+    if(currentTab==='desempenho') attachDesempenhoHandlers();
 
     app.querySelectorAll('details').forEach((d,i) => { if(openIdx.includes(i)) d.open = true; });
     Object.entries(fieldValues).forEach(([id,val]) => { const el = document.getElementById(id); if(el) el.value = val; });
