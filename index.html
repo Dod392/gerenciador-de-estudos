@@ -19,6 +19,7 @@
     --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow:0 4px 16px rgba(0,0,0,.4);
     --tap:48px;
     --hoje-border:#374151; --hoje-shadow-card:0 4px 12px rgba(0,0,0,.4); --hoje-text-secondary:#b0b9c6;
+    --status-not-started:#6b7280; --status-in-progress:#f59e0b; --status-review:#a855f7; --status-completed:#10b981;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
@@ -148,6 +149,40 @@
   .resumo-meta-item{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) 0;border-bottom:1px solid var(--border);}
   .resumo-meta-item:last-child{border-bottom:none;}
   .resumo-meta-item .stat-icon{font-size:20px;opacity:.8;}
+
+  /* === MAPA (redesign) === */
+  .mapa-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3);}
+  .mapa-busca{flex:0 1 280px;min-width:200px;}
+  .mapa-busca input{margin:0;}
+  .mapa-filtros-row{display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-top:var(--space-2);}
+  .mapa-filtros-label{font-size:var(--text-sm);color:var(--muted);flex:0 0 auto;}
+  .mapa-filtros-botoes{display:flex;gap:6px;flex-wrap:wrap;}
+  .mapa-filtro-btn{width:auto;min-height:32px;padding:0 12px;margin:0;font-size:var(--text-xs);
+    display:inline-flex;align-items:center;gap:6px;border-radius:999px;}
+  .mapa-filtro-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600;}
+  .mapa-dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:currentColor;}
+  .mapa-filtro-btn[data-filtro-status="nao_iniciado"] .mapa-dot{color:var(--status-not-started);}
+  .mapa-filtro-btn[data-filtro-status="estudado"] .mapa-dot{color:var(--status-in-progress);}
+  .mapa-filtro-btn[data-filtro-status="revisado"] .mapa-dot{color:var(--status-review);}
+  .mapa-filtro-btn[data-filtro-status="dominado"] .mapa-dot{color:var(--status-completed);}
+  .mapa-resumo-grid{margin-top:var(--space-4);}
+
+  .mapa-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-4);margin-bottom:var(--space-3);}
+  @media(max-width:1100px){.mapa-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:600px){.mapa-grid{grid-template-columns:1fr;}}
+  .mapa-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    padding:var(--space-3);position:relative;transition:background .15s;}
+  .mapa-card:hover{background:var(--surface);}
+  .mapa-card-icon{font-size:22px;margin-bottom:6px;}
+  .mapa-card-nome{font-weight:650;font-size:var(--text-base);margin-bottom:8px;padding-right:36px;}
+  .mapa-status-badge{display:inline-block;margin-bottom:6px;border:none;}
+  .mapa-status-badge.status-not-started{background:var(--status-not-started);color:#fff;}
+  .mapa-status-badge.status-in-progress{background:var(--status-in-progress);color:#1a1206;}
+  .mapa-status-badge.status-review{background:var(--status-review);color:#fff;}
+  .mapa-status-badge.status-completed{background:var(--status-completed);color:#062117;}
+  .mapa-card-concursos{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
+  .mapa-concurso-badge{background:rgba(79,157,222,.18);color:var(--accent);border:none;}
+  .mapa-card-pct{position:absolute;bottom:var(--space-3);right:var(--space-3);font-size:var(--text-xs);color:var(--muted);}
 
   /* === HOJE (redesign) === */
   .hoje-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3);flex-wrap:wrap;}
@@ -535,7 +570,9 @@
   }
   /* === MAPA (Tarefa 6) === */
   const STATUS_CONTEUDO_ORDEM = ['nao_iniciado','estudado','revisado','dominado'];
-  const STATUS_CONTEUDO_LABEL = { nao_iniciado:'não iniciado', estudado:'estudado', revisado:'revisado', dominado:'dominado' };
+  const STATUS_CONTEUDO_LABEL = { nao_iniciado:'Não iniciado', estudado:'Em andamento', revisado:'Revisão', dominado:'Concluído' };
+  const STATUS_CONTEUDO_COR = { nao_iniciado:'not-started', estudado:'in-progress', revisado:'review', dominado:'completed' };
+  const STATUS_CONTEUDO_PCT = { nao_iniciado:0, estudado:33, revisado:67, dominado:100 };
   const CONCURSO_ORDEM = ['ambos','transpetro','inea'];
   const CONCURSO_LABEL = { ambos:'Transpetro + INEA', transpetro:'Transpetro', inea:'INEA' };
 
@@ -547,37 +584,184 @@
     const i = CONCURSO_ORDEM.indexOf(atual);
     return CONCURSO_ORDEM[(i+1) % CONCURSO_ORDEM.length];
   }
+  function concursosDoItem(concurso){
+    if(concurso === 'ambos') return ['Transpetro','INEA'];
+    return [CONCURSO_LABEL[concurso]];
+  }
+  function iconePorAssunto(nome){
+    const n = nome.toLowerCase();
+    if(n.includes('água') || n.includes('agua') || n.includes('hídric') || n.includes('hidric')) return '💧';
+    if(n.includes('resíduo') || n.includes('residuo') || n.includes('esgoto')) return '🗑️';
+    if(n.includes('licenciamento')) return '🏛️';
+    if(n.includes('conama') || n.includes('nbr') || n.includes('pnrs') || n.includes('pnma') || n.includes('snuc') || n.includes('pnrh') || n.includes('lc ')) return '📜';
+    if(n.includes('inglês') || n.includes('ingles') || n.includes('português') || n.includes('portugues')) return '🗣️';
+    return '📘';
+  }
+  function adicionarAssunto(state, nome){
+    const trimmed = (nome || '').trim();
+    if(!trimmed) return null;
+    const existe = state.conteudo.some(c => c.assunto.toLowerCase() === trimmed.toLowerCase());
+    if(existe) return null;
+    const novo = { assunto: trimmed, status: 'nao_iniciado', concurso: 'ambos', atualizadoEm: null };
+    state.conteudo.push(novo);
+    return novo;
+  }
+  function filtrarConteudo(conteudo, { status, concurso, busca }){
+    return conteudo.filter(c => {
+      if(status && status !== 'todos' && c.status !== status) return false;
+      if(concurso && concurso !== 'todos'){
+        if(concurso === 'ambos'){
+          if(c.concurso !== 'ambos') return false;
+        } else if(c.concurso !== concurso && c.concurso !== 'ambos'){
+          return false;
+        }
+      }
+      if(busca && !c.assunto.toLowerCase().includes(busca.toLowerCase())) return false;
+      return true;
+    });
+  }
 
   function renderMapa(){
-    return `<div class="card"><h2>Mapa de Conteúdo</h2><small class="muted">Toque no status pra avançar; toque no concurso pra trocar.</small></div>` +
-      `<div class="card-grid">` +
-      state.conteudo.map((c, i) => `
-        <div class="card">
-          <b>${escapeHtml(c.assunto)}</b><br>
-          <button data-status-idx="${i}" class="badge">${STATUS_CONTEUDO_LABEL[c.status]}</button>
-          <button data-concurso-idx="${i}" class="badge">${CONCURSO_LABEL[c.concurso]}</button>
-        </div>`).join('') +
-      `</div>`;
+    const listaCompleta = state.conteudo;
+    const listaFiltrada = filtrarConteudo(listaCompleta, { status: mapaFiltroStatus, concurso: mapaFiltroConcurso, busca: mapaBusca });
+    const totalPorStatus = STATUS_CONTEUDO_ORDEM.reduce((acc, s) => { acc[s] = listaCompleta.filter(c => c.status === s).length; return acc; }, {});
+    const progressoGeral = listaCompleta.length
+      ? Math.round(listaCompleta.reduce((s,c) => s + STATUS_CONTEUDO_PCT[c.status], 0) / listaCompleta.length)
+      : 0;
+    const filtrosAtivos = mapaFiltroStatus !== 'todos' || mapaFiltroConcurso !== 'todos' || mapaBusca !== '';
+
+    const headerHtml = `
+      <div class="card">
+        <div class="mapa-header-row">
+          <div class="planejamento-header">
+            <div class="hoje-header-icon">🗺️</div>
+            <div>
+              <h2>Mapa de Conteúdo</h2>
+              <small class="muted">Toque no status pra avançar; toque no concurso pra trocar.</small>
+            </div>
+          </div>
+          <div class="mapa-busca">
+            <input type="text" id="mapa-busca-input" placeholder="Buscar assunto..." value="${escapeHtml(mapaBusca)}">
+          </div>
+        </div>
+
+        <div class="mapa-filtros-row">
+          <span class="mapa-filtros-label">Filtrar por status</span>
+          <div class="mapa-filtros-botoes">
+            <button class="mapa-filtro-btn ${mapaFiltroStatus==='todos'?'active':''}" data-filtro-status="todos">Todos</button>
+            ${STATUS_CONTEUDO_ORDEM.map(s => `<button class="mapa-filtro-btn ${mapaFiltroStatus===s?'active':''}" data-filtro-status="${s}"><i class="mapa-dot"></i>${STATUS_CONTEUDO_LABEL[s]}</button>`).join('')}
+          </div>
+        </div>
+        <div class="mapa-filtros-row">
+          <span class="mapa-filtros-label">Filtrar por concurso</span>
+          <div class="mapa-filtros-botoes">
+            <button class="mapa-filtro-btn ${mapaFiltroConcurso==='todos'?'active':''}" data-filtro-concurso="todos">Todos</button>
+            <button class="mapa-filtro-btn ${mapaFiltroConcurso==='inea'?'active':''}" data-filtro-concurso="inea">INEA</button>
+            <button class="mapa-filtro-btn ${mapaFiltroConcurso==='transpetro'?'active':''}" data-filtro-concurso="transpetro">Transpetro</button>
+            <button class="mapa-filtro-btn ${mapaFiltroConcurso==='ambos'?'active':''}" data-filtro-concurso="ambos">Ambos</button>
+          </div>
+          ${filtrosAtivos ? `<button class="card-link" id="mapa-limpar-filtros">Limpar filtros</button>` : ''}
+        </div>
+
+        <div class="kpi-grid mapa-resumo-grid">
+          <div class="card stat-card"><div class="stat-label">Total de assuntos</div><div class="stat-value">${listaCompleta.length}</div><div class="stat-icon">📚</div></div>
+          <div class="card stat-card"><div class="stat-label">Não iniciados</div><div class="stat-value">${totalPorStatus.nao_iniciado||0}</div><div class="stat-icon" style="color:var(--status-not-started)">●</div></div>
+          <div class="card stat-card"><div class="stat-label">Em andamento</div><div class="stat-value">${totalPorStatus.estudado||0}</div><div class="stat-icon" style="color:var(--status-in-progress)">●</div></div>
+          <div class="card stat-card"><div class="stat-label">Em revisão</div><div class="stat-value">${totalPorStatus.revisado||0}</div><div class="stat-icon" style="color:var(--status-review)">●</div></div>
+          <div class="card stat-card"><div class="stat-label">Concluídos</div><div class="stat-value">${totalPorStatus.dominado||0}</div><div class="stat-icon" style="color:var(--status-completed)">●</div></div>
+          <div class="card stat-card"><div class="stat-label">Progresso geral</div><div class="stat-value">${progressoGeral}%</div><div class="stat-icon">🎯</div></div>
+        </div>
+      </div>`;
+
+    const gridHtml = `
+      <div class="mapa-grid">
+        ${listaFiltrada.map(c => `
+          <div class="mapa-card">
+            <div class="mapa-card-icon">${iconePorAssunto(c.assunto)}</div>
+            <div class="mapa-card-nome">${escapeHtml(c.assunto)}</div>
+            <div><button data-status-assunto="${escapeHtml(c.assunto)}" class="badge mapa-status-badge status-${STATUS_CONTEUDO_COR[c.status]}">${STATUS_CONTEUDO_LABEL[c.status]}</button></div>
+            <div class="mapa-card-concursos">
+              ${concursosDoItem(c.concurso).map(nome => `<button data-concurso-assunto="${escapeHtml(c.assunto)}" class="badge mapa-concurso-badge">${escapeHtml(nome)}</button>`).join('')}
+            </div>
+            <div class="mapa-card-pct">${STATUS_CONTEUDO_PCT[c.status]}%</div>
+          </div>`).join('')}
+      </div>
+      ${listaFiltrada.length === 0 ? `<div class="card"><p class="muted">Nenhum assunto encontrado com esses filtros.</p></div>` : ''}
+    `;
+
+    const addAssuntoHtml = mapaAssuntoAberto ? `
+      <div class="card">
+        <label>Novo assunto</label>
+        <div class="row">
+          <input type="text" id="mapa-novo-assunto" placeholder="Nome do assunto">
+          <button class="primary" id="mapa-salvar-assunto" style="flex:0 0 auto;width:auto;padding:0 16px;">Adicionar</button>
+        </div>
+      </div>` : `<button class="card-link" id="mapa-abrir-assunto">+ Adicionar assunto</button>`;
+
+    return `<div class="mapa-screen">${headerHtml}${gridHtml}${addAssuntoHtml}</div>`;
   }
 
   function attachMapaHandlers(){
     const app = document.getElementById('app');
-    app.querySelectorAll('button[data-status-idx]').forEach(btn => {
+    app.querySelectorAll('button[data-status-assunto]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const c = state.conteudo[Number(btn.dataset.statusIdx)];
+        const c = state.conteudo.find(x => x.assunto === btn.dataset.statusAssunto);
+        if(!c) return;
         c.status = proximoStatusConteudo(c.status);
         c.atualizadoEm = hojeISO();
         saveState(state);
         render();
       });
     });
-    app.querySelectorAll('button[data-concurso-idx]').forEach(btn => {
+    app.querySelectorAll('button[data-concurso-assunto]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const c = state.conteudo[Number(btn.dataset.concursoIdx)];
+        const c = state.conteudo.find(x => x.assunto === btn.dataset.concursoAssunto);
+        if(!c) return;
         c.concurso = proximoConcurso(c.concurso);
         saveState(state);
         render();
       });
+    });
+    app.querySelectorAll('[data-filtro-status]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        mapaFiltroStatus = btn.dataset.filtroStatus;
+        render();
+      });
+    });
+    app.querySelectorAll('[data-filtro-concurso]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        mapaFiltroConcurso = btn.dataset.filtroConcurso;
+        render();
+      });
+    });
+    document.getElementById('mapa-limpar-filtros')?.addEventListener('click', () => {
+      mapaFiltroStatus = 'todos';
+      mapaFiltroConcurso = 'todos';
+      mapaBusca = '';
+      render();
+    });
+    const buscaInput = document.getElementById('mapa-busca-input');
+    if(buscaInput){
+      buscaInput.addEventListener('input', () => {
+        mapaBusca = buscaInput.value;
+        renderPreservandoFoco();
+      });
+    }
+    document.getElementById('mapa-abrir-assunto')?.addEventListener('click', () => {
+      mapaAssuntoAberto = true;
+      render();
+      document.getElementById('mapa-novo-assunto')?.focus();
+    });
+    document.getElementById('mapa-salvar-assunto')?.addEventListener('click', () => {
+      const input = document.getElementById('mapa-novo-assunto');
+      const novo = adicionarAssunto(state, input.value);
+      if(!novo){
+        alert('Informe um nome válido (e diferente dos assuntos já existentes).');
+        return;
+      }
+      saveState(state);
+      mapaAssuntoAberto = false;
+      render();
     });
   }
 
@@ -1166,6 +1350,27 @@
   const TIPO_LABEL = { questoes:'Questões', teoria:'Teoria', revisao:'Revisão', anki:'Anki' };
   let semanaVisualizada = null;
   let atividadeDiaAberta = null;
+  let mapaFiltroStatus = 'todos';
+  let mapaFiltroConcurso = 'todos';
+  let mapaBusca = '';
+  let mapaAssuntoAberto = false;
+
+  function renderPreservandoFoco(){
+    const ativo = document.activeElement;
+    const id = ativo && ativo.id;
+    const selStart = ativo && typeof ativo.selectionStart === 'number' ? ativo.selectionStart : null;
+    const selEnd = ativo && typeof ativo.selectionEnd === 'number' ? ativo.selectionEnd : null;
+    render();
+    if(id){
+      const el = document.getElementById(id);
+      if(el){
+        el.focus();
+        if(selStart !== null && el.setSelectionRange){
+          try { el.setSelectionRange(selStart, selEnd); } catch(e){}
+        }
+      }
+    }
+  }
 
   function renderSidebar(){
     const nav = document.getElementById('sidebar-nav');
