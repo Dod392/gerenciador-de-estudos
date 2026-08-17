@@ -140,6 +140,9 @@
   .chip.atrasado{border-color:var(--warn);}
   .chip button{width:20px;height:20px;min-height:20px;flex-shrink:0;padding:0;margin:0;border:none;
     background:var(--border);border-radius:50%;font-size:13px;line-height:1;color:var(--fg);}
+  .chip-sugestao{width:auto;min-height:28px;padding:4px 12px;margin:0;border-radius:999px;
+    font-size:var(--text-xs);background:transparent;border:1px dashed var(--border);color:var(--muted);}
+  .chip-sugestao:hover{border-color:var(--accent);color:var(--accent);}
 
   .dias-checkbox-row{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-2);}
   .dia-checkbox{display:flex;align-items:center;gap:6px;width:auto;font-size:var(--text-sm);color:var(--fg);margin:0;}
@@ -584,9 +587,18 @@
       criadoEm: new Date().toISOString(),
     };
   }
+  function avancarStatusPorAtividade(state, assunto, hojeIso){
+    if(!assunto) return null;
+    const item = state.conteudo.find(c => c.assunto === assunto);
+    if(!item || item.status !== 'nao_iniciado') return null;
+    item.status = 'estudado';
+    item.atualizadoEm = hojeIso;
+    return item;
+  }
   function registrarSessao(state, hojeIso, dados){
     const sessao = criarSessao({data: hojeIso, ...dados});
     state.sessoes.push(sessao);
+    avancarStatusPorAtividade(state, sessao.assunto, hojeIso);
     return sessao;
   }
   function iniciarSessaoEmAndamento(state, {assunto, tipo, origem}){
@@ -1044,6 +1056,7 @@
     const item = obterPlano(state, semanaId)?.atividadesPorDia?.[dataIso]?.find(a => a.id === atividadeId);
     if(!item) return null;
     item.concluida = !item.concluida;
+    if(item.concluida) avancarStatusPorAtividade(state, item.assunto, dataIso);
     return item;
   }
 
@@ -2927,6 +2940,14 @@
       <span class="chip ${atrasados.includes(a)?'atrasado':''}">${escapeHtml(a)} <button type="button" data-remover-assunto="${escapeHtml(a)}" title="Remover">×</button></span>
     `).join('');
 
+    const sugestoesAssuntos = (() => {
+      const jaSelecionados = new Set(assuntosAtuais);
+      const naoIniciados = state.conteudo.filter(c => c.status === 'nao_iniciado' && !jaSelecionados.has(c.assunto)).map(c => c.assunto);
+      const agregadoGeral = agregarPorAssunto(state.checkins, state.sessoes);
+      const fracos = piores5(agregadoGeral).map(p => p.assunto).filter(a => !jaSelecionados.has(a) && !naoIniciados.includes(a));
+      return [...naoIniciados.slice(0,3), ...fracos.slice(0,3)].slice(0,5);
+    })();
+
     const metaFormHtml = `
       <div class="card">
         <h3>Definir meta da semana</h3>
@@ -2940,6 +2961,12 @@
           <div class="combo-results" id="meta-assunto-resultados"></div>
         </div>
         <button type="button" id="meta-assunto-adicionar">+ Adicionar assunto</button>
+        ${sugestoesAssuntos.length ? `
+          <small class="muted">Sugestões — não iniciados ou com desempenho fraco</small>
+          <div class="assunto-chips">
+            ${sugestoesAssuntos.map(a => `<button type="button" class="chip-sugestao" data-sugestao-assunto="${escapeHtml(a)}">+ ${escapeHtml(a)}</button>`).join('')}
+          </div>
+        ` : ''}
 
         <div class="row">
           <div>
@@ -3019,6 +3046,15 @@
       if(metaAssuntosDraft === null) metaAssuntosDraft = [...(plano?.assuntosAlvo || [])];
       if(!metaAssuntosDraft.includes(assunto)) metaAssuntosDraft.push(assunto);
       render();
+    });
+    document.querySelectorAll('[data-sugestao-assunto]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const assunto = btn.dataset.sugestaoAssunto;
+        const plano = obterPlano(state, semanaVisualizada);
+        if(metaAssuntosDraft === null) metaAssuntosDraft = [...(plano?.assuntosAlvo || [])];
+        if(!metaAssuntosDraft.includes(assunto)) metaAssuntosDraft.push(assunto);
+        render();
+      });
     });
 
     document.getElementById('semana-salvar')?.addEventListener('click', () => {
@@ -3290,7 +3326,9 @@
               <div class="desempenho-assunto-row">
                 <div class="desempenho-assunto-row-top"><span>${escapeHtml(p.assunto)}</span><b>${p.pct}%</b></div>
                 <div class="desempenho-assunto-bar-track"><div class="desempenho-assunto-bar-fill ruim" style="width:${p.pct}%"></div></div>
-              </div>`).join('') + (todos.length > 5 ? `<button class="card-link" id="desempenho-toggle-piores">${desempenhoMostrarTodosPiores?'Ver menos':'Ver todos os assuntos'} →</button>` : '');
+              </div>`).join('')
+              + (todos.length > 5 ? `<button class="card-link" id="desempenho-toggle-piores">${desempenhoMostrarTodosPiores?'Ver menos':'Ver todos os assuntos'} →</button>` : '')
+              + (lista.length ? `<button class="card-link" data-ir-erros>Revisar no Caderno de Erros →</button>` : '');
           })()}
         </div>
       </div>
@@ -3302,7 +3340,7 @@
           return `
             <div class="card desempenho-insight-card">
               <h3><span class="section-icon">✨</span>Insight automático</h3>
-              ${insight ? `<p>${escapeHtml(insight)}</p><button class="primary" data-ir-planejamento>Ver plano sugerido</button>` : '<p class="muted">Registre mais questões no período pra receber um insight.</p>'}
+              ${insight ? `<p>${escapeHtml(insight)}</p><div class="row"><button class="primary" data-ir-planejamento>Ver plano sugerido</button><button data-ir-erros>Revisar no Caderno de Erros</button></div>` : '<p class="muted">Registre mais questões no período pra receber um insight.</p>'}
             </div>`;
         })()}
         <div class="card">
@@ -3394,6 +3432,9 @@
     });
     document.querySelectorAll('[data-ir-planejamento]').forEach(btn => {
       btn.addEventListener('click', () => { currentTab = 'planejamento'; render(); });
+    });
+    document.querySelectorAll('[data-ir-erros]').forEach(btn => {
+      btn.addEventListener('click', () => { currentTab = 'erros'; render(); });
     });
 
     if(desempenhoCicloId === null) desempenhoCicloId = state.ciclos[state.ciclos.length-1].id;
