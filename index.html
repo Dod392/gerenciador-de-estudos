@@ -22,6 +22,15 @@
     --status-not-started:#6b7280; --status-in-progress:#f59e0b; --status-review:#a855f7; --status-completed:#10b981;
     --status-pending:#f59e0b; --status-reviewed:#10b981; --status-high-priority:#ef4444;
   }
+  :root[data-theme="light"]{
+    --bg:#f5f6f8; --surface:#ffffff; --card:#ffffff;
+    --fg:#14171d; --muted:#5b6270;
+    --accent:#1d6fb8; --accent-fg:#ffffff;
+    --ok:#0e7d44; --warn:#a15c07; --bad:#c0392b;
+    --border:#dde1e7;
+    --shadow-sm:0 1px 2px rgba(20,23,29,.08); --shadow:0 4px 16px rgba(20,23,29,.12);
+    --hoje-border:#d7dbe2; --hoje-shadow-card:0 4px 12px rgba(20,23,29,.08); --hoje-text-secondary:#5b6270;
+  }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
@@ -34,9 +43,9 @@
   button{font:inherit;min-height:var(--tap);border-radius:var(--radius);
     border:1px solid var(--border);background:var(--card);color:var(--fg);
     padding:0 16px;width:100%;margin-bottom:8px;}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#0b0d10;font-weight:600;}
-  button.ok{background:var(--ok);border-color:var(--ok);color:#0b0d10;}
-  button.bad{background:var(--bad);border-color:var(--bad);color:#0b0d10;}
+  button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600;}
+  button.ok{background:var(--ok);border-color:var(--ok);color:var(--accent-fg);}
+  button.bad{background:var(--bad);border-color:var(--bad);color:var(--accent-fg);}
   .row{display:flex;gap:8px;}
   .row>*{flex:1;margin-bottom:0;}
   label{display:block;font-size:13px;color:var(--muted);margin:8px 0 4px;}
@@ -76,7 +85,8 @@
   table.data th{text-align:left;color:var(--muted);font-weight:600;font-size:var(--text-xs);
     text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--border);}
   table.data td{padding:8px;border-bottom:1px solid var(--border);}
-  table.data tr:nth-child(even) td{background:rgba(255,255,255,.02);}
+  table.data tr:nth-child(even) td{background:rgba(128,128,128,.07);}
+  .table-wrap{overflow-x:auto;}
   .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--space-4);}
 
   @media (min-width:900px){
@@ -505,6 +515,60 @@
   .hoje-screen .item-icon.tipo-teoria{background:rgba(224,168,62,.22);}
   .hoje-screen .item-icon.tipo-revisao{background:rgba(62,207,142,.22);}
   .hoje-screen .item-icon.tipo-anki{background:rgba(224,90,79,.22);}
+
+  /* === CONFIGURAÇÕES (redesign) === */
+  .config-header-row{display:flex;align-items:flex-start;gap:var(--space-3);}
+  .config-header-icon{font-size:24px;}
+  .config-status-grid{margin-bottom:var(--space-4);}
+  .stat-sub{font-size:var(--text-xs);color:var(--muted);margin-top:2px;}
+
+  .config-action-card{display:flex;align-items:center;gap:var(--space-3);text-align:left;
+    background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:var(--space-3);min-height:auto;width:100%;margin:0;font:inherit;color:var(--fg);}
+  .config-action-icon{font-size:20px;flex-shrink:0;color:var(--accent);}
+  .config-action-text{flex:1;min-width:0;}
+  .config-action-text b{display:block;font-size:var(--text-sm);}
+  .config-action-text small{color:var(--muted);font-size:var(--text-xs);}
+  .config-action-arrow{color:var(--muted);flex-shrink:0;}
+
+  .config-sessoes-filtros{display:flex;gap:var(--space-2);flex-wrap:wrap;margin:var(--space-2) 0 var(--space-3);}
+  .config-sessoes-filtros input{flex:1 1 200px;margin:0;}
+  .config-sessoes-filtros select{width:auto;margin:0;}
+  .config-sessao-acoes{display:flex;gap:6px;}
+  .config-sessao-acoes button{width:auto;min-height:36px;margin:0;padding:0 10px;font-size:var(--text-xs);}
+
+  .config-pref-item{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);
+    padding:var(--space-2) 0;border-bottom:1px solid var(--border);}
+  .config-pref-item:last-child{border-bottom:none;}
+  .config-pref-text b{display:block;font-size:var(--text-sm);}
+  .config-pref-text small{color:var(--muted);font-size:var(--text-xs);}
+  .config-pref-select{width:auto;min-height:40px;margin:0;flex-shrink:0;}
+
+  .switch{position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0;margin:0;min-height:auto;}
+  .switch input{opacity:0;width:0;height:0;position:absolute;}
+  .switch-slider{position:absolute;inset:0;background:var(--border);border-radius:999px;transition:background .15s;cursor:pointer;}
+  .switch-slider::before{content:'';position:absolute;width:20px;height:20px;left:3px;top:3px;
+    background:#fff;border-radius:50%;transition:transform .15s;}
+  .switch input:checked + .switch-slider{background:var(--accent);}
+  .switch input:checked + .switch-slider::before{transform:translateX(18px);}
+  .switch input:focus-visible + .switch-slider{outline:2px solid var(--accent);outline-offset:2px;}
+
+  .config-avancado{margin-top:var(--space-3);border-top:1px solid var(--border);padding-top:var(--space-3);}
+  .config-avancado summary{cursor:pointer;font-weight:600;color:var(--fg);list-style:none;}
+  .config-avancado summary::-webkit-details-marker{display:none;}
+  .config-avancado summary::before{content:'▸ ';color:var(--muted);}
+  .config-avancado[open] summary::before{content:'▾ ';}
+  .config-avancado small{display:block;margin-top:4px;}
+
+  .config-danger-card{border-color:var(--bad);background:rgba(200,60,50,.07);}
+  .config-danger-inner{background:var(--bg);border:1px solid var(--bad);border-radius:var(--radius-sm);
+    padding:var(--space-3);margin-top:var(--space-2);}
+  .config-danger-inner b{color:var(--bad);}
+  .config-danger-inner p{font-size:var(--text-sm);color:var(--muted);margin:4px 0 var(--space-2);}
+  .config-danger-warn{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:var(--space-3);
+    background:rgba(224,168,62,.12);border:1px solid var(--warn);border-radius:var(--radius-sm);
+    padding:var(--space-2) var(--space-3);font-size:var(--text-sm);color:var(--fg);}
+  .config-danger-warn button{margin:0 0 0 auto;}
 </style>
 </head>
 <body>
@@ -539,8 +603,37 @@
     d.setDate(d.getDate() + offset);
     return d.toISOString().slice(0,10);
   }
+  function formatarData(iso, formato){
+    if(!iso) return '';
+    const f = formato || state?.preferencias?.formatoData || 'DD/MM/AAAA';
+    const [ano, mes, dia] = iso.slice(0,10).split('-');
+    if(f === 'MM/DD/AAAA') return `${mes}/${dia}/${ano}`;
+    if(f === 'AAAA-MM-DD') return `${ano}-${mes}-${dia}`;
+    return `${dia}/${mes}/${ano}`;
+  }
+  function formatarDataHora(isoDateTime){
+    if(!isoDateTime) return null;
+    const d = new Date(isoDateTime);
+    const dataFormatada = formatarData(d.toISOString().slice(0,10));
+    const hora = String(d.getHours()).padStart(2,'0');
+    const min = String(d.getMinutes()).padStart(2,'0');
+    return `${dataFormatada} às ${hora}:${min}`;
+  }
+  function corVar(nome){
+    return getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+  }
+  function aplicarTema(tema){
+    document.documentElement.dataset.theme = tema === 'claro' ? 'light' : 'dark';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if(meta) meta.setAttribute('content', tema === 'claro' ? '#f5f6f8' : '#0b0d11');
+  }
+  function confirmarAcao(mensagem){
+    if(state?.preferencias?.confirmacoes === false) return true;
+    return confirm(mensagem);
+  }
   /* === STATE (Tarefa 2) === */
   const STORAGE_KEY = 'estudos_v1';
+  const APP_VERSION = 'v1.0 beta';
   const SEED_CONTEUDO = [
     'PNMA (6.938/81)','SNUC (9.985/00)','LC 140/2011','PNRH','CONAMA 357',
     'CONAMA 430','PNRS','NBR 10004','licenciamento ambiental',
@@ -561,6 +654,8 @@
       sessaoEmAndamento: null,
       ciclos: [{ id: 'ciclo-1', nome: '1º Ciclo', inicio: hojeISO() }],
       contadorRevisoes: 0,
+      preferencias: { tema: 'escuro', formatoData: 'DD/MM/AAAA', confirmacoes: true, notificacoes: true },
+      ultimoBackup: null,
     };
   }
 
@@ -684,6 +779,12 @@
     if(!Array.isArray(s.concursos) || !s.concursos.length) s.concursos = ['Transpetro', 'INEA'];
     if(!Array.isArray(s.ciclos) || !s.ciclos.length) s.ciclos = [{ id: 'ciclo-1', nome: '1º Ciclo', inicio: s.meta?.cicloInicio || hojeISO() }];
     if(typeof s.contadorRevisoes !== 'number') s.contadorRevisoes = 0;
+    if(!s.preferencias || typeof s.preferencias !== 'object') s.preferencias = {};
+    if(s.preferencias.tema !== 'claro' && s.preferencias.tema !== 'escuro') s.preferencias.tema = 'escuro';
+    if(!['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'].includes(s.preferencias.formatoData)) s.preferencias.formatoData = 'DD/MM/AAAA';
+    if(typeof s.preferencias.confirmacoes !== 'boolean') s.preferencias.confirmacoes = true;
+    if(typeof s.preferencias.notificacoes !== 'boolean') s.preferencias.notificacoes = true;
+    if(typeof s.ultimoBackup !== 'string') s.ultimoBackup = null;
     return s;
   }
 
@@ -1262,6 +1363,13 @@
 
   function exportarJSON(){
     baixarArquivo(`estudos-${hojeISO()}.json`, JSON.stringify(state, null, 2), 'application/json');
+    state.ultimoBackup = new Date().toISOString();
+    saveState(state);
+  }
+
+  function limparTodosDados(){
+    state = seedState();
+    saveState(state);
   }
 
   function importarJSON(texto){
@@ -1275,7 +1383,7 @@
   }
 
   function tentarImportar(texto){
-    if(!confirm('Importar vai substituir todos os dados atuais. Continuar?')) return false;
+    if(!confirmarAcao('Importar vai substituir todos os dados atuais. Continuar?')) return false;
     try { importarJSON(texto); render(); return true; }
     catch(err){ alert('Falha ao importar: ' + err.message); return false; }
   }
@@ -1729,8 +1837,8 @@
       options: {
         responsive:true, plugins:{ legend:{ display:false } },
         scales:{
-          x:{ grid:{ display:false }, ticks:{ color:'#9aa0a6' } },
-          y:{ beginAtZero:true, grid:{ color:'#2a2f3a' }, ticks:{ color:'#9aa0a6' } }
+          x:{ grid:{ display:false }, ticks:{ color:corVar('--muted') } },
+          y:{ beginAtZero:true, grid:{ color:corVar('--border') }, ticks:{ color:corVar('--muted') } }
         }
       }
     });
@@ -1738,24 +1846,53 @@
 
   /* === CONFIG (redesign, Tarefa 6) === */
   function renderConfig(){
+    const prefs = state.preferencias;
     const sessoesOrdenadas = [...state.sessoes].sort((a,b) => (b.data+b.criadoEm).localeCompare(a.data+a.criadoEm));
+    const buscaLower = configSessaoBusca.trim().toLowerCase();
+    const sessoesFiltradas = sessoesOrdenadas.filter(s => {
+      if(configSessaoFiltroTipo !== 'todos' && s.tipo !== configSessaoFiltroTipo) return false;
+      if(buscaLower && !(s.assunto || 'estudo livre').toLowerCase().includes(buscaLower)) return false;
+      return true;
+    });
+    const tabelaSessoesHtml = sessoesFiltradas.length ? `
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Data</th><th>Assunto</th><th>Tipo</th><th>Duração</th><th>Ações</th></tr></thead>
+          <tbody>
+            ${sessoesFiltradas.map(s => `
+              <tr>
+                <td>${formatarData(s.data)}</td>
+                <td>${escapeHtml(s.assunto || 'Estudo livre')}</td>
+                <td>${escapeHtml(TIPO_LABEL[s.tipo] || s.tipo)}</td>
+                <td>${s.minutos} min</td>
+                <td><div class="config-sessao-acoes">
+                  <button data-editar-sessao="${s.id}">Editar</button>
+                  <button class="bad" data-excluir-sessao="${s.id}">Excluir</button>
+                </div></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : (
+      state.sessoes.length === 0
+        ? `<div class="empty-state"><div class="empty-state-icon">📅</div><p>Nenhuma sessão registrada ainda.</p><small>Registre suas sessões de estudo para acompanhar seu progresso.</small></div>`
+        : `<div class="empty-state"><div class="empty-state-icon">🔎</div><p>Nenhuma sessão encontrada.</p><small>Tente ajustar a busca ou o filtro de tipo.</small></div>`
+    );
     const sessoesHtml = `
       <div class="card">
-        <h3>Sessões registradas</h3>
-        <small class="muted">Corrija ou remova uma sessão registrada por engano — a mudança já reflete em Hoje, Dashboard e Desempenho.</small>
-        ${sessoesOrdenadas.length ? `<div class="sessao-list">
-          ${sessoesOrdenadas.map(s => `
-            <div class="sessao-item">
-              <div class="sessao-info">
-                <div class="sessao-title">${escapeHtml(s.assunto || 'Estudo livre')}</div>
-                <div class="sessao-meta">${s.data} · ${escapeHtml(TIPO_LABEL[s.tipo] || s.tipo)} · ${s.minutos} min${s.tipo==='questoes' && s.questoes ? ` · ${s.questoes} questões (${calcularAproveitamento(s.questoes, s.acertos)}%)` : ''}</div>
-              </div>
-              <div class="sessao-actions">
-                <button data-editar-sessao="${s.id}">Editar</button>
-                <button class="bad" data-excluir-sessao="${s.id}">Excluir</button>
-              </div>
-            </div>`).join('')}
-        </div>` : '<p class="muted">Nenhuma sessão registrada ainda.</p>'}
+        <h3>📅 Sessões registradas</h3>
+        <small class="muted">Gerencie suas sessões de estudo registradas. Alterações aqui afetam Hoje, Dashboard e Desempenho.</small>
+        <div class="config-sessoes-filtros">
+          <input type="text" id="config-sessao-busca" placeholder="Buscar sessões..." value="${escapeHtml(configSessaoBusca)}">
+          <select id="config-sessao-tipo-select">
+            <option value="todos" ${configSessaoFiltroTipo==='todos'?'selected':''}>Todos os tipos</option>
+            <option value="teoria" ${configSessaoFiltroTipo==='teoria'?'selected':''}>Teoria</option>
+            <option value="questoes" ${configSessaoFiltroTipo==='questoes'?'selected':''}>Questões</option>
+            <option value="revisao" ${configSessaoFiltroTipo==='revisao'?'selected':''}>Revisão</option>
+            <option value="anki" ${configSessaoFiltroTipo==='anki'?'selected':''}>Anki</option>
+          </select>
+        </div>
+        ${tabelaSessoesHtml}
       </div>
     `;
     const editarSessaoModalHtml = sessaoEditando ? `
@@ -1811,28 +1948,134 @@
         </div>
       </div>
     ` : '';
+    const ultimoBackupValor = state.ultimoBackup ? formatarDataHora(state.ultimoBackup) : 'Nunca';
+    const ultimoBackupSub = state.ultimoBackup ? 'Backup salvo neste aparelho' : 'Nenhum backup realizado';
     return `
-      <div class="card"><h2>Configurações</h2></div>
       <div class="card">
-        <h3>Dados e Backup</h3>
-        <small class="muted">Dados salvos só neste aparelho — use uma das opções abaixo pra levar pro celular ou fazer backup.</small>
-        <button id="btn-export-md">Exportar Markdown</button>
-        <button id="btn-export-json">Exportar JSON (arquivo)</button>
-        <button id="btn-copy-json">Copiar JSON (área de transferência)</button>
-        <label>Importar JSON (arquivo)</label>
-        <input type="file" id="input-import-json" accept="application/json">
-        <label>ou colar JSON aqui</label>
-        <textarea id="input-import-paste" placeholder="Cole aqui o JSON exportado"></textarea>
-        <button id="btn-import-paste">Importar JSON colado</button>
+        <div class="config-header-row">
+          <span class="config-header-icon">⚙️</span>
+          <div>
+            <h2>Configurações</h2>
+            <small class="muted">Gerencie seus dados, personalização e manutenção do sistema.</small>
+          </div>
+        </div>
       </div>
-      ${sessoesHtml}
+
+      <div class="kpi-grid config-status-grid">
+        <div class="card stat-card">
+          <div class="stat-label">Último backup</div>
+          <div class="stat-value">${ultimoBackupValor}</div>
+          <div class="stat-icon" style="color:var(--accent)">🕐</div>
+          <div class="stat-sub">${ultimoBackupSub}</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Armazenamento</div>
+          <div class="stat-value">Dados locais</div>
+          <div class="stat-icon" style="color:var(--accent)">💽</div>
+          <div class="stat-sub">Somente neste aparelho</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Versão do app</div>
+          <div class="stat-value">${APP_VERSION}</div>
+          <div class="stat-icon" style="color:var(--accent)">📦</div>
+          <div class="stat-sub">Você está atualizado</div>
+        </div>
+      </div>
+
+      <div class="grid-hoje">
+        <div>
+          <div class="card">
+            <h3>💾 Dados e backup</h3>
+            <small class="muted">Faça backup, exporte seus dados ou importe um backup para restaurar.</small>
+            <div class="card-grid" style="margin-top:var(--space-3);">
+              <button type="button" class="config-action-card" id="btn-export-backup">
+                <span class="config-action-icon">☁️</span>
+                <span class="config-action-text"><b>Exportar backup</b><small>Salve um backup completo dos seus dados.</small></span>
+                <span class="config-action-arrow">›</span>
+              </button>
+              <button type="button" class="config-action-card" id="btn-import-backup-trigger">
+                <span class="config-action-icon">📥</span>
+                <span class="config-action-text"><b>Importar backup</b><small>Restaure seus dados a partir de um arquivo de backup.</small></span>
+                <span class="config-action-arrow">›</span>
+              </button>
+              <button type="button" class="config-action-card" id="btn-export-md">
+                <span class="config-action-icon">📄</span>
+                <span class="config-action-text"><b>Exportar Markdown</b><small>Exporte seus dados em Markdown.</small></span>
+              </button>
+              <button type="button" class="config-action-card" id="btn-copy-json">
+                <span class="config-action-icon">{ }</span>
+                <span class="config-action-text"><b>Copiar JSON</b><small>Copie todos os dados em JSON.</small></span>
+              </button>
+            </div>
+            <input type="file" id="input-import-json" accept="application/json" style="display:none">
+            <label>Importar JSON colado</label>
+            <textarea id="input-import-paste" placeholder="Cole aqui o JSON exportado"></textarea>
+            <button id="btn-import-paste">Importar JSON colado</button>
+            <small class="muted">Cole o conteúdo JSON exportado de outro aparelho ou pacote de dados.</small>
+          </div>
+          ${sessoesHtml}
+        </div>
+
+        <div>
+          <div class="card">
+            <h3>🎨 Preferências</h3>
+            <small class="muted">Personalize sua experiência no app.</small>
+            <div class="config-pref-list" style="margin-top:var(--space-3);">
+              <div class="config-pref-item">
+                <div class="config-pref-text"><b>🌙 Tema escuro</b><small>Aparência escura do aplicativo.</small></div>
+                <label class="switch"><input type="checkbox" id="pref-tema-toggle" ${prefs.tema==='escuro'?'checked':''}><span class="switch-slider"></span></label>
+              </div>
+              <div class="config-pref-item">
+                <div class="config-pref-text"><b>📅 Formato de data</b><small>Escolha como as datas são exibidas.</small></div>
+                <select id="pref-formato-data" class="config-pref-select">
+                  <option value="DD/MM/AAAA" ${prefs.formatoData==='DD/MM/AAAA'?'selected':''}>DD/MM/AAAA</option>
+                  <option value="MM/DD/AAAA" ${prefs.formatoData==='MM/DD/AAAA'?'selected':''}>MM/DD/AAAA</option>
+                  <option value="AAAA-MM-DD" ${prefs.formatoData==='AAAA-MM-DD'?'selected':''}>AAAA-MM-DD</option>
+                </select>
+              </div>
+              <div class="config-pref-item">
+                <div class="config-pref-text"><b>✅ Confirmações</b><small>Exibir confirmações antes de ações críticas.</small></div>
+                <label class="switch"><input type="checkbox" id="pref-confirmacoes-toggle" ${prefs.confirmacoes?'checked':''}><span class="switch-slider"></span></label>
+              </div>
+              <div class="config-pref-item">
+                <div class="config-pref-text"><b>🔔 Notificações</b><small>Receber lembretes e alertas do app.</small></div>
+                <label class="switch"><input type="checkbox" id="pref-notificacoes-toggle" ${prefs.notificacoes?'checked':''}><span class="switch-slider"></span></label>
+              </div>
+            </div>
+            <details class="config-avancado">
+              <summary>Avançado</summary>
+              <small class="muted">Configurações e ferramentas avançadas de manutenção.</small>
+            </details>
+          </div>
+
+          <div class="card config-danger-card">
+            <h3>⚠️ Zona de perigo</h3>
+            <small class="muted">Atenção: esta ação é irreversível.</small>
+            <div class="config-danger-inner">
+              <b>Limpar todos os dados</b>
+              <p>Todos os seus dados de estudo serão removidos deste aparelho.</p>
+              <label>Digite EXCLUIR para confirmar</label>
+              <input type="text" id="config-excluir-input" placeholder="Digite EXCLUIR para confirmar" value="${escapeHtml(configExcluirTexto)}" autocomplete="off">
+              <button class="bad" id="btn-limpar-dados" ${configExcluirTexto.trim()==='EXCLUIR' ? '' : 'disabled'}>🗑 Limpar todos os dados</button>
+            </div>
+            <div class="config-danger-warn">
+              <span>🛡️ Recomendamos fazer um backup antes de prosseguir.</span>
+              <button type="button" class="card-link" id="btn-export-antes">Exportar backup antes</button>
+            </div>
+          </div>
+        </div>
+      </div>
       ${editarSessaoModalHtml}
     `;
   }
 
   function attachConfigHandlers(){
     document.getElementById('btn-export-md')?.addEventListener('click', exportarMarkdown);
-    document.getElementById('btn-export-json')?.addEventListener('click', exportarJSON);
+    document.getElementById('btn-export-backup')?.addEventListener('click', () => { exportarJSON(); render(); });
+    document.getElementById('btn-export-antes')?.addEventListener('click', () => { exportarJSON(); render(); });
+    document.getElementById('btn-import-backup-trigger')?.addEventListener('click', () => {
+      document.getElementById('input-import-json')?.click();
+    });
     document.getElementById('btn-copy-json')?.addEventListener('click', () => {
       copiarTexto(JSON.stringify(state, null, 2));
     });
@@ -1855,6 +2098,55 @@
       });
     }
 
+    const buscaSessaoInput = document.getElementById('config-sessao-busca');
+    if(buscaSessaoInput){
+      buscaSessaoInput.addEventListener('input', () => {
+        configSessaoBusca = buscaSessaoInput.value;
+        renderPreservandoFoco();
+      });
+    }
+    document.getElementById('config-sessao-tipo-select')?.addEventListener('change', (e) => {
+      configSessaoFiltroTipo = e.target.value;
+      render();
+    });
+
+    document.getElementById('pref-tema-toggle')?.addEventListener('change', (e) => {
+      state.preferencias.tema = e.target.checked ? 'escuro' : 'claro';
+      aplicarTema(state.preferencias.tema);
+      saveState(state);
+      render();
+    });
+    document.getElementById('pref-formato-data')?.addEventListener('change', (e) => {
+      state.preferencias.formatoData = e.target.value;
+      saveState(state);
+      render();
+    });
+    document.getElementById('pref-confirmacoes-toggle')?.addEventListener('change', (e) => {
+      state.preferencias.confirmacoes = e.target.checked;
+      saveState(state);
+      render();
+    });
+    document.getElementById('pref-notificacoes-toggle')?.addEventListener('change', (e) => {
+      state.preferencias.notificacoes = e.target.checked;
+      saveState(state);
+      render();
+    });
+
+    const excluirInput = document.getElementById('config-excluir-input');
+    if(excluirInput){
+      excluirInput.addEventListener('input', () => {
+        configExcluirTexto = excluirInput.value;
+        renderPreservandoFoco();
+      });
+    }
+    document.getElementById('btn-limpar-dados')?.addEventListener('click', () => {
+      if(configExcluirTexto.trim() !== 'EXCLUIR') return;
+      if(!confirm('Isso vai apagar TODOS os seus dados de estudo deste aparelho. Essa ação não pode ser desfeita. Tem certeza?')) return;
+      limparTodosDados();
+      configExcluirTexto = '';
+      render();
+    });
+
     document.querySelectorAll('[data-editar-sessao]').forEach(btn => {
       btn.addEventListener('click', () => {
         const s = state.sessoes.find(x => x.id === btn.dataset.editarSessao);
@@ -1865,7 +2157,7 @@
     });
     document.querySelectorAll('[data-excluir-sessao]').forEach(btn => {
       btn.addEventListener('click', () => {
-        if(!confirm('Excluir esta sessão registrada? Essa ação não pode ser desfeita.')) return;
+        if(!confirmarAcao('Excluir esta sessão registrada? Essa ação não pode ser desfeita.')) return;
         excluirSessao(state, btn.dataset.excluirSessao);
         saveState(state);
         render();
@@ -1929,6 +2221,9 @@
   let iniciarAberto = null;
   let timerIntervalId = null;
   let sessaoEditando = null;
+  let configSessaoBusca = '';
+  let configSessaoFiltroTipo = 'todos';
+  let configExcluirTexto = '';
   const TIPO_LABEL = { questoes:'Questões', teoria:'Teoria', revisao:'Revisão', anki:'Anki' };
   let semanaVisualizada = null;
   let atividadeDiaAberta = null;
@@ -2506,7 +2801,7 @@
     });
     document.getElementById('registro-backdrop')?.addEventListener('click', (e) => {
       if(e.target.id !== 'registro-backdrop') return;
-      if(registroAberto?.minutosPreenchidos != null && !confirm('Você tem uma sessão cronometrada aguardando registro. Fechar sem salvar descarta esse tempo. Continuar?')) return;
+      if(registroAberto?.minutosPreenchidos != null && !confirmarAcao('Você tem uma sessão cronometrada aguardando registro. Fechar sem salvar descarta esse tempo. Continuar?')) return;
       registroAberto = null;
       render();
     });
@@ -2526,7 +2821,7 @@
       if(e.target.id === 'iniciar-backdrop'){ iniciarAberto = null; render(); }
     });
     document.getElementById('iniciar-confirmar')?.addEventListener('click', () => {
-      if(state.sessaoEmAndamento && !confirm('Já existe uma sessão em andamento. Descartar e iniciar outra?')) return;
+      if(state.sessaoEmAndamento && !confirmarAcao('Já existe uma sessão em andamento. Descartar e iniciar outra?')) return;
       const assunto = resolverAssuntoBusca('iniciar-assunto-busca', 'iniciar-assunto');
       const tipo = document.getElementById('iniciar-tipo').value;
       iniciarSessaoEmAndamento(state, { assunto, tipo, origem: 'header' });
@@ -2598,7 +2893,7 @@
     });
     app.querySelectorAll('[data-iniciar-timer]').forEach(btn => {
       btn.addEventListener('click', () => {
-        if(state.sessaoEmAndamento && !confirm('Já existe uma sessão em andamento. Descartar e iniciar outra?')) return;
+        if(state.sessaoEmAndamento && !confirmarAcao('Já existe uma sessão em andamento. Descartar e iniciar outra?')) return;
         iniciarSessaoEmAndamento(state, { assunto: btn.dataset.iniciarTimer || null, tipo: btn.dataset.tipoSugerido || null, origem: btn.dataset.origem || null });
         saveState(state);
         render();
@@ -2966,7 +3261,7 @@
     });
     document.querySelectorAll('[data-excluir-erro]').forEach(btn => {
       btn.addEventListener('click', () => {
-        if(!confirm('Excluir este erro registrado? Essa ação não pode ser desfeita.')) return;
+        if(!confirmarAcao('Excluir este erro registrado? Essa ação não pode ser desfeita.')) return;
         excluirErro(state, btn.dataset.excluirErro);
         erroMenuAberto = null;
         saveState(state);
@@ -3685,8 +3980,8 @@
         options: {
           responsive:true, plugins:{legend:{display:false}},
           scales:{
-            y:{min:0,max:100, ticks:{color:'#9aa0a6'}, grid:{color:'#2a2f3a'}},
-            x:{ticks:{color:'#9aa0a6'}, grid:{display:false}}
+            y:{min:0,max:100, ticks:{color:corVar('--muted')}, grid:{color:corVar('--border')}},
+            x:{ticks:{color:corVar('--muted')}, grid:{display:false}}
           }
         }
       });
@@ -3730,6 +4025,7 @@
 
   attachSidebarHandlers();
   attachTabsHandlers();
+  aplicarTema(state.preferencias.tema);
 
   /* === INIT === */
   if('serviceWorker' in navigator){
