@@ -703,12 +703,13 @@
     return PRIORIDADE_POR_GRAU[erro.grau] || 'baixa';
   }
 
-  function filtrarErros(erros, { filtro, assunto, busca, hojeIso }){
+  function filtrarErros(state, erros, { filtro, assunto, busca, concurso, hojeIso }){
     return erros.filter(e => {
       if(filtro === 'pendentes' && e.proximaRevisao > hojeIso) return false;
       if(filtro === 'revisados' && !e.ultimaRevisao) return false;
       if(filtro === 'alta_prioridade' && prioridadeErro(e) !== 'alta') return false;
       if(assunto && assunto !== 'todos' && e.assunto !== assunto) return false;
+      if(concurso && concurso !== 'todos' && !assuntoPertenceAoConcurso(state, e.assunto, concurso)) return false;
       if(busca){
         const termo = busca.toLowerCase();
         if(!e.assunto.toLowerCase().includes(termo) && !e.oQueErrei.toLowerCase().includes(termo)) return false;
@@ -1727,6 +1728,7 @@
   let mapaConcursoAberto = false;
   let errosFiltro = 'todos';
   let errosFiltroAssunto = 'todos';
+  let errosFiltroConcurso = 'todos';
   let errosBusca = '';
   const errosExpandidos = new Set();
   const errosRevisando = new Set();
@@ -2261,6 +2263,7 @@
         const e = state.erros.find(x => x.id === btn.dataset.acertei);
         graduarAcerto(e);
         incrementarContadorRevisoes(state);
+        avancarStatusPorAtividade(state, e.assunto, hojeISO());
         saveState(state);
         render();
       });
@@ -2270,6 +2273,7 @@
         const e = state.erros.find(x => x.id === btn.dataset.errei);
         graduarErro(e);
         incrementarContadorRevisoes(state);
+        avancarStatusPorAtividade(state, e.assunto, hojeISO());
         saveState(state);
         render();
       });
@@ -2453,7 +2457,7 @@
   function renderErros(){
     const hojeIso = hojeISO();
     const stats = statsErros(state.erros, hojeIso);
-    const listaFiltrada = ordenarErros(filtrarErros(state.erros, { filtro: errosFiltro, assunto: errosFiltroAssunto, busca: errosBusca, hojeIso }), errosOrdenacao);
+    const listaFiltrada = ordenarErros(filtrarErros(state, state.erros, { filtro: errosFiltro, assunto: errosFiltroAssunto, busca: errosBusca, concurso: errosFiltroConcurso, hojeIso }), errosOrdenacao);
     const assuntosComErro = [...new Set(state.erros.map(e => e.assunto))].sort();
 
     const headerHtml = `
@@ -2489,6 +2493,10 @@
           <select id="erros-assunto-select" class="erros-assunto-select">
             <option value="todos">Todos os assuntos</option>
             ${assuntosComErro.map(a => `<option value="${escapeHtml(a)}" ${errosFiltroAssunto===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}
+          </select>
+          <select id="erros-concurso-select" class="erros-assunto-select">
+            <option value="todos" ${errosFiltroConcurso==='todos'?'selected':''}>Todos os concursos</option>
+            ${(state.concursos||[]).map(nome => `<option value="${slugConcurso(nome)}" ${errosFiltroConcurso===slugConcurso(nome)?'selected':''}>${escapeHtml(nome)}</option>`).join('')}
           </select>
         </div>
 
@@ -2590,6 +2598,7 @@
           <div class="resumo-meta-item"><div><b>${stats.revisoesHoje}</b><br><small class="muted">Revisões hoje</small></div></div>
           <div class="resumo-meta-item"><div><b>${stats.revisadosEstaSemana}</b><br><small class="muted">Revisados esta semana</small></div></div>
           <div class="resumo-meta-item"><div><b>${stats.taxaRevisao}%</b><br><small class="muted">Taxa de revisão</small></div></div>
+          <div class="resumo-meta-item"><div><b>${state.contadorRevisoes || 0}</b><br><small class="muted">Total de revisões (desde sempre)</small></div></div>
           ${stats.assuntoMaisFrequente ? `<div class="resumo-meta-item"><div><b>${escapeHtml(stats.assuntoMaisFrequente)}</b><br><small class="muted">Assunto mais frequente — ${stats.assuntoMaisFrequenteCount} erros</small></div></div>` : ''}
         </div>
         <div class="card">
@@ -2683,6 +2692,10 @@
       errosFiltroAssunto = e.target.value;
       render();
     });
+    document.getElementById('erros-concurso-select')?.addEventListener('change', (e) => {
+      errosFiltroConcurso = e.target.value;
+      render();
+    });
     document.getElementById('erros-ordenar-select')?.addEventListener('change', (e) => {
       errosOrdenacao = e.target.value;
       render();
@@ -2712,7 +2725,7 @@
     app.querySelectorAll('button[data-acertei]').forEach(btn => {
       btn.addEventListener('click', () => {
         const e = state.erros.find(x => x.id === btn.dataset.acertei);
-        if(e){ graduarAcerto(e); incrementarContadorRevisoes(state); }
+        if(e){ graduarAcerto(e); incrementarContadorRevisoes(state); avancarStatusPorAtividade(state, e.assunto, hojeISO()); }
         errosRevisando.delete(btn.dataset.acertei);
         saveState(state);
         render();
@@ -2721,7 +2734,7 @@
     app.querySelectorAll('button[data-errei]').forEach(btn => {
       btn.addEventListener('click', () => {
         const e = state.erros.find(x => x.id === btn.dataset.errei);
-        if(e){ graduarErro(e); incrementarContadorRevisoes(state); }
+        if(e){ graduarErro(e); incrementarContadorRevisoes(state); avancarStatusPorAtividade(state, e.assunto, hojeISO()); }
         errosRevisando.delete(btn.dataset.errei);
         saveState(state);
         render();
@@ -2798,7 +2811,7 @@
     });
     document.getElementById('revisao-sessao-acertei')?.addEventListener('click', () => {
       const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
-      if(erroAtual){ graduarAcerto(erroAtual); incrementarContadorRevisoes(state); }
+      if(erroAtual){ graduarAcerto(erroAtual); incrementarContadorRevisoes(state); avancarStatusPorAtividade(state, erroAtual.assunto, hojeISO()); }
       saveState(state);
       revisaoSessao.indice++;
       revisaoSessao.revelado = false;
@@ -2806,7 +2819,7 @@
     });
     document.getElementById('revisao-sessao-errei')?.addEventListener('click', () => {
       const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
-      if(erroAtual){ graduarErro(erroAtual); incrementarContadorRevisoes(state); }
+      if(erroAtual){ graduarErro(erroAtual); incrementarContadorRevisoes(state); avancarStatusPorAtividade(state, erroAtual.assunto, hojeISO()); }
       saveState(state);
       revisaoSessao.indice++;
       revisaoSessao.revelado = false;
@@ -2945,7 +2958,9 @@
       const naoIniciados = state.conteudo.filter(c => c.status === 'nao_iniciado' && !jaSelecionados.has(c.assunto)).map(c => c.assunto);
       const agregadoGeral = agregarPorAssunto(state.checkins, state.sessoes);
       const fracos = piores5(agregadoGeral).map(p => p.assunto).filter(a => !jaSelecionados.has(a) && !naoIniciados.includes(a));
-      return [...naoIniciados.slice(0,3), ...fracos.slice(0,3)].slice(0,5);
+      const comErroSemDados = [...new Set(state.erros.map(e => e.assunto))]
+        .filter(a => !jaSelecionados.has(a) && !naoIniciados.includes(a) && !fracos.includes(a));
+      return [...naoIniciados.slice(0,3), ...fracos.slice(0,3), ...comErroSemDados.slice(0,2)].slice(0,5);
     })();
 
     const metaFormHtml = `
