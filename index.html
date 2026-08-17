@@ -239,6 +239,56 @@
   .revisao-sessao-secao{margin-top:var(--space-3);}
   .revisao-sessao-secao p{margin-top:4px;}
 
+  /* === DASHBOARD (redesign) === */
+  .dashboard-hero-row{display:flex;align-items:stretch;gap:var(--space-4);flex-wrap:wrap;}
+  .dashboard-hero-divider{width:1px;background:var(--border);flex-shrink:0;align-self:stretch;}
+  @media(max-width:700px){.dashboard-hero-divider{display:none;}}
+  .dashboard-hero-progresso{flex:1 1 220px;min-width:200px;}
+  .dashboard-hero-progresso-label{font-size:var(--text-sm);color:var(--muted);display:flex;align-items:center;gap:4px;margin-bottom:4px;}
+  .dashboard-hero-progresso-valor{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:4px;}
+  .dashboard-hero-progresso-valor b{font-size:var(--text-2xl);font-weight:650;}
+  .dashboard-hero-dias{font-size:var(--text-sm);color:var(--muted);}
+
+  .dashboard-kpi-meta{font-size:10px;color:var(--muted);margin-top:2px;}
+  .dashboard-kpi-card .progress{margin-top:6px;height:6px;}
+
+  .dashboard-progresso-row{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2);}
+  .dashboard-progresso-label{flex:0 0 130px;font-size:var(--text-sm);color:var(--muted);}
+  .dashboard-progresso-row .progress{flex:1;margin:0;}
+  .dashboard-progresso-valor{flex:0 0 auto;font-size:var(--text-sm);white-space:nowrap;}
+  .dashboard-dias-blocos{display:flex;gap:4px;flex:1;}
+  .dashboard-dia-bloco{flex:1;height:8px;border-radius:4px;background:var(--border);}
+  .dashboard-dia-bloco.feito{background:var(--accent);}
+
+  .dashboard-badge-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:var(--space-2);}
+  .dashboard-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;
+    font-size:var(--text-sm);font-weight:600;border:1px solid var(--border);background:var(--bg);}
+
+  .dashboard-atencao-item{display:flex;align-items:center;gap:var(--space-2);width:100%;text-align:left;
+    background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);
+    margin-bottom:var(--space-2);cursor:pointer;font:inherit;color:var(--fg);}
+  .dashboard-atencao-item:last-child{margin-bottom:0;}
+  .dashboard-atencao-icon{flex-shrink:0;}
+  .dashboard-atencao-texto{flex:1;font-size:var(--text-sm);}
+  .dashboard-atencao-seta{color:var(--muted);flex-shrink:0;}
+
+  .dashboard-status-badges{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-2);margin-bottom:var(--space-3);}
+  @media(min-width:480px){.dashboard-status-badges{grid-template-columns:repeat(4,1fr);}}
+  .dashboard-status-badge{text-align:center;padding:var(--space-2);border-radius:var(--radius-sm);background:var(--bg);border:1px solid var(--border);}
+  .dashboard-status-badge .stat-icon{position:static;opacity:1;font-size:16px;}
+  .dashboard-status-badge b{display:block;font-size:var(--text-xl);margin-top:2px;}
+  .dashboard-status-badge small{color:var(--muted);font-size:10px;}
+  .dashboard-status-bar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--border);}
+  .dashboard-status-bar span{height:100%;}
+
+  .dashboard-quick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-3);}
+  .dashboard-quick-btn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;
+    background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--space-3);
+    min-height:auto;width:100%;margin:0;font:inherit;color:var(--fg);}
+  .dashboard-quick-btn .dashboard-quick-icon{font-size:20px;margin-bottom:4px;}
+  .dashboard-quick-btn b{font-size:var(--text-sm);}
+  .dashboard-quick-btn small{color:var(--muted);font-size:var(--text-xs);}
+
   /* === DESEMPENHO (redesign) === */
   .desempenho-filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex:0 1 auto;}
   .desempenho-filtros select{width:auto;min-height:36px;margin:0;padding:0 10px;font-size:var(--text-xs);}
@@ -1455,50 +1505,199 @@
     const hojeIso = hojeISO();
     const semanaId = semanaAtualId();
     const dias = diasAte(hojeIso, state.meta.provaData);
-    const agregado = agregarPorAssunto(state.checkins, state.sessoes);
-    const piores = piores5(agregado);
-    const fila = filaRevisao(state.erros, hojeIso);
+    const plano = obterPlano(state, semanaId);
+    const diasFeitos = diasRealizadosNaSemana(state.checkins, state.sessoes, semanaId);
+    const horasFeitas = horasRealizadasNaSemana(state.checkins, state.sessoes, semanaId);
+    const diasAlvo = plano?.diasAlvo || 0;
+    const horasAlvo = plano?.horasAlvo || 0;
+    const pctMetaSemanal = horasAlvo ? Math.min(100, Math.round((horasFeitas/horasAlvo)*100)) : 0;
+
+    const cicloAtivo = state.ciclos[state.ciclos.length-1];
+    const anoProva = state.meta.provaData ? state.meta.provaData.slice(0,4) : '';
+
+    const checkinsSemana = state.checkins.filter(c => dentroDaSemana(c.data, semanaId));
+    const sessoesSemana = state.sessoes.filter(s => dentroDaSemana(s.data, semanaId));
+    const agregadoSemana = agregarPorAssunto(checkinsSemana, sessoesSemana);
+    const questoesSemana = agregadoSemana.reduce((s,a)=>s+a.questoes,0);
     const ci = checkinDeHoje();
-    const statusAtivo = ci ? ci.status : null;
-    return `
-      <div class="card"><h2>${dias} dias até a prova</h2></div>
+    const questoesHoje = (ci?.questoes || 0) + state.sessoes.filter(s => s.data===hojeIso && s.tipo==='questoes').reduce((s,x)=>s+(x.questoes||0),0);
+
+    const sete = addDays(hojeIso, -6);
+    const checkins7 = state.checkins.filter(c => c.data >= sete && c.data <= hojeIso);
+    const sessoes7 = state.sessoes.filter(s => s.data >= sete && s.data <= hojeIso);
+    const agregado7 = agregarPorAssunto(checkins7, sessoes7);
+    const questoes7 = agregado7.reduce((s,a)=>s+a.questoes,0);
+    const acertos7 = agregado7.reduce((s,a)=>s+a.acertos,0);
+    const pctAcerto7 = questoes7 ? Math.round((acertos7/questoes7)*100) : 0;
+
+    const fila = filaRevisao(state.erros, hojeIso);
+    const revisoesHojeCount = state.erros.filter(e => e.proximaRevisao === hojeIso).length;
+
+    const agregadoGeral = agregarPorAssunto(state.checkins, state.sessoes);
+    const piores = piores5(agregadoGeral);
+    const piorAssunto = piores[0] || null;
+
+    const atividades = atividadesDoDiaCombinadas(plano, state.conteudo, state.checkins, state.sessoes, hojeIso);
+    const proxima = proximaAtividadeDoDia(atividades, fila);
+    const proximaInfo = proxima
+      ? (proxima.origem === 'conteudo' ? { assunto: proxima.assunto, tipo: proxima.tipo || 'questoes' } : { assunto: proxima.erro.assunto, tipo: 'revisao' })
+      : null;
+
+    const statusCounts = {
+      nao_iniciado: state.conteudo.filter(c=>c.status==='nao_iniciado').length,
+      estudado: state.conteudo.filter(c=>c.status==='estudado').length,
+      revisado: state.conteudo.filter(c=>c.status==='revisado').length,
+      dominado: state.conteudo.filter(c=>c.status==='dominado').length,
+    };
+    const totalConteudo = state.conteudo.length || 1;
+
+    const heroHtml = `
+      <div class="card">
+        <div class="dashboard-hero-row">
+          <div class="planejamento-header">
+            <div class="hoje-header-icon">📅</div>
+            <div>
+              <h2>${dias} dias até a prova</h2>
+              <small class="muted">${cicloAtivo ? escapeHtml(cicloAtivo.nome) : ''}${anoProva ? ` • prova em ${anoProva}` : ''} • ciclo atual em andamento</small>
+            </div>
+          </div>
+          <div class="dashboard-hero-divider"></div>
+          <div class="dashboard-hero-progresso">
+            <div class="dashboard-hero-progresso-label">Progresso semanal</div>
+            <div class="dashboard-hero-progresso-valor"><b>${horasFeitas}h / ${horasAlvo}h</b><span class="dashboard-hero-dias">${diasFeitos} de ${diasAlvo} dias</span></div>
+            <div class="progress"><i style="width:${pctMetaSemanal}%"></i></div>
+            <small class="muted">${pctMetaSemanal}% da meta semanal</small>
+          </div>
+        </div>
+      </div>`;
+
+    const kpiHtml = `
       <div class="kpi-grid">
-        <div class="card stat-card"><div class="stat-label">Horas hoje</div><div class="stat-value">${horasNoDia(state.checkins, state.sessoes, hojeIso)}h</div><div class="stat-icon">⏱️</div></div>
-        <div class="card stat-card"><div class="stat-label">Horas na semana</div><div class="stat-value">${horasRealizadasNaSemana(state.checkins, state.sessoes, semanaId)}h</div><div class="stat-icon">🗓️</div></div>
-        <div class="card stat-card"><div class="stat-label">Questões feitas</div><div class="stat-value">${agregado.reduce((s,a)=>s+a.questoes,0)}</div><div class="stat-icon">❓</div></div>
-        <div class="card stat-card"><div class="stat-label">% de acerto</div><div class="stat-value">${agregado.length ? Math.round(agregado.reduce((s,a)=>s+a.acertos,0)/Math.max(1,agregado.reduce((s,a)=>s+a.questoes,0))*100) : 0}%</div><div class="stat-icon">✅</div></div>
-        <div class="card stat-card"><div class="stat-label">Revisões pendentes</div><div class="stat-value">${fila.length}</div><div class="stat-icon">🔁</div></div>
-        <div class="card stat-card"><div class="stat-label">Dias em sequência</div><div class="stat-value">${calcularSequencia(state.checkins, state.sessoes, hojeIso)}</div><div class="stat-icon">🔥</div></div>
-        <div class="card stat-card"><div class="stat-label">% do cronograma</div><div class="stat-value">${pctCronograma(state.conteudo)}%</div><div class="stat-icon">📘</div></div>
-      </div>
-      <div class="grid-2">
-        <div class="card">
-          <h3>Horas por dia da semana</h3>
-          <canvas id="chart-horas-semana" height="220"></canvas>
+        <div class="card stat-card dashboard-kpi-card">
+          <div class="stat-label">Horas na semana</div><div class="stat-value">${horasFeitas}h</div><div class="stat-icon" style="color:#3b82f6">⏱️</div>
+          <div class="dashboard-kpi-meta">meta: ${horasAlvo}h</div>
+          <div class="progress"><i style="width:${horasAlvo?Math.min(100,Math.round(horasFeitas/horasAlvo*100)):0}%;background:#3b82f6"></i></div>
         </div>
-        <div class="card">
-          <h3>Desempenho por disciplina</h3>
-          ${agregado.length ? `<table class="data"><thead><tr><th>Assunto</th><th>%</th></tr></thead><tbody>
-            ${agregado.map(a => `<tr><td>${escapeHtml(a.assunto)}<div class="progress"><i style="width:${a.pct}%"></i></div></td><td>${a.pct}%</td></tr>`).join('')}
-          </tbody></table>` : '<p class="muted">Sem questões registradas ainda.</p>'}
+        <div class="card stat-card dashboard-kpi-card">
+          <div class="stat-label">Questões na semana</div><div class="stat-value">${questoesSemana}</div><div class="stat-icon" style="color:#10b981">❓</div>
+          <div class="dashboard-kpi-meta" style="color:var(--ok)">+${questoesHoje} hoje</div>
+          <div class="progress"><i style="width:${questoesSemana?Math.min(100,Math.round(questoesHoje/Math.max(1,questoesSemana)*100)):0}%;background:#10b981"></i></div>
         </div>
-        <div class="card">
-          <h3>Assuntos com pior desempenho</h3>
-          ${piores.length ? piores.map(p=>`<p>${escapeHtml(p.assunto)} — ${p.pct}%</p>`).join('') : '<p class="muted">Sem dados suficientes.</p>'}
+        <div class="card stat-card dashboard-kpi-card">
+          <div class="stat-label">% de acerto</div><div class="stat-value">${pctAcerto7}%</div><div class="stat-icon" style="color:#a855f7">🎯</div>
+          <div class="dashboard-kpi-meta">últimos 7 dias</div>
+          <div class="progress"><i style="width:${pctAcerto7}%;background:#a855f7"></i></div>
         </div>
-        <div class="card">
-          <h3>O que estudar hoje</h3>
-          ${fila.length ? `
-            <p>${fila.length} revisão${fila.length===1?'':'ões'} pendente${fila.length===1?'':'s'}</p>
-            ${fila.slice(0,5).map(e => `<p class="muted">${escapeHtml(e.assunto)} — ${escapeHtml(GRAU_LABEL[e.grau])}</p>`).join('')}
-            ${fila.length > 5 ? `<p class="muted">+ ${fila.length - 5} outra${fila.length - 5===1?'':'s'}</p>` : ''}
-            <button data-ir-hoje>Ir para Hoje →</button>
-          ` : '<p class="muted">Nada atrasado — bom sinal.</p>'}
+        <div class="card stat-card dashboard-kpi-card">
+          <div class="stat-label">Revisões pendentes</div><div class="stat-value">${fila.length}</div><div class="stat-icon" style="color:#f59e0b">🔔</div>
+          <div class="dashboard-kpi-meta" style="color:var(--warn)">${revisoesHojeCount} vence${revisoesHojeCount===1?'':'m'} hoje</div>
+          <div class="progress"><i style="width:${fila.length?100:0}%;background:#f59e0b"></i></div>
         </div>
-        <div class="card">
-          <h3>Como foi hoje?</h3>
-          ${statusAtivo==='base' ? '<p>✓ Meta cumprida</p>' : statusAtivo==='minimo' ? '<p>★ Fiz o mínimo</p>' : statusAtivo==='nao' ? '<p>✕ Não estudei</p>' : '<p class="muted">Ainda não registrado hoje.</p>'}
-          <button data-ir-hoje>Ir para Hoje →</button>
+      </div>`;
+
+    const progressoSemanaHtml = `
+      <div class="card">
+        <h3><span class="section-icon">📊</span>Seu progresso esta semana</h3>
+        <div class="dashboard-progresso-row">
+          <div class="dashboard-progresso-label">Horas estudadas</div>
+          <div class="progress"><i style="width:${pctMetaSemanal}%"></i></div>
+          <div class="dashboard-progresso-valor">${horasFeitas}h / ${horasAlvo}h</div>
+        </div>
+        <div class="dashboard-progresso-row">
+          <div class="dashboard-progresso-label">Dias estudados</div>
+          <div class="dashboard-dias-blocos">
+            ${Array.from({length: Math.max(diasAlvo,1)}, (_, i) => `<div class="dashboard-dia-bloco ${i < diasFeitos ? 'feito' : ''}"></div>`).join('')}
+          </div>
+          <div class="dashboard-progresso-valor">${diasFeitos} / ${diasAlvo}</div>
+        </div>
+        <div class="dashboard-badge-row">
+          <span class="dashboard-badge" style="color:#f59e0b;border-color:#f59e0b">🔥 Sequência: ${calcularSequencia(state.checkins, state.sessoes, hojeIso)} dias</span>
+          <span class="dashboard-badge" style="color:#3b82f6;border-color:#3b82f6">📅 Cronograma: ${pctCronograma(state.conteudo)}%</span>
+        </div>
+      </div>`;
+
+    const hojeCardHtml = `
+      <div class="card">
+        <h3><span class="section-icon">☀️</span>Hoje</h3>
+        ${state.sessaoEmAndamento ? `
+          <small class="muted">Sessão em andamento</small>
+          <h3 style="margin-top:2px;">${escapeHtml(state.sessaoEmAndamento.assunto || 'Estudo livre')}</h3>
+        ` : proximaInfo ? `
+          <small class="muted">Próxima atividade</small>
+          <h3 style="margin-top:2px;">${escapeHtml(proximaInfo.assunto)}</h3>
+          <div class="row" style="margin-bottom:8px;">
+            <div><small class="muted">Tipo</small><div>${iconeTipo(proximaInfo.tipo)} ${escapeHtml(TIPO_LABEL[proximaInfo.tipo] || proximaInfo.tipo)}</div></div>
+          </div>
+        ` : `<p class="muted">Nada planejado ainda pra hoje.</p>`}
+        <div class="row">
+          <button class="primary" data-ir-hoje>Ir para Hoje →</button>
+          ${state.sessaoEmAndamento ? `<button data-ir-hoje>Continuar sessão ▶</button>` : ''}
+        </div>
+        <div class="row" style="margin-top:var(--space-2);">
+          <button class="card-link" data-ir-erros style="width:auto;">🔔 Revisões de hoje <b style="margin:0 4px;">${fila.length}</b> →</button>
+          <button class="card-link" data-ir-hoje style="width:auto;">❓ Questões hoje <b style="margin:0 4px;">${questoesHoje}</b> →</button>
+        </div>
+      </div>`;
+
+    const chartHtml = `
+      <div class="card">
+        <div class="card-header-row">
+          <h3><span class="section-icon">📊</span>Últimos 7 dias</h3>
+          <small class="muted">Total: ${horasFeitas}h</small>
+        </div>
+        <canvas id="chart-horas-semana" height="220"></canvas>
+      </div>`;
+
+    const atencaoHtml = `
+      <div class="card">
+        <h3><span class="section-icon">⚠️</span>Atenção</h3>
+        ${piorAssunto ? `<button class="dashboard-atencao-item" data-ir-desempenho><span class="dashboard-atencao-icon">🎯</span><span class="dashboard-atencao-texto">${escapeHtml(piorAssunto.assunto)} com ${piorAssunto.pct}% de acerto</span><span class="dashboard-atencao-seta">›</span></button>` : ''}
+        ${fila.length ? `<button class="dashboard-atencao-item" data-ir-erros><span class="dashboard-atencao-icon">⏰</span><span class="dashboard-atencao-texto">${fila.length} revis${fila.length===1?'ão':'ões'} pendente${fila.length===1?'':'s'}</span><span class="dashboard-atencao-seta">›</span></button>` : ''}
+        <button class="dashboard-atencao-item" data-ir-planejamento><span class="dashboard-atencao-icon">📈</span><span class="dashboard-atencao-texto">Meta semanal em ${pctMetaSemanal}%</span><span class="dashboard-atencao-seta">›</span></button>
+        ${!piorAssunto && !fila.length ? '<p class="muted">Tudo em dia — sem alertas.</p>' : ''}
+      </div>`;
+
+    const cicloAtualHtml = `
+      <div class="card">
+        <h3><span class="section-icon">🔄</span>Ciclo atual</h3>
+        <div class="dashboard-status-badges">
+          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-not-started)">⭕</div><b>${statusCounts.nao_iniciado}</b><small>Não iniciados</small></div>
+          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-in-progress)">🔵</div><b>${statusCounts.estudado}</b><small>Em andamento</small></div>
+          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-review)">🟡</div><b>${statusCounts.revisado}</b><small>Em revisão</small></div>
+          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-completed)">✅</div><b>${statusCounts.dominado}</b><small>Concluídos</small></div>
+        </div>
+        <div class="dashboard-status-bar">
+          <span style="width:${statusCounts.nao_iniciado/totalConteudo*100}%;background:var(--status-not-started)"></span>
+          <span style="width:${statusCounts.estudado/totalConteudo*100}%;background:var(--status-in-progress)"></span>
+          <span style="width:${statusCounts.revisado/totalConteudo*100}%;background:var(--status-review)"></span>
+          <span style="width:${statusCounts.dominado/totalConteudo*100}%;background:var(--status-completed)"></span>
+        </div>
+      </div>`;
+
+    const acessoRapidoHtml = `
+      <div class="card">
+        <h3><span class="section-icon">⚡</span>Acesso rápido</h3>
+        <div class="dashboard-quick-grid">
+          <button class="dashboard-quick-btn" data-ir-planejamento><span class="dashboard-quick-icon">📅</span><b>Planejar semana</b><small>Organize seu estudo</small></button>
+          <button class="dashboard-quick-btn" data-ir-erros><span class="dashboard-quick-icon">📝</span><b>Registrar erro</b><small>Revise e aprenda</small></button>
+          <button class="dashboard-quick-btn" data-ir-desempenho><span class="dashboard-quick-icon">📊</span><b>Ver desempenho</b><small>Acompanhe seus dados</small></button>
+          <button class="dashboard-quick-btn" data-ir-mapa><span class="dashboard-quick-icon">🗺️</span><b>Mapa de conteúdo</b><small>Veja seu progresso</small></button>
+        </div>
+      </div>`;
+
+    return `
+      ${heroHtml}
+      ${kpiHtml}
+      <div class="grid-hoje">
+        <div>
+          ${progressoSemanaHtml}
+          ${hojeCardHtml}
+          ${chartHtml}
+        </div>
+        <div>
+          ${atencaoHtml}
+          ${cicloAtualHtml}
+          ${acessoRapidoHtml}
         </div>
       </div>
     `;
@@ -1508,6 +1707,18 @@
     const app = document.getElementById('app');
     app.querySelectorAll('[data-ir-hoje]').forEach(btn => {
       btn.addEventListener('click', () => { currentTab = 'hoje'; render(); });
+    });
+    app.querySelectorAll('[data-ir-erros]').forEach(btn => {
+      btn.addEventListener('click', () => { currentTab = 'erros'; render(); });
+    });
+    app.querySelectorAll('[data-ir-planejamento]').forEach(btn => {
+      btn.addEventListener('click', () => { currentTab = 'planejamento'; render(); });
+    });
+    app.querySelectorAll('[data-ir-desempenho]').forEach(btn => {
+      btn.addEventListener('click', () => { currentTab = 'desempenho'; render(); });
+    });
+    app.querySelectorAll('[data-ir-mapa]').forEach(btn => {
+      btn.addEventListener('click', () => { currentTab = 'mapa'; render(); });
     });
     criarOuAtualizarChart('chart-horas-semana', {
       type: 'bar',
