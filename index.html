@@ -1319,6 +1319,7 @@
     if(!Array.isArray(state.historicoImportacoes)) state.historicoImportacoes = [];
     state.historicoImportacoes.push({
       id: String(Date.now()) + Math.random().toString(36).slice(2,7),
+      tipo: 'plano',
       quando: new Date().toISOString(),
       cicloNome: planoExterno.ciclo?.nome || null,
       atividadesAdicionadas: adicionadas,
@@ -1327,6 +1328,32 @@
       periodoFim: datas[datas.length-1] || null,
     });
     return adicionadas;
+  }
+
+  function mesclarErrosExternos(state, entrada){
+    const lista = Array.isArray(entrada) ? entrada : Array.isArray(entrada?.erros) ? entrada.erros : null;
+    if(!lista) throw new Error('formato não reconhecido — esperava um array de erros ou um objeto com "erros"');
+    let adicionados = 0;
+    lista.forEach(item => {
+      if(!item || !item.assunto || !item.oQueErrei || !item.regraCorreta) return;
+      const jaExiste = state.erros.some(e => e.assunto === item.assunto && e.oQueErrei === item.oQueErrei);
+      if(jaExiste) return;
+      criarErro(state, {
+        assunto: item.assunto,
+        oQueErrei: item.oQueErrei,
+        regraCorreta: item.regraCorreta,
+        origemQuestao: !!item.origemQuestao,
+      });
+      adicionados++;
+    });
+    if(!Array.isArray(state.historicoImportacoes)) state.historicoImportacoes = [];
+    state.historicoImportacoes.push({
+      id: String(Date.now()) + Math.random().toString(36).slice(2,7),
+      tipo: 'erros',
+      quando: new Date().toISOString(),
+      errosAdicionados: adicionados,
+    });
+    return adicionados;
   }
 
   function removerAtividadeDia(state, semanaId, dataIso, atividadeId){
@@ -2156,10 +2183,16 @@
     const historicoOrdenado = [...(state.historicoImportacoes||[])].sort((a,b) => b.quando.localeCompare(a.quando));
     const historicoImportacoesHtml = historicoOrdenado.length ? `
       <div class="historico-import-list">
-        ${historicoOrdenado.map(h => `
+        ${historicoOrdenado.map(h => h.tipo === 'erros' ? `
           <div class="historico-import-item">
             <div class="historico-import-info">
-              <b>${escapeHtml(h.cicloNome || 'Plano sem nome de ciclo')}</b>
+              <b>${icone('notebook')} Caderno de Erros</b>
+              <small class="muted">${formatarDataHora(h.quando)} · ${h.errosAdicionados} ${h.errosAdicionados===1?'erro adicionado':'erros adicionados'}</small>
+            </div>
+          </div>` : `
+          <div class="historico-import-item">
+            <div class="historico-import-info">
+              <b>${icone('calendar')} ${escapeHtml(h.cicloNome || 'Plano sem nome de ciclo')}</b>
               <small class="muted">${formatarDataHora(h.quando)} · ${h.atividadesAdicionadas} ${h.atividadesAdicionadas===1?'atividade':'atividades'}${h.periodoInicio ? ` · ${formatarData(h.periodoInicio)} a ${formatarData(h.periodoFim)}` : ''}</small>
             </div>
           </div>`).join('')}
@@ -2235,6 +2268,12 @@
             <button id="btn-import-plano" class="primary">Importar plano</button>
           </div>
           <div class="card">
+            <h3>${icone('notebook')} Importar caderno de erros</h3>
+            <small class="muted">Cole uma lista de erros (JSON — array com assunto, oQueErrei e regraCorreta) pra adicionar ao Caderno de Erros. Isso soma aos erros já registrados — nunca substitui nem apaga o que já foi importado antes.</small>
+            <textarea id="input-import-erros" placeholder='Cole aqui os erros (JSON), ex: [{"assunto":"PNRS","oQueErrei":"...","regraCorreta":"..."}]' style="margin-top:var(--space-2);"></textarea>
+            <button id="btn-import-erros" class="primary">Importar erros</button>
+          </div>
+          <div class="card">
             <h3>${icone('clipboard-list')} Histórico de importações</h3>
             <small class="muted">Todo plano de estudos importado fica registrado aqui — nada é apagado.</small>
             ${historicoImportacoesHtml}
@@ -2283,6 +2322,12 @@
                 </div>`).join('')}
             </div>
             <button type="button" id="btn-salvar-provas" class="primary" style="margin-top:var(--space-2);">Salvar datas</button>
+            <label style="margin-top:var(--space-3);">Adicionar prova (concurso novo)</label>
+            <div class="row">
+              <input type="text" id="nova-prova-nome" placeholder="Nome do concurso">
+              <input type="date" id="nova-prova-data">
+            </div>
+            <button type="button" id="btn-adicionar-prova">${icone('flag')} Adicionar prova</button>
           </div>
 
           <div class="card config-danger-card">
@@ -2349,6 +2394,21 @@
         alert('Falha ao importar plano: ' + err.message);
       }
     });
+    document.getElementById('btn-import-erros')?.addEventListener('click', () => {
+      const textarea = document.getElementById('input-import-erros');
+      const texto = textarea.value.trim();
+      if(!texto) return;
+      try {
+        const parsed = JSON.parse(texto);
+        const n = mesclarErrosExternos(state, parsed);
+        saveState(state);
+        textarea.value = '';
+        render();
+        alert(n > 0 ? `Erros importados: ${n} novo${n===1?'':'s'} adicionado${n===1?'':'s'} ao Caderno de Erros.` : 'Nada novo pra importar — esses erros já estavam registrados.');
+      } catch(err){
+        alert('Falha ao importar erros: ' + err.message);
+      }
+    });
 
     const buscaSessaoInput = document.getElementById('config-sessao-busca');
     if(buscaSessaoInput){
@@ -2393,6 +2453,17 @@
         if(input.value) state.provasPorConcurso[nome] = input.value;
         else delete state.provasPorConcurso[nome];
       });
+      saveState(state);
+      render();
+    });
+    document.getElementById('btn-adicionar-prova')?.addEventListener('click', () => {
+      const nomeInput = document.getElementById('nova-prova-nome');
+      const dataInput = document.getElementById('nova-prova-data');
+      const nome = nomeInput.value.trim();
+      if(!nome){ alert('Informe o nome do concurso.'); return; }
+      const adicionado = adicionarConcurso(state, nome);
+      const nomeFinal = adicionado || state.concursos.find(n => slugConcurso(n) === slugConcurso(nome)) || nome;
+      if(dataInput.value) state.provasPorConcurso[nomeFinal] = dataInput.value;
       saveState(state);
       render();
     });
