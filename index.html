@@ -617,6 +617,19 @@
   @keyframes sync-pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
   .sync-conta-row{display:flex;align-items:center;gap:10px;margin-top:var(--space-3);}
   .sync-avatar{width:36px;height:36px;border-radius:50%;flex-shrink:0;}
+
+  #auth-gate{display:none;position:fixed;inset:0;background:var(--bg);z-index:100;
+    align-items:center;justify-content:center;padding:var(--space-4);}
+  #auth-gate.ativo{display:flex;}
+  .auth-gate-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);
+    box-shadow:var(--shadow);padding:var(--space-8) var(--space-6);max-width:380px;width:100%;text-align:center;}
+  .auth-gate-icon{width:56px;height:56px;border-radius:var(--radius);background:var(--accent-soft);color:var(--accent);
+    display:flex;align-items:center;justify-content:center;margin:0 auto var(--space-4);}
+  .auth-gate-card h1{font-size:var(--text-xl);margin-bottom:4px;}
+  .auth-gate-card p{color:var(--muted);font-size:var(--text-sm);margin-bottom:var(--space-4);}
+  .auth-gate-spinner{width:28px;height:28px;border-radius:50%;border:3px solid var(--border);
+    border-top-color:var(--accent);margin:0 auto;animation:auth-spin 0.8s linear infinite;}
+  @keyframes auth-spin{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
@@ -632,6 +645,7 @@
   </div>
   <nav id="tabs"></nav>
   <div id="mais-sheet" class="hidden"></div>
+  <div id="auth-gate"></div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script>
   /* === HELPERS (Tarefa 2) === */
@@ -828,7 +842,6 @@
     appId: "1:318344366702:web:39fdd5ec8ef36d64a6b47f",
   };
   const FIREBASE_SDK_VERSAO = '10.7.1';
-  const SYNC_ATIVO_KEY = 'estudos_sync_ativo';
   const SYNC_DEVICE_KEY = 'estudos_device_id';
 
   let firebaseApp = null, firebaseAuth = null, firebaseDb = null;
@@ -894,7 +907,7 @@
 
   async function entrarComGoogle(){
     if(!firebaseConfigurado()){
-      alert('Sincronização ainda não configurada neste app (falta a chave do Firebase). Veja o comentário no código-fonte.');
+      alert('Login ainda não configurado neste app (falta a chave do Firebase). Veja o comentário no código-fonte.');
       return;
     }
     try {
@@ -904,23 +917,23 @@
       if(!authListenerAtivo) inicializarAuthListener();
       const provider = new firebaseAuthMod.GoogleAuthProvider();
       await firebaseAuthMod.signInWithPopup(firebaseAuth, provider);
-      localStorage.setItem(SYNC_ATIVO_KEY, '1');
     } catch(e){
       syncStatus = 'error';
       atualizarIndicadorSyncDOM();
       alert('Não foi possível entrar com Google: ' + (e && e.message ? e.message : e));
+      if(authGateStatus !== 'signed-in'){ authGateStatus = 'signed-out'; atualizarVisibilidadeApp(); }
     }
   }
   async function sairDaConta(){
     try {
       if(syncUnsubscribe){ syncUnsubscribe(); syncUnsubscribe = null; }
-      localStorage.removeItem(SYNC_ATIVO_KEY);
       if(firebaseAuth && firebaseAuthMod) await firebaseAuthMod.signOut(firebaseAuth);
     } catch(e){ /* best-effort */ }
     usuarioSincronizado = null;
     syncStatus = 'signed-out';
+    authGateStatus = 'signed-out';
     atualizarIndicadorSyncDOM();
-    render();
+    atualizarVisibilidadeApp();
   }
 
   let authListenerAtivo = false;
@@ -931,13 +944,16 @@
       if(!user){
         usuarioSincronizado = null;
         syncStatus = 'signed-out';
+        authGateStatus = 'signed-out';
         if(syncUnsubscribe){ syncUnsubscribe(); syncUnsubscribe = null; }
         atualizarIndicadorSyncDOM();
+        atualizarVisibilidadeApp();
         return;
       }
       usuarioSincronizado = { uid: user.uid, email: user.email, nome: user.displayName, foto: user.photoURL };
       await conectarDocumentoNuvem();
-      render();
+      authGateStatus = 'signed-in';
+      atualizarVisibilidadeApp();
     });
   }
 
@@ -1011,11 +1027,61 @@
     atualizarIndicadorSyncDOM();
   }
 
-  async function inicializarSincronizacaoSeAtiva(){
-    if(!firebaseConfigurado()) return;
-    if(localStorage.getItem(SYNC_ATIVO_KEY) !== '1') return;
-    await carregarFirebaseSdk();
-    inicializarAuthListener();
+  /* === PORTÃO DE LOGIN — só quem está autenticado com Google acessa o app === */
+  let authGateStatus = 'loading'; // 'loading' | 'signed-out' | 'signed-in'
+
+  function renderAuthGate(){
+    if(authGateStatus === 'signed-out'){
+      return `
+        <div class="auth-gate-card">
+          <div class="auth-gate-icon">${icone('book-open', 28)}</div>
+          <h1>Gerenciador de Estudos</h1>
+          <p>Entre com sua conta Google pra acessar seus dados de estudo, sincronizados entre todos os seus aparelhos.</p>
+          <button id="auth-gate-entrar" class="primary">${icone('link')} Entrar com Google</button>
+        </div>`;
+    }
+    return `
+      <div class="auth-gate-card">
+        <div class="auth-gate-spinner"></div>
+        <p style="margin-top:var(--space-4);">Verificando sua conta...</p>
+      </div>`;
+  }
+  function attachAuthGateHandlers(){
+    document.getElementById('auth-gate-entrar')?.addEventListener('click', entrarComGoogle);
+  }
+  function atualizarVisibilidadeApp(){
+    const gate = document.getElementById('auth-gate');
+    const layout = document.getElementById('layout');
+    const tabs = document.getElementById('tabs');
+    if(!gate || !layout || !tabs) return;
+    if(authGateStatus === 'signed-in'){
+      gate.classList.remove('ativo');
+      layout.style.display = '';
+      tabs.style.display = '';
+      render();
+    } else {
+      layout.style.display = 'none';
+      tabs.style.display = 'none';
+      gate.classList.add('ativo');
+      gate.innerHTML = renderAuthGate();
+      attachAuthGateHandlers();
+    }
+  }
+  async function iniciarGateDeAutenticacao(){
+    if(!firebaseConfigurado()){
+      // Sem chave configurada não há como exigir login — libera o app localmente
+      // em vez de travar o acesso de todo mundo por uma configuração ausente.
+      authGateStatus = 'signed-in';
+      atualizarVisibilidadeApp();
+      return;
+    }
+    try {
+      await carregarFirebaseSdk();
+      inicializarAuthListener();
+    } catch(e){
+      authGateStatus = 'signed-out';
+      atualizarVisibilidadeApp();
+    }
   }
 
   let state = loadState();
@@ -2756,8 +2822,8 @@
       <div class="grid-hoje">
         <div>
           <div class="card">
-            <h3>${icone('cloud')} Sincronização entre aparelhos</h3>
-            <small class="muted">Entre com sua conta Google pra manter os dados sincronizados entre celular, computador e qualquer outro aparelho automaticamente.</small>
+            <h3>${icone('cloud')} Sua conta</h3>
+            <small class="muted">Seus dados ficam sincronizados automaticamente entre celular, computador e qualquer outro aparelho onde você entrar com esta conta.</small>
             ${usuarioSincronizado ? `
               <div class="sync-conta-row">
                 ${usuarioSincronizado.foto ? `<img class="sync-avatar" src="${escapeHtml(usuarioSincronizado.foto)}" alt="">` : `<span class="item-icon">${icone('cloud')}</span>`}
@@ -2766,7 +2832,8 @@
                   <small class="muted" id="sync-status-texto">${escapeHtml(textoStatusSync())}</small>
                 </div>
               </div>
-              <button id="btn-sync-sair" style="margin-top:var(--space-3);">Sair da sincronização</button>
+              <button id="btn-sync-sair" style="margin-top:var(--space-3);">Sair da conta</button>
+              <small class="muted">Ao sair, você precisa entrar de novo com o Google pra voltar a acessar o app.</small>
             ` : `
               <button id="btn-sync-entrar" class="primary" style="margin-top:var(--space-3);">${icone('link')} Entrar com Google</button>
             `}
@@ -5097,7 +5164,6 @@
   attachSidebarHandlers();
   attachTabsHandlers();
   verificarNotificacoesPendentes();
-  inicializarSincronizacaoSeAtiva();
 
   /* === INIT === */
   if('serviceWorker' in navigator){
@@ -5108,7 +5174,8 @@
     });
   }
 
-  render();
+  atualizarVisibilidadeApp();
+  iniciarGateDeAutenticacao();
   </script>
 </body>
 </html>
