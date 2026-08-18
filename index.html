@@ -608,12 +608,21 @@
     background:rgba(224,168,62,.12);border:1px solid var(--warn);border-radius:var(--radius-sm);
     padding:var(--space-2) var(--space-3);font-size:var(--text-sm);color:var(--fg);}
   .config-danger-warn button{margin:0 0 0 auto;}
+
+  .sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--border-strong);flex-shrink:0;}
+  .sync-dot.signed-out{background:var(--border-strong);}
+  .sync-dot.syncing{background:var(--warn);animation:sync-pulse 1s ease-in-out infinite;}
+  .sync-dot.synced{background:var(--ok);}
+  .sync-dot.error{background:var(--bad);}
+  @keyframes sync-pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .sync-conta-row{display:flex;align-items:center;gap:10px;margin-top:var(--space-3);}
+  .sync-avatar{width:36px;height:36px;border-radius:50%;flex-shrink:0;}
 </style>
 </head>
 <body>
   <div id="layout">
     <aside id="sidebar">
-      <div id="sidebar-brand"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6c-2-1.5-5-2-8-1v13c3-1 6-.5 8 1 2-1.5 5-2 8-1V5c-3-1-6-.5-8 1zM12 6v13"/></svg> <span class="brand-text">Estudos</span></div>
+      <div id="sidebar-brand"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6c-2-1.5-5-2-8-1v13c3-1 6-.5 8 1 2-1.5 5-2 8-1V5c-3-1-6-.5-8 1zM12 6v13"/></svg> <span class="brand-text">Estudos</span> <span id="sync-status-dot" class="sync-dot" title="Sincronização desativada"></span></div>
       <nav id="sidebar-nav"></nav>
       <button id="sidebar-toggle" title="Recolher menu">«</button>
     </aside>
@@ -778,11 +787,235 @@
   function saveState(s){
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+      agendarSyncNuvem();
       return true;
     } catch(e){
       alert('Não foi possível salvar: armazenamento indisponível ou cheio.');
       return false;
     }
+  }
+
+  /* === SINCRONIZAÇÃO ENTRE APARELHOS (Firebase Auth + Firestore) ===
+     Os valores abaixo (apiKey, projectId etc.) são identificadores públicos
+     do projeto Firebase — não são senhas e é seguro deixá-los neste arquivo
+     público. A segurança de verdade vem das regras do Firestore (que
+     restringem cada documento ao dono autenticado), configuradas no console
+     do Firebase, não aqui no código. Veja as regras recomendadas no final
+     deste bloco.
+
+     Pra ativar: crie um projeto em console.firebase.google.com, ative
+     Firestore (modo produção) e o provedor de login "Google" em
+     Authentication, depois cole os valores de Configurações do projeto
+     (ícone de engrenagem → Configurações do projeto → seus apps → SDK
+     setup) nos campos abaixo.
+
+     Regras do Firestore recomendadas (colar na aba "Regras"):
+       rules_version = '2';
+       service cloud.firestore {
+         match /databases/{database}/documents {
+           match /estados/{uid} {
+             allow read, write: if request.auth != null && request.auth.uid == uid;
+           }
+         }
+       }
+  */
+  const FIREBASE_CONFIG = {
+    apiKey: "COLE_AQUI",
+    authDomain: "COLE_AQUI",
+    projectId: "COLE_AQUI",
+    storageBucket: "COLE_AQUI",
+    messagingSenderId: "COLE_AQUI",
+    appId: "COLE_AQUI",
+  };
+  const FIREBASE_SDK_VERSAO = '10.7.1';
+  const SYNC_ATIVO_KEY = 'estudos_sync_ativo';
+  const SYNC_DEVICE_KEY = 'estudos_device_id';
+
+  let firebaseApp = null, firebaseAuth = null, firebaseDb = null;
+  let firebaseAuthMod = null, firebaseFsMod = null;
+  let firebaseSdkPromise = null;
+  let usuarioSincronizado = null; // { uid, email, nome, foto }
+  let syncStatus = 'signed-out'; // 'signed-out' | 'syncing' | 'synced' | 'error'
+  let syncDebounceTimer = null;
+  let syncUnsubscribe = null;
+  let syncAplicandoRemoto = false;
+
+  function firebaseConfigurado(){
+    return Object.values(FIREBASE_CONFIG).every(v => v && v !== 'COLE_AQUI');
+  }
+  function obterDeviceId(){
+    let id = localStorage.getItem(SYNC_DEVICE_KEY);
+    if(!id){
+      id = (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(36).slice(2)));
+      localStorage.setItem(SYNC_DEVICE_KEY, id);
+    }
+    return id;
+  }
+  function carregarFirebaseSdk(){
+    if(firebaseSdkPromise) return firebaseSdkPromise;
+    firebaseSdkPromise = (async () => {
+      const [appMod, authMod, fsMod] = await Promise.all([
+        import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSAO}/firebase-app.js`),
+        import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSAO}/firebase-auth.js`),
+        import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSAO}/firebase-firestore.js`),
+      ]);
+      firebaseAuthMod = authMod;
+      firebaseFsMod = fsMod;
+      firebaseApp = appMod.initializeApp(FIREBASE_CONFIG);
+      firebaseAuth = authMod.getAuth(firebaseApp);
+      firebaseDb = fsMod.getFirestore(firebaseApp);
+    })();
+    return firebaseSdkPromise;
+  }
+
+  function atualizarIndicadorSyncDOM(){
+    const dot = document.getElementById('sync-status-dot');
+    if(!dot) return;
+    dot.className = 'sync-dot ' + syncStatus;
+    dot.title = textoStatusSync();
+  }
+  function textoStatusSync(){
+    if(!usuarioSincronizado) return 'Sincronização desativada';
+    if(syncStatus === 'syncing') return 'Sincronizando...';
+    if(syncStatus === 'error') return 'Erro ao sincronizar — verifique sua conexão';
+    return 'Sincronizado — ' + (usuarioSincronizado.email || '');
+  }
+  function temDadosReais(s){
+    return !!((s.sessoes && s.sessoes.length) || (s.checkins && s.checkins.length) ||
+      (s.erros && s.erros.length) || (s.conteudo && s.conteudo.some(c => c.status !== 'nao_iniciado')));
+  }
+  function podeRerenderizarComSeguranca(){
+    const ativo = document.activeElement;
+    if(!ativo) return true;
+    if(ativo.tagName === 'TEXTAREA') return false;
+    if(ativo.tagName === 'INPUT' && !['checkbox','radio','button'].includes(ativo.type)) return false;
+    return true;
+  }
+
+  async function entrarComGoogle(){
+    if(!firebaseConfigurado()){
+      alert('Sincronização ainda não configurada neste app (falta a chave do Firebase). Veja o comentário no código-fonte.');
+      return;
+    }
+    try {
+      syncStatus = 'syncing';
+      atualizarIndicadorSyncDOM();
+      await carregarFirebaseSdk();
+      if(!authListenerAtivo) inicializarAuthListener();
+      const provider = new firebaseAuthMod.GoogleAuthProvider();
+      await firebaseAuthMod.signInWithPopup(firebaseAuth, provider);
+      localStorage.setItem(SYNC_ATIVO_KEY, '1');
+    } catch(e){
+      syncStatus = 'error';
+      atualizarIndicadorSyncDOM();
+      alert('Não foi possível entrar com Google: ' + (e && e.message ? e.message : e));
+    }
+  }
+  async function sairDaConta(){
+    try {
+      if(syncUnsubscribe){ syncUnsubscribe(); syncUnsubscribe = null; }
+      localStorage.removeItem(SYNC_ATIVO_KEY);
+      if(firebaseAuth && firebaseAuthMod) await firebaseAuthMod.signOut(firebaseAuth);
+    } catch(e){ /* best-effort */ }
+    usuarioSincronizado = null;
+    syncStatus = 'signed-out';
+    atualizarIndicadorSyncDOM();
+    render();
+  }
+
+  let authListenerAtivo = false;
+  function inicializarAuthListener(){
+    if(authListenerAtivo) return;
+    authListenerAtivo = true;
+    firebaseAuthMod.onAuthStateChanged(firebaseAuth, async (user) => {
+      if(!user){
+        usuarioSincronizado = null;
+        syncStatus = 'signed-out';
+        if(syncUnsubscribe){ syncUnsubscribe(); syncUnsubscribe = null; }
+        atualizarIndicadorSyncDOM();
+        return;
+      }
+      usuarioSincronizado = { uid: user.uid, email: user.email, nome: user.displayName, foto: user.photoURL };
+      await conectarDocumentoNuvem();
+      render();
+    });
+  }
+
+  async function conectarDocumentoNuvem(){
+    if(!usuarioSincronizado) return;
+    syncStatus = 'syncing';
+    atualizarIndicadorSyncDOM();
+    try {
+      const ref = firebaseFsMod.doc(firebaseDb, 'estados', usuarioSincronizado.uid);
+      const snap = await firebaseFsMod.getDoc(ref);
+      if(!snap.exists()){
+        await enviarEstadoParaNuvem();
+      } else {
+        const remoto = snap.data();
+        const localTemDados = temDadosReais(state);
+        const manterLocal = localTemDados && !confirmarAcao('Já existem dados sincronizados na nuvem para esta conta. Substituir os dados deste aparelho pelos da nuvem? (Cancelar mantém os dados locais e sobrescreve a nuvem com eles.)');
+        if(!manterLocal && remoto.estado && estadoValido(remoto.estado)){
+          syncAplicandoRemoto = true;
+          state = normalizarCamposNovos(remoto.estado);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          syncAplicandoRemoto = false;
+        } else {
+          await enviarEstadoParaNuvem();
+        }
+      }
+      syncStatus = 'synced';
+      ativarListenerTempoReal(ref);
+    } catch(e){
+      syncStatus = 'error';
+    }
+    atualizarIndicadorSyncDOM();
+  }
+
+  function ativarListenerTempoReal(ref){
+    if(syncUnsubscribe) syncUnsubscribe();
+    syncUnsubscribe = firebaseFsMod.onSnapshot(ref, (snap) => {
+      if(!snap.exists()) return;
+      const dados = snap.data();
+      if(dados.origemDispositivo === obterDeviceId()) return; // veio da própria escrita deste aparelho
+      if(!dados.estado || !estadoValido(dados.estado)) return;
+      syncAplicandoRemoto = true;
+      state = normalizarCamposNovos(dados.estado);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      syncAplicandoRemoto = false;
+      syncStatus = 'synced';
+      atualizarIndicadorSyncDOM();
+      if(podeRerenderizarComSeguranca()) render();
+    }, () => { syncStatus = 'error'; atualizarIndicadorSyncDOM(); });
+  }
+
+  function agendarSyncNuvem(){
+    if(!usuarioSincronizado || syncAplicandoRemoto) return;
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = setTimeout(() => { enviarEstadoParaNuvem(); }, 2000);
+  }
+  async function enviarEstadoParaNuvem(){
+    if(!usuarioSincronizado || !firebaseFsMod) return;
+    syncStatus = 'syncing';
+    atualizarIndicadorSyncDOM();
+    try {
+      const ref = firebaseFsMod.doc(firebaseDb, 'estados', usuarioSincronizado.uid);
+      await firebaseFsMod.setDoc(ref, {
+        estado: state,
+        atualizadoEm: firebaseFsMod.serverTimestamp(),
+        origemDispositivo: obterDeviceId(),
+      });
+      syncStatus = 'synced';
+    } catch(e){
+      syncStatus = 'error';
+    }
+    atualizarIndicadorSyncDOM();
+  }
+
+  async function inicializarSincronizacaoSeAtiva(){
+    if(!firebaseConfigurado()) return;
+    if(localStorage.getItem(SYNC_ATIVO_KEY) !== '1') return;
+    await carregarFirebaseSdk();
+    inicializarAuthListener();
   }
 
   let state = loadState();
@@ -2508,9 +2741,9 @@
         </div>
         <div class="card stat-card">
           <div class="stat-label">Armazenamento</div>
-          <div class="stat-value">Dados locais</div>
-          <div class="stat-icon" style="color:var(--accent)">${icone('database')}</div>
-          <div class="stat-sub">Somente neste aparelho</div>
+          <div class="stat-value">${usuarioSincronizado ? 'Sincronizado' : 'Dados locais'}</div>
+          <div class="stat-icon" style="color:var(--accent)">${icone(usuarioSincronizado ? 'cloud' : 'database')}</div>
+          <div class="stat-sub">${usuarioSincronizado ? 'Entre aparelhos, via ' + escapeHtml(usuarioSincronizado.email || '') : 'Somente neste aparelho'}</div>
         </div>
         <div class="card stat-card">
           <div class="stat-label">Versão do app</div>
@@ -2522,6 +2755,22 @@
 
       <div class="grid-hoje">
         <div>
+          <div class="card">
+            <h3>${icone('cloud')} Sincronização entre aparelhos</h3>
+            <small class="muted">Entre com sua conta Google pra manter os dados sincronizados entre celular, computador e qualquer outro aparelho automaticamente.</small>
+            ${usuarioSincronizado ? `
+              <div class="sync-conta-row">
+                ${usuarioSincronizado.foto ? `<img class="sync-avatar" src="${escapeHtml(usuarioSincronizado.foto)}" alt="">` : `<span class="item-icon">${icone('cloud')}</span>`}
+                <div>
+                  <b>${escapeHtml(usuarioSincronizado.nome || usuarioSincronizado.email || '')}</b><br>
+                  <small class="muted" id="sync-status-texto">${escapeHtml(textoStatusSync())}</small>
+                </div>
+              </div>
+              <button id="btn-sync-sair" style="margin-top:var(--space-3);">Sair da sincronização</button>
+            ` : `
+              <button id="btn-sync-entrar" class="primary" style="margin-top:var(--space-3);">${icone('link')} Entrar com Google</button>
+            `}
+          </div>
           <div class="card">
             <h3>${icone('save')} Dados e backup</h3>
             <small class="muted">Faça backup, exporte seus dados ou importe um backup para restaurar.</small>
@@ -2642,6 +2891,8 @@
   }
 
   function attachConfigHandlers(){
+    document.getElementById('btn-sync-entrar')?.addEventListener('click', entrarComGoogle);
+    document.getElementById('btn-sync-sair')?.addEventListener('click', sairDaConta);
     document.getElementById('btn-export-md')?.addEventListener('click', exportarMarkdown);
     document.getElementById('btn-export-backup')?.addEventListener('click', () => { exportarJSON(); render(); });
     document.getElementById('btn-export-antes')?.addEventListener('click', () => { exportarJSON(); render(); });
@@ -4846,6 +5097,7 @@
   attachSidebarHandlers();
   attachTabsHandlers();
   verificarNotificacoesPendentes();
+  inicializarSincronizacaoSeAtiva();
 
   /* === INIT === */
   if('serviceWorker' in navigator){

@@ -1,7 +1,7 @@
 // Bump CACHE_VERSION when precached files change, as an extra safety net —
 // navigation requests below are network-first, so this mainly protects
 // icons/manifest/Chart.js from going stale.
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE = 'estudos-' + CACHE_VERSION;
 const LOCAIS = [
   './', './index.html', './manifest.json',
@@ -23,8 +23,13 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+const HOSTS_SEM_CACHE = ['googleapis.com', 'google.com', 'firebaseapp.com', 'firebaseio.com', 'gstatic.com'];
+
 self.addEventListener('fetch', (event) => {
   if(event.request.method !== 'GET') return;
+
+  const host = new URL(event.request.url).hostname;
+  if(host !== 'fonts.gstatic.com' && HOSTS_SEM_CACHE.some(h => host === h || host.endsWith('.' + h))) return;
 
   const isNavegacao = event.request.mode === 'navigate' || event.request.destination === 'document';
   if(isNavegacao){
