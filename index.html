@@ -1259,6 +1259,39 @@
     return atividade;
   }
 
+  const TIPO_PLANO_EXTERNO_MAP = { conteudo:'teoria', questoes:'questoes', revisao:'revisao', misto:'teoria', simulado:'questoes' };
+  function mesclarPlanoExterno(state, planoExterno){
+    if(!planoExterno || typeof planoExterno !== 'object' || !Array.isArray(planoExterno.dias)){
+      throw new Error('formato não reconhecido — esperava um objeto com um array "dias"');
+    }
+    let adicionadas = 0;
+    planoExterno.dias.forEach(dia => {
+      if(!dia || !dia.data || !Array.isArray(dia.blocos)) return;
+      const semanaId = segundaFeiraDaSemana(dia.data);
+      const concluidoNoDia = dia.status === 'concluido';
+      dia.blocos.forEach(bloco => {
+        if(!bloco) return;
+        const tipo = TIPO_PLANO_EXTERNO_MAP[bloco.tipo] || 'teoria';
+        const minutos = Number(bloco.min) || 0;
+        const assunto = bloco.tema || null;
+        const plano = obterPlano(state, semanaId);
+        const jaExiste = plano?.atividadesPorDia?.[dia.data]?.some(a =>
+          a.assunto === assunto && a.tipo === tipo && a.minutos === minutos);
+        if(jaExiste) return;
+        const atividade = adicionarAtividadeDia(state, semanaId, dia.data, { assunto, tipo, minutos });
+        if(concluidoNoDia) atividade.concluida = true;
+        adicionadas++;
+      });
+    });
+    if(planoExterno.ciclo && planoExterno.ciclo.nome){
+      const jaTemCiclo = state.ciclos.some(c => c.nome === planoExterno.ciclo.nome);
+      if(!jaTemCiclo){
+        state.ciclos.push({ id: 'ciclo-' + String(Date.now()).slice(-6), nome: planoExterno.ciclo.nome, inicio: planoExterno.ciclo.dataInicio || hojeISO() });
+      }
+    }
+    return adicionadas;
+  }
+
   function removerAtividadeDia(state, semanaId, dataIso, atividadeId){
     const lista = obterPlano(state, semanaId)?.atividadesPorDia?.[dataIso];
     if(!lista) return false;
@@ -2102,6 +2135,12 @@
             <button id="btn-import-paste">Importar JSON colado</button>
             <small class="muted">Cole o conteúdo JSON exportado de outro aparelho ou pacote de dados.</small>
           </div>
+          <div class="card">
+            <h3>${icone('calendar')} Importar plano de estudos</h3>
+            <small class="muted">Cole um plano de estudos (JSON com um ciclo, dias e blocos) pra adicionar ao Planejamento. Isso soma às atividades já existentes — não apaga nada.</small>
+            <textarea id="input-import-plano" placeholder="Cole aqui o plano de estudos (JSON)" style="margin-top:var(--space-2);"></textarea>
+            <button id="btn-import-plano" class="primary">Importar plano</button>
+          </div>
           ${sessoesHtml}
         </div>
 
@@ -2184,6 +2223,21 @@
         if(tentarImportar(texto)) textarea.value = '';
       });
     }
+    document.getElementById('btn-import-plano')?.addEventListener('click', () => {
+      const textarea = document.getElementById('input-import-plano');
+      const texto = textarea.value.trim();
+      if(!texto) return;
+      try {
+        const parsed = JSON.parse(texto);
+        const n = mesclarPlanoExterno(state, parsed);
+        saveState(state);
+        textarea.value = '';
+        render();
+        alert(n > 0 ? `Plano importado: ${n} ${n===1?'atividade adicionada':'atividades adicionadas'} ao Planejamento.` : 'Nada novo pra importar — essas atividades já estavam no Planejamento.');
+      } catch(err){
+        alert('Falha ao importar plano: ' + err.message);
+      }
+    });
 
     const buscaSessaoInput = document.getElementById('config-sessao-busca');
     if(buscaSessaoInput){
