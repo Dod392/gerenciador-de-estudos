@@ -1304,11 +1304,16 @@
         adicionadas++;
       });
     });
+    const regras = Array.isArray(planoExterno.regras) ? planoExterno.regras.filter(r => typeof r === 'string') : [];
+    const foraDoCiclo = Array.isArray(planoExterno.foraDoCiclo) ? planoExterno.foraDoCiclo.filter(r => typeof r === 'string') : [];
     if(planoExterno.ciclo && planoExterno.ciclo.nome){
-      const jaTemCiclo = state.ciclos.some(c => c.nome === planoExterno.ciclo.nome);
-      if(!jaTemCiclo){
-        state.ciclos.push({ id: 'ciclo-' + String(Date.now()).slice(-6), nome: planoExterno.ciclo.nome, inicio: planoExterno.ciclo.dataInicio || hojeISO() });
+      let cicloAlvo = state.ciclos.find(c => c.nome === planoExterno.ciclo.nome);
+      if(!cicloAlvo){
+        cicloAlvo = { id: 'ciclo-' + String(Date.now()).slice(-6), nome: planoExterno.ciclo.nome, inicio: planoExterno.ciclo.dataInicio || hojeISO() };
+        state.ciclos.push(cicloAlvo);
       }
+      if(regras.length) cicloAlvo.regras = regras;
+      if(foraDoCiclo.length) cicloAlvo.foraDoCiclo = foraDoCiclo;
     }
     const datas = planoExterno.dias.filter(d => d?.data).map(d => d.data).sort();
     if(!Array.isArray(state.historicoImportacoes)) state.historicoImportacoes = [];
@@ -1448,6 +1453,7 @@
     const acertosSemana = agregadoSemana.reduce((s,a)=>s+a.acertos,0);
     const pctAcertoSemana = questoesSemana ? Math.round((acertosSemana/questoesSemana)*100) : null;
     const sequencia = calcularSequencia(state.checkins, state.sessoes, hojeIso);
+    const tipoSemana = distribuicaoTempoPorTipo(sessoesSemana);
     const cicloAtivo = state.ciclos[state.ciclos.length-1];
     const provas = provasOrdenadas(state, hojeIso);
     const naoIniciados = state.conteudo.filter(c => c.status === 'nao_iniciado').map(c => c.assunto);
@@ -1471,6 +1477,7 @@
           `- Dias estudados: ${diasSemana}/${plano.diasAlvo}`,
           `- Horas estudadas: ${horasSemana}/${plano.horasAlvo}`,
           `- Questões respondidas: ${questoesSemana}${pctAcertoSemana!==null ? ` (${pctAcertoSemana}% de acerto)` : ''}`,
+          `- Por tipo de sessão: teoria ${tipoSemana.teoria}min · questões ${tipoSemana.questoes}min · revisão ${tipoSemana.revisao}min · anki ${tipoSemana.anki}min`,
           `- Assuntos-alvo que ficaram pra trás: ${atrasadosSemana.length ? atrasadosSemana.join(', ') : 'nenhum'}`,
         ].join('\n')
       : '- nenhuma meta foi definida para esta semana');
@@ -1531,11 +1538,29 @@
   function verificarNotificacoesPendentes(){
     if(!state.preferencias.notificacoes) return;
     if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    const fila = filaRevisao(state.erros, hojeISO());
-    if(!fila.length) return;
+    const hojeIso = hojeISO();
+    const avisos = [];
+
+    const fila = filaRevisao(state.erros, hojeIso);
+    if(fila.length) avisos.push(`${fila.length} revis${fila.length===1?'ão':'ões'} pendente${fila.length===1?'':'s'} no Caderno de Erros`);
+
+    const semanaId = semanaAtualId();
+    const plano = obterPlano(state, semanaId);
+    if(plano && plano.horasAlvo){
+      const horasFeitas = horasRealizadasNaSemana(state.checkins, state.sessoes, semanaId);
+      const pctFeito = Math.round((horasFeitas / plano.horasAlvo) * 100);
+      const diaSemanaIdx = new Date(hojeIso + 'T00:00:00').getDay(); // 0=dom..6=sáb
+      const diasDecorridos = (diaSemanaIdx + 6) % 7; // seg=0 ... dom=6
+      const pctEsperado = Math.round(((diasDecorridos + 1) / 7) * 100);
+      if(pctFeito < pctEsperado - 20){
+        avisos.push(`meta semanal em ${pctFeito}% (esperado por volta de ${pctEsperado}% a essa altura da semana)`);
+      }
+    }
+
+    if(!avisos.length) return;
     try {
       new Notification('Gerenciador de Estudos', {
-        body: `Você tem ${fila.length} revis${fila.length===1?'ão':'ões'} pendente${fila.length===1?'':'s'} no Caderno de Erros.`,
+        body: avisos.join(' · '),
         icon: './icons/icon-192.png',
       });
     } catch(e){ /* Notification indisponível neste contexto — sem problema, é best-effort. */ }
@@ -1849,6 +1874,12 @@
             <small class="muted">${pctMetaSemanal}% da meta semanal</small>
           </div>
         </div>
+        ${(cicloAtivo?.regras?.length || cicloAtivo?.foraDoCiclo?.length) ? `
+        <details class="meta-opcionais" style="margin-top:var(--space-3);">
+          <summary>Regras e observações do ciclo</summary>
+          ${cicloAtivo.regras?.length ? `<b style="display:block;margin-top:var(--space-2);font-size:var(--text-sm);">Regras</b><ul style="margin:4px 0 0;padding-left:20px;font-size:var(--text-sm);">${cicloAtivo.regras.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>` : ''}
+          ${cicloAtivo.foraDoCiclo?.length ? `<b style="display:block;margin-top:var(--space-3);font-size:var(--text-sm);">Fora do ciclo (por enquanto)</b><ul style="margin:4px 0 0;padding-left:20px;font-size:var(--text-sm);">${cicloAtivo.foraDoCiclo.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>` : ''}
+        </details>` : ''}
       </div>`;
 
     const kpiHtml = `
