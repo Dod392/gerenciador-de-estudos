@@ -5,35 +5,45 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gerenciador de Estudos</title>
 <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#0b0d11">
+<meta name="theme-color" content="#0d1712">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0b0d11; --surface:#14171d; --card:#1a1e26;
-    --fg:#e8eaed; --muted:#9aa0a6;
-    --accent:#4f9dde; --accent-fg:#06121c;
-    --ok:#3ecf8e; --warn:#e0a83e; --bad:#e05a4f;
-    --border:#2a2f3a;
+    /* Vade Mecum — capa de livro jurídico: verde-tinta, lombada dourada, carimbo de aprovado */
+    --bg:#0d1712; --surface:#152019; --card:#1b2921;
+    --fg:#ece7d8; --muted:#8a9186;
+    --accent:#b8863a; --accent-fg:#0d1712;
+    --ok:#3f7a52; --warn:#c99a3f; --bad:#b5482f;
+    --border:#2c3a30;
     --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-6:24px; --space-8:32px;
     --radius-sm:8px; --radius:12px; --radius-lg:16px;
     --text-xs:12px; --text-sm:13px; --text-base:14px; --text-lg:16px; --text-xl:20px; --text-2xl:28px;
     --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow:0 4px 16px rgba(0,0,0,.4);
     --tap:48px;
-    --hoje-border:#374151; --hoje-shadow-card:0 4px 12px rgba(0,0,0,.4); --hoje-text-secondary:#b0b9c6;
-    --status-not-started:#6b7280; --status-in-progress:#f59e0b; --status-review:#a855f7; --status-completed:#10b981;
-    --status-pending:#f59e0b; --status-reviewed:#10b981; --status-high-priority:#ef4444;
+    --font-display:'Source Serif 4',Georgia,serif;
+    --font-body:'IBM Plex Sans',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+    --hoje-border:#33453a; --hoje-shadow-card:0 4px 12px rgba(0,0,0,.4); --hoje-text-secondary:#a8ad9f;
+    --status-not-started:#6b7280; --status-in-progress:#c99a3f; --status-review:#8a6bb0; --status-completed:#3f7a52;
+    --status-pending:#c99a3f; --status-reviewed:#3f7a52; --status-high-priority:#b5482f;
   }
   :root[data-theme="light"]{
-    --bg:#f5f6f8; --surface:#ffffff; --card:#ffffff;
-    --fg:#14171d; --muted:#5b6270;
-    --accent:#1d6fb8; --accent-fg:#ffffff;
-    --ok:#0e7d44; --warn:#a15c07; --bad:#c0392b;
-    --border:#dde1e7;
-    --shadow-sm:0 1px 2px rgba(20,23,29,.08); --shadow:0 4px 16px rgba(20,23,29,.12);
-    --hoje-border:#d7dbe2; --hoje-shadow-card:0 4px 12px rgba(20,23,29,.08); --hoje-text-secondary:#5b6270;
+    /* mesma identidade, folha do livro em vez da capa */
+    --bg:#f2ead4; --surface:#faf6e9; --card:#fbf8ee;
+    --fg:#241f14; --muted:#6b6350;
+    --accent:#8a5a1f; --accent-fg:#fbf8ee;
+    --ok:#2c6b41; --warn:#8a5a1f; --bad:#96341c;
+    --border:#ddd3b4;
+    --shadow-sm:0 1px 2px rgba(36,31,20,.10); --shadow:0 4px 16px rgba(36,31,20,.14);
+    --hoje-border:#ddd3b4; --hoje-shadow-card:0 4px 12px rgba(36,31,20,.08); --hoje-text-secondary:#6b6350;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+    font-family:var(--font-body);}
+  h1,h2,h3{font-family:var(--font-display);letter-spacing:.01em;}
+  .stat-value{font-family:var(--font-mono);font-weight:500;}
   body{padding-bottom:calc(72px + env(safe-area-inset-bottom));}
   #app{max-width:480px;margin:0 auto;padding:var(--gap);}
   h1,h2,h3{margin:0 0 8px;}
@@ -193,7 +203,12 @@
   .mapa-status-badge.status-not-started{background:var(--status-not-started);color:#fff;}
   .mapa-status-badge.status-in-progress{background:var(--status-in-progress);color:#1a1206;}
   .mapa-status-badge.status-review{background:var(--status-review);color:#fff;}
-  .mapa-status-badge.status-completed{background:var(--status-completed);color:#062117;}
+  .selo{background:transparent !important;color:var(--status-completed);
+    border:2px solid currentColor;border-radius:3px;font-family:var(--font-mono);font-weight:600;
+    letter-spacing:.06em;text-transform:uppercase;transform:rotate(-2deg);position:relative;}
+  .selo::after{content:'';position:absolute;inset:2px;
+    border:1px solid currentColor;border-radius:2px;opacity:.5;pointer-events:none;}
+  .mapa-status-badge.status-completed{background:transparent;color:var(--status-completed);}
   .mapa-card-concursos{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
   .mapa-concurso-badge{background:rgba(79,157,222,.18);color:var(--accent);border:none;}
   .mapa-card-pct{position:absolute;bottom:var(--space-3);right:var(--space-3);font-size:var(--text-xs);color:var(--muted);}
@@ -1054,7 +1069,7 @@
           <div class="mapa-card">
             <div class="mapa-card-icon">${iconePorAssunto(c.assunto)}</div>
             <div class="mapa-card-nome">${escapeHtml(c.assunto)}</div>
-            <div><button data-status-assunto="${escapeHtml(c.assunto)}" class="badge mapa-status-badge status-${STATUS_CONTEUDO_COR[c.status]}">${STATUS_CONTEUDO_LABEL[c.status]}</button></div>
+            <div><button data-status-assunto="${escapeHtml(c.assunto)}" class="badge mapa-status-badge status-${STATUS_CONTEUDO_COR[c.status]} ${c.status==='dominado'?'selo':''}">${STATUS_CONTEUDO_LABEL[c.status]}</button></div>
             <div class="mapa-card-concursos">
               ${concursosDoItem(state, c.concurso).map(nome => `<button data-concurso-assunto="${escapeHtml(c.assunto)}" class="badge mapa-concurso-badge">${escapeHtml(nome)}</button>`).join('')}
             </div>
@@ -3092,7 +3107,9 @@
               <div class="erro-card-preview muted">${escapeHtml(e.oQueErrei.length > 90 ? e.oQueErrei.slice(0,90)+'…' : e.oQueErrei)}</div>
             </div>
             <div class="erro-card-meta">
-              <span class="erro-prioridade-badge prioridade-${prioridade}">${PRIORIDADE_LABEL[prioridade]}</span>
+              ${e.grau === 'corrigido'
+                ? `<span class="badge selo" style="color:var(--ok);">${GRAU_LABEL.corrigido}</span>`
+                : `<span class="erro-prioridade-badge prioridade-${prioridade}">${PRIORIDADE_LABEL[prioridade]}</span>`}
               <span class="erro-card-data">📅 ${diasAtrasoLabel(e.proximaRevisao, hojeIso)}</span>
             </div>
             <button class="erro-card-chevron" aria-label="Expandir">${expandido?'▲':'▼'}</button>
