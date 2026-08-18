@@ -1336,9 +1336,40 @@
     return adicionadas;
   }
 
+  function normalizarListaErrosExternos(entrada){
+    if(Array.isArray(entrada)) return entrada;
+    if(Array.isArray(entrada?.erros)) return entrada.erros;
+    // Formato "histórico do caderno de erros": um resumo por tema, com
+    // dificuldades/pegadinhas em vez de erro+regra separados. Cada item
+    // vira um erro, usando o texto da dificuldade/pegadinha como oQueErrei
+    // e a lei (quando houver) como pista de regraCorreta — sem inventar
+    // enunciado nem taxa de acerto que o arquivo não informa.
+    if(Array.isArray(entrada?.historico)){
+      const convertidos = [];
+      entrada.historico.forEach(item => {
+        if(!item || !item.tema) return;
+        const fontes = [
+          ...(Array.isArray(item.pegadinhas_relevantes) ? item.pegadinhas_relevantes : []),
+          ...(Array.isArray(item.dificuldades_principais) ? item.dificuldades_principais : []),
+          ...(Array.isArray(item.dificuldades) ? item.dificuldades : []),
+        ];
+        fontes.forEach(texto => {
+          if(typeof texto !== 'string' || !texto.trim()) return;
+          convertidos.push({
+            assunto: item.tema,
+            oQueErrei: texto.trim(),
+            regraCorreta: item.lei ? `Revisar base legal: ${item.lei}` : 'Revisar teoria deste ponto',
+            origemQuestao: true,
+          });
+        });
+      });
+      return convertidos;
+    }
+    return null;
+  }
   function mesclarErrosExternos(state, entrada){
-    const lista = Array.isArray(entrada) ? entrada : Array.isArray(entrada?.erros) ? entrada.erros : null;
-    if(!lista) throw new Error('formato não reconhecido — esperava um array de erros ou um objeto com "erros"');
+    const lista = normalizarListaErrosExternos(entrada);
+    if(!lista) throw new Error('formato não reconhecido — esperava um array de erros, um objeto com "erros" ou um "histórico" por tema');
     let adicionados = 0;
     lista.forEach(item => {
       if(!item || !item.assunto || !item.oQueErrei || !item.regraCorreta) return;
