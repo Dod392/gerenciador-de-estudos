@@ -83,6 +83,11 @@
   .stat-card .stat-value{font-size:var(--text-2xl);font-weight:650;margin-top:4px;}
   .icone{display:inline-block;vertical-align:-3px;flex-shrink:0;}
   .disciplina-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;flex-shrink:0;}
+  .historico-import-list{display:flex;flex-direction:column;}
+  .historico-import-item{padding:var(--space-2) 0;border-bottom:1px solid var(--border);}
+  .historico-import-item:last-child{border-bottom:none;}
+  .historico-import-info b{display:block;font-size:var(--text-sm);}
+  .historico-import-info small{display:block;margin-top:2px;}
   .stat-card .stat-icon{position:absolute;top:var(--space-4);right:var(--space-4);opacity:.5;font-size:18px;}
   .stat-icon .icone{width:18px;height:18px;}
   .empty-state-icon .icone{width:24px;height:24px;}
@@ -720,6 +725,7 @@
       ciclos: [{ id: 'ciclo-1', nome: '1º Ciclo', inicio: hojeISO() }],
       contadorRevisoes: 0,
       preferencias: { formatoData: 'DD/MM/AAAA', confirmacoes: true, notificacoes: true },
+      historicoImportacoes: [],
       ultimoBackup: null,
     };
   }
@@ -849,6 +855,7 @@
     if(typeof s.preferencias.confirmacoes !== 'boolean') s.preferencias.confirmacoes = true;
     if(typeof s.preferencias.notificacoes !== 'boolean') s.preferencias.notificacoes = true;
     if(typeof s.ultimoBackup !== 'string') s.ultimoBackup = null;
+    if(!Array.isArray(s.historicoImportacoes)) s.historicoImportacoes = [];
     return s;
   }
 
@@ -1289,6 +1296,17 @@
         state.ciclos.push({ id: 'ciclo-' + String(Date.now()).slice(-6), nome: planoExterno.ciclo.nome, inicio: planoExterno.ciclo.dataInicio || hojeISO() });
       }
     }
+    const datas = planoExterno.dias.filter(d => d?.data).map(d => d.data).sort();
+    if(!Array.isArray(state.historicoImportacoes)) state.historicoImportacoes = [];
+    state.historicoImportacoes.push({
+      id: String(Date.now()) + Math.random().toString(36).slice(2,7),
+      quando: new Date().toISOString(),
+      cicloNome: planoExterno.ciclo?.nome || null,
+      atividadesAdicionadas: adicionadas,
+      diasCobertos: datas.length,
+      periodoInicio: datas[0] || null,
+      periodoFim: datas[datas.length-1] || null,
+    });
     return adicionadas;
   }
 
@@ -1788,7 +1806,7 @@
             <div class="hoje-header-icon">${icone('calendar')}</div>
             <div>
               <h2>${dias} dias até a prova</h2>
-              <small class="muted">${cicloAtivo ? escapeHtml(cicloAtivo.nome) : ''}${anoProva ? ` • prova em ${anoProva}` : ''} • ciclo atual em andamento</small>
+              <small class="muted">${cicloAtivo ? escapeHtml(cicloAtivo.nome) : ''}${state.ciclos.length > 1 ? ` (ciclo ${state.ciclos.length} de ${state.ciclos.length})` : ''}${anoProva ? ` • prova em ${anoProva}` : ''} • ciclo atual em andamento</small>
             </div>
           </div>
           <div class="dashboard-hero-divider"></div>
@@ -2072,6 +2090,18 @@
     ` : '';
     const ultimoBackupValor = state.ultimoBackup ? formatarDataHora(state.ultimoBackup) : 'Nunca';
     const ultimoBackupSub = state.ultimoBackup ? 'Backup salvo neste aparelho' : 'Nenhum backup realizado';
+    const historicoOrdenado = [...(state.historicoImportacoes||[])].sort((a,b) => b.quando.localeCompare(a.quando));
+    const historicoImportacoesHtml = historicoOrdenado.length ? `
+      <div class="historico-import-list">
+        ${historicoOrdenado.map(h => `
+          <div class="historico-import-item">
+            <div class="historico-import-info">
+              <b>${escapeHtml(h.cicloNome || 'Plano sem nome de ciclo')}</b>
+              <small class="muted">${formatarDataHora(h.quando)} · ${h.atividadesAdicionadas} ${h.atividadesAdicionadas===1?'atividade':'atividades'}${h.periodoInicio ? ` · ${formatarData(h.periodoInicio)} a ${formatarData(h.periodoFim)}` : ''}</small>
+            </div>
+          </div>`).join('')}
+      </div>
+    ` : `<div class="empty-state"><div class="empty-state-icon">${icone('clipboard-list',24)}</div><p>Nenhuma importação ainda.</p><small>Planos importados em Configurações aparecem aqui.</small></div>`;
     return `
       <div class="card">
         <div class="config-header-row">
@@ -2140,6 +2170,11 @@
             <small class="muted">Cole um plano de estudos (JSON com um ciclo, dias e blocos) pra adicionar ao Planejamento. Isso soma às atividades já existentes — não apaga nada.</small>
             <textarea id="input-import-plano" placeholder="Cole aqui o plano de estudos (JSON)" style="margin-top:var(--space-2);"></textarea>
             <button id="btn-import-plano" class="primary">Importar plano</button>
+          </div>
+          <div class="card">
+            <h3>${icone('clipboard-list')} Histórico de importações</h3>
+            <small class="muted">Todo plano de estudos importado fica registrado aqui — nada é apagado.</small>
+            ${historicoImportacoesHtml}
           </div>
           ${sessoesHtml}
         </div>
