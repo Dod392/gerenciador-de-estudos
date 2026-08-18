@@ -590,7 +590,10 @@
   function escapeHtml(str){
     return String(str ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   }
-  function hojeISO(){ return new Date().toISOString().slice(0,10); }
+  function hojeISO(){
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
   function addDays(iso, n){
     const d = new Date(iso + 'T00:00:00');
     d.setDate(d.getDate() + n);
@@ -1372,6 +1375,31 @@
     saveState(state);
   }
 
+  async function forcarAtualizacaoApp(){
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if('caches' in window){
+      const nomes = await caches.keys();
+      await Promise.all(nomes.map(n => caches.delete(n)));
+    }
+    location.reload();
+  }
+
+  function verificarNotificacoesPendentes(){
+    if(!state.preferencias.notificacoes) return;
+    if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const fila = filaRevisao(state.erros, hojeISO());
+    if(!fila.length) return;
+    try {
+      new Notification('Gerenciador de Estudos', {
+        body: `Você tem ${fila.length} revis${fila.length===1?'ão':'ões'} pendente${fila.length===1?'':'s'} no Caderno de Erros.`,
+        icon: './icons/icon-192.png',
+      });
+    } catch(e){ /* Notification indisponível neste contexto — sem problema, é best-effort. */ }
+  }
+
   function importarJSON(texto){
     const parsed = JSON.parse(texto);
     if(!estadoValido(parsed)){
@@ -2045,6 +2073,8 @@
             <details class="config-avancado">
               <summary>Avançado</summary>
               <small class="muted">Configurações e ferramentas avançadas de manutenção.</small>
+              <button type="button" id="btn-forcar-atualizacao" style="margin-top:var(--space-3);">🔄 Forçar atualização do app</button>
+              <small class="muted">Limpa o cache local do app (não mexe nos seus dados) e recarrega a versão mais recente. Use se a tela parecer desatualizada após uma atualização.</small>
             </details>
           </div>
 
@@ -2129,7 +2159,17 @@
     document.getElementById('pref-notificacoes-toggle')?.addEventListener('change', (e) => {
       state.preferencias.notificacoes = e.target.checked;
       saveState(state);
+      if(e.target.checked && typeof Notification !== 'undefined' && Notification.permission === 'default'){
+        Notification.requestPermission().then((permissao) => {
+          if(permissao === 'granted') verificarNotificacoesPendentes();
+          else if(permissao === 'denied') alert('Permissão de notificação negada pelo navegador. Pra ativar, permita notificações pra este site nas configurações do navegador.');
+        });
+      }
       render();
+    });
+    document.getElementById('btn-forcar-atualizacao')?.addEventListener('click', () => {
+      if(!confirmarAcao('Isso vai limpar o cache local do app e recarregar a versão mais atual. Seus dados de estudo não são afetados. Continuar?')) return;
+      forcarAtualizacaoApp();
     });
 
     const excluirInput = document.getElementById('config-excluir-input');
@@ -4026,6 +4066,7 @@
   attachSidebarHandlers();
   attachTabsHandlers();
   aplicarTema(state.preferencias.tema);
+  verificarNotificacoesPendentes();
 
   /* === INIT === */
   if('serviceWorker' in navigator){
