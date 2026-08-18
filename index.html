@@ -230,7 +230,8 @@
   .erro-card-header{display:flex;align-items:flex-start;gap:var(--space-3);padding:var(--space-3);cursor:pointer;}
   .erro-card-titulo{flex:1 1 200px;min-width:0;}
   .erro-card-assunto-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-  .erro-card-preview{font-size:var(--text-sm);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .erro-card-oque{font-size:var(--text-sm);margin-top:4px;color:var(--on-surface-muted,var(--muted));}
+  .erro-card-preview{font-size:var(--text-sm);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .erro-card.expandido .erro-card-preview{display:none;}
   .erro-card-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:0 0 auto;}
   .erro-prioridade-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:var(--text-xs);font-weight:600;white-space:nowrap;}
@@ -245,6 +246,18 @@
   .erro-card-col-titulo{font-size:var(--text-sm);font-weight:600;margin-bottom:4px;}
   .erro-col-bad{color:var(--bad);}
   .erro-col-ok{color:var(--ok);}
+  .erro-card-pegadinha{background:var(--warn-soft);border-radius:var(--radius-sm);padding:var(--space-3);}
+  .erro-card-pegadinha .erro-card-col-titulo{color:var(--warn);}
+  .erro-form-panel{max-width:560px;}
+  .erro-form-explicacao{min-height:132px;}
+  .erro-form-contador{font-size:var(--text-xs);color:var(--muted);text-align:right;margin-top:2px;}
+  .erro-form-contador.ok{color:var(--ok);}
+  .erro-form-exemplo{margin:var(--space-2) 0;border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);}
+  .erro-form-exemplo summary{cursor:pointer;font-size:var(--text-sm);color:var(--muted);}
+  .erro-form-exemplo p{font-size:var(--text-sm);margin:6px 0 0;}
+  .erro-form-erro{background:var(--bad-soft);color:var(--bad);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);font-size:var(--text-sm);margin:var(--space-2) 0;}
+  .revisao-sm2-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .revisao-sm2-row button{margin:0;font-size:var(--text-sm);padding:0 8px;}
   .erro-card-footer{display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);flex-wrap:wrap;
     padding:var(--space-2) var(--space-3);border-top:1px solid var(--border);}
   .erro-card-footer-info{font-size:var(--text-xs);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
@@ -724,6 +737,7 @@
       provasPorConcurso: {},
       checkins: [],
       erros: [],
+      flashcards: [],
       conteudo: SEED_CONTEUDO.map(assunto => ({ assunto, status:'nao_iniciado', concurso:'ambos', atualizadoEm: hojeISO() })),
       concursos: ['Transpetro', 'INEA'],
       planejamento: [],
@@ -876,42 +890,125 @@
     if(typeof s.ultimoBackup !== 'string') s.ultimoBackup = null;
     if(!Array.isArray(s.historicoImportacoes)) s.historicoImportacoes = [];
     if(!s.provasPorConcurso || typeof s.provasPorConcurso !== 'object') s.provasPorConcurso = {};
+    if(!Array.isArray(s.flashcards)) s.flashcards = [];
+    migrarErrosParaModeloV2(s);
     return s;
   }
 
-  /* === ERROS (Tarefa 4) === */
-  const GRAU_ORDEM = ['deficiencia','erro_novo','reforcado','corrigido'];
-  const GRAU_DIAS = { deficiencia:1, erro_novo:2, reforcado:7, corrigido:21 };
-  const GRAU_LABEL = { deficiencia:'deficiência confirmada', erro_novo:'erro novo', reforcado:'reforçado', corrigido:'corrigido' };
+  /* === ERROS/FLASHCARDS — migração pro modelo v2 ===
+     Não-destrutiva: cada Erro do formato antigo (grau/proximaRevisao/
+     regraCorreta como "lembrete") vira um Erro completo do formato novo
+     + exatamente 1 Flashcard que herda a proximaRevisao/prioridade
+     antigas, pra fila de revisão não perder nada. Idempotente por erro
+     (roda de novo em todo load sem duplicar) via checagem de
+     flashcardIds. */
+  function migrarErrosParaModeloV2(s){
+    if(!Array.isArray(s.erros) || !s.erros.length) return;
+    s.erros.forEach(e => {
+      if(Array.isArray(e.flashcardIds)) return; // já migrado
+      const grauAntigo = e.grau;
+      const prioridadeAntiga = { deficiencia:'alta', erro_novo:'media', reforcado:'baixa', corrigido:'baixa' }[grauAntigo] || 'media';
+      const intervaloAntigo = { deficiencia:1, erro_novo:2, reforcado:7, corrigido:21 }[grauAntigo] || 2;
+      const fc = {
+        id: 'fc-' + String(Date.now()) + Math.random().toString(36).slice(2,7),
+        erroId: e.id,
+        frente: e.oQueErrei || e.assunto,
+        verso: e.regraCorreta || '(sem verso registrado)',
+        criadoEm: e.criadoEm || hojeISO(),
+        intervalo: intervaloAntigo,
+        facilidade: 2.5,
+        repeticoes: 0,
+        proximaRevisao: e.proximaRevisao || hojeISO(),
+        historico: [],
+        precisaCompletar: true,
+      };
+      s.flashcards.push(fc);
+      e.disciplinaId = e.disciplinaId || e.assunto;
+      e.origem = e.origem || (e.origemQuestao ? 'questao_prova' : 'leitura');
+      e.fonte = e.fonte ?? null;
+      e.enunciadoResumo = e.enunciadoResumo ?? '';
+      e.explicacao = e.explicacao ?? '';
+      e.pegadinha = e.pegadinha ?? null;
+      e.baseLegal = e.baseLegal ?? (e.regraCorreta || null);
+      e.tipoErro = e.tipoErro || 'conteudo';
+      e.prioridade = e.prioridade || prioridadeAntiga;
+      e.flashcardIds = [fc.id];
+      e.precisaCompletar = true;
+      delete e.grau;
+      delete e.proximaRevisao;
+      delete e.regraCorreta;
+      delete e.ultimaRevisao;
+      delete e.origemQuestao;
+    });
+  }
 
-  function criarErro(state, {assunto, oQueErrei, regraCorreta, origemQuestao}){
+  /* === ERROS (Tarefa 4) === */
+  const ORIGEM_LABEL = { questao_prova:'Questão de prova', simulado:'Simulado', leitura:'Leitura', aula:'Aula' };
+  const TIPO_ERRO_LABEL = { conteudo:'Conteúdo', interpretacao:'Interpretação', distracao:'Distração' };
+  const PRIORIDADE_LABEL = { alta:'Alta prioridade', media:'Média prioridade', baixa:'Baixa prioridade' };
+  const EXPLICACAO_MIN_CHARS = 200;
+  const EXPLICACAO_PREFIXOS_PROIBIDOS = ['revisar','estudar','ver ','consultar','olhar','buscar','pesquisar','rever'];
+
+  function validarExplicacao(texto){
+    const limpo = (texto || '').trim();
+    if(limpo.length < EXPLICACAO_MIN_CHARS){
+      return `Isso é um lembrete, não uma explicação. Escreva o conteúdo em si — o que você precisa saber para acertar da próxima vez. (mínimo ${EXPLICACAO_MIN_CHARS} caracteres, tem ${limpo.length})`;
+    }
+    const normalizado = limpo.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if(EXPLICACAO_PREFIXOS_PROIBIDOS.some(p => normalizado.startsWith(p))){
+      return 'Isso é um lembrete, não uma explicação. Escreva o conteúdo em si — o que você precisa saber para acertar da próxima vez.';
+    }
+    return null;
+  }
+
+  function criarFlashcard(state, erroId, {frente, verso, precisaCompletar}){
+    const fc = {
+      id: 'fc-' + String(Date.now()) + Math.random().toString(36).slice(2,7),
+      erroId,
+      frente: frente || '',
+      verso: verso || '',
+      criadoEm: hojeISO(),
+      intervalo: 1,
+      facilidade: 2.5,
+      repeticoes: 0,
+      proximaRevisao: hojeISO(),
+      historico: [],
+      precisaCompletar: !!precisaCompletar,
+    };
+    state.flashcards.push(fc);
+    const erro = state.erros.find(e => e.id === erroId);
+    if(erro){
+      if(!Array.isArray(erro.flashcardIds)) erro.flashcardIds = [];
+      erro.flashcardIds.push(fc.id);
+    }
+    return fc;
+  }
+
+  function criarErro(state, dados){
     const hoje = hojeISO();
     const erro = {
       id: String(Date.now()) + Math.random().toString(36).slice(2,7),
-      assunto, oQueErrei, regraCorreta,
-      origemQuestao: !!origemQuestao,
-      grau: 'erro_novo',
-      proximaRevisao: addDays(hoje, GRAU_DIAS.erro_novo),
-      ultimaRevisao: null,
       criadoEm: hoje,
+      disciplinaId: dados.disciplinaId || dados.assunto,
+      assunto: dados.assunto,
+      origem: dados.origem || 'leitura',
+      fonte: dados.fonte || null,
+      enunciadoResumo: dados.enunciadoResumo || '',
+      oQueErrei: dados.oQueErrei,
+      explicacao: dados.explicacao || '',
+      pegadinha: dados.pegadinha || null,
+      baseLegal: dados.baseLegal || null,
+      tipoErro: dados.tipoErro || 'conteudo',
+      prioridade: dados.prioridade || 'media',
+      flashcardIds: [],
+      precisaCompletar: !!dados.precisaCompletar,
     };
     state.erros.push(erro);
-    return erro;
-  }
-
-  function graduarAcerto(erro){
-    const i = GRAU_ORDEM.indexOf(erro.grau);
-    const novoGrau = i < GRAU_ORDEM.length - 1 ? GRAU_ORDEM[i+1] : erro.grau;
-    erro.grau = novoGrau;
-    erro.proximaRevisao = addDays(hojeISO(), GRAU_DIAS[novoGrau]);
-    erro.ultimaRevisao = hojeISO();
-    return erro;
-  }
-
-  function graduarErro(erro){
-    erro.grau = 'deficiencia';
-    erro.proximaRevisao = addDays(hojeISO(), GRAU_DIAS.deficiencia);
-    erro.ultimaRevisao = hojeISO();
+    criarFlashcard(state, erro.id, {
+      frente: erro.pegadinha || erro.oQueErrei,
+      verso: erro.explicacao,
+      precisaCompletar: erro.precisaCompletar,
+    });
     return erro;
   }
 
@@ -919,16 +1016,31 @@
     const erro = state.erros.find(e => e.id === id);
     if(!erro) return null;
     erro.assunto = dados.assunto;
+    erro.disciplinaId = dados.disciplinaId || dados.assunto;
+    erro.origem = dados.origem || erro.origem;
+    erro.fonte = dados.fonte ?? erro.fonte;
+    erro.enunciadoResumo = dados.enunciadoResumo ?? erro.enunciadoResumo;
     erro.oQueErrei = dados.oQueErrei;
-    erro.regraCorreta = dados.regraCorreta;
-    erro.origemQuestao = !!dados.origemQuestao;
+    erro.explicacao = dados.explicacao;
+    erro.pegadinha = dados.pegadinha ?? erro.pegadinha;
+    erro.baseLegal = dados.baseLegal ?? erro.baseLegal;
+    erro.tipoErro = dados.tipoErro || erro.tipoErro;
+    erro.prioridade = dados.prioridade || erro.prioridade;
+    if(!validarExplicacao(erro.explicacao) && erro.precisaCompletar){
+      erro.precisaCompletar = false;
+      (erro.flashcardIds||[]).forEach(fcId => {
+        const fc = state.flashcards.find(f => f.id === fcId);
+        if(fc) fc.precisaCompletar = false;
+      });
+    }
     return erro;
   }
 
   function excluirErro(state, id){
     const idx = state.erros.findIndex(e => e.id === id);
     if(idx === -1) return false;
-    state.erros.splice(idx, 1);
+    const [erro] = state.erros.splice(idx, 1);
+    state.flashcards = state.flashcards.filter(f => f.erroId !== erro.id);
     return true;
   }
 
@@ -939,18 +1051,62 @@
     return 'Geral';
   }
 
-  const PRIORIDADE_POR_GRAU = { deficiencia:'alta', erro_novo:'media', reforcado:'baixa', corrigido:'baixa' };
-  const PRIORIDADE_LABEL = { alta:'Alta prioridade', media:'Média prioridade', baixa:'Baixa prioridade' };
   function prioridadeErro(erro){
-    return PRIORIDADE_POR_GRAU[erro.grau] || 'baixa';
+    return erro.prioridade || 'media';
   }
 
-  function filtrarErros(state, erros, { filtro, assunto, busca, concurso, hojeIso }){
+  function obterErroDoFlashcard(state, flashcard){
+    return state.erros.find(e => e.id === flashcard.erroId) || null;
+  }
+
+  function flashcardsDoErro(state, erroId){
+    return state.flashcards.filter(f => f.erroId === erroId);
+  }
+
+  function aplicarResultadoRevisao(flashcard, resultado){
+    const hoje = hojeISO();
+    const facilidade = flashcard.facilidade || 2.5;
+    const intervaloAtual = flashcard.intervalo || 1;
+    let novoIntervalo;
+    if(resultado === 'errei') novoIntervalo = 1;
+    else if(resultado === 'dificil') novoIntervalo = Math.max(1, Math.round(intervaloAtual * 1.2));
+    else if(resultado === 'bom') novoIntervalo = Math.max(1, Math.round(intervaloAtual * facilidade));
+    else if(resultado === 'facil') novoIntervalo = Math.max(1, Math.round(intervaloAtual * facilidade * 1.3));
+    else novoIntervalo = intervaloAtual;
+    flashcard.intervalo = novoIntervalo;
+    flashcard.repeticoes = (flashcard.repeticoes || 0) + 1;
+    flashcard.proximaRevisao = addDays(hoje, novoIntervalo);
+    if(!Array.isArray(flashcard.historico)) flashcard.historico = [];
+    flashcard.historico.push({ data: hoje, resultado });
+    return flashcard;
+  }
+
+  function ordenarFlashcardsPorRevisao(flashcards){
+    return [...flashcards].sort((a,b) => a.proximaRevisao < b.proximaRevisao ? -1 : a.proximaRevisao > b.proximaRevisao ? 1 : 0);
+  }
+
+  function filaFlashcardsRevisao(state, hojeIso){
+    return ordenarFlashcardsPorRevisao((state.flashcards||[]).filter(f => f.proximaRevisao <= hojeIso));
+  }
+
+  function filtrarErros(state, erros, { filtro, assunto, busca, concurso, tipoErro, prioridade, hojeIso }){
     return erros.filter(e => {
-      if(filtro === 'pendentes' && e.proximaRevisao > hojeIso) return false;
-      if(filtro === 'revisados' && !e.ultimaRevisao) return false;
+      const cards = flashcardsDoErro(state, e.id);
+      const pendente = cards.some(f => f.proximaRevisao <= hojeIso);
+      const revisado = cards.some(f => f.historico && f.historico.length);
+      if(filtro === 'pendentes' && !pendente) return false;
+      if(filtro === 'revisados' && !revisado) return false;
       if(filtro === 'alta_prioridade' && prioridadeErro(e) !== 'alta') return false;
-      if(assunto && assunto !== 'todos' && e.assunto !== assunto) return false;
+      if(filtro === 'ainda_errando'){
+        const ultimoResultado = cards
+          .flatMap(f => f.historico || [])
+          .sort((a,b) => a.data < b.data ? -1 : a.data > b.data ? 1 : 0)
+          .pop();
+        if(!ultimoResultado || ultimoResultado.resultado !== 'errei') return false;
+      }
+      if(assunto && assunto !== 'todos' && e.disciplinaId !== assunto) return false;
+      if(tipoErro && tipoErro !== 'todos' && e.tipoErro !== tipoErro) return false;
+      if(prioridade && prioridade !== 'todas' && e.prioridade !== prioridade) return false;
       if(concurso && concurso !== 'todos' && !assuntoPertenceAoConcurso(state, e.assunto, concurso)) return false;
       if(busca){
         const termo = busca.toLowerCase();
@@ -960,16 +1116,20 @@
     });
   }
 
-  function statsErros(erros, hojeIso){
+  function statsErros(state, hojeIso){
+    const erros = state.erros;
+    const flashcards = state.flashcards || [];
     const total = erros.length;
-    const pendentes = erros.filter(e => e.proximaRevisao <= hojeIso).length;
+    const pendentes = filaFlashcardsRevisao(state, hojeIso).length;
     const seteDiasAtras = addDays(hojeIso, -7);
     const catorzeDiasAtras = addDays(hojeIso, -14);
     const criadosUltimos7Dias = erros.filter(e => e.criadoEm >= seteDiasAtras).length;
-    const revisadosEstaSemana = erros.filter(e => e.ultimaRevisao && e.ultimaRevisao >= seteDiasAtras).length;
-    const revisadosSemanaAnterior = erros.filter(e => e.ultimaRevisao && e.ultimaRevisao >= catorzeDiasAtras && e.ultimaRevisao < seteDiasAtras).length;
-    const revisoesHoje = erros.filter(e => e.ultimaRevisao === hojeIso).length;
-    const taxaRevisao = total ? Math.round((erros.filter(e => e.ultimaRevisao).length / total) * 100) : 0;
+    const historicoTodos = flashcards.flatMap(f => f.historico || []);
+    const revisadosEstaSemana = historicoTodos.filter(h => h.data >= seteDiasAtras).length;
+    const revisadosSemanaAnterior = historicoTodos.filter(h => h.data >= catorzeDiasAtras && h.data < seteDiasAtras).length;
+    const revisoesHoje = historicoTodos.filter(h => h.data === hojeIso).length;
+    const errosComRevisao = new Set(flashcards.filter(f => f.historico && f.historico.length).map(f => f.erroId)).size;
+    const taxaRevisao = total ? Math.round((errosComRevisao / total) * 100) : 0;
     const porAssunto = {};
     erros.forEach(e => { porAssunto[e.assunto] = (porAssunto[e.assunto]||0) + 1; });
     let assuntoMaisFrequente = null, maxCount = 0;
@@ -977,15 +1137,7 @@
     return { total, pendentes, criadosUltimos7Dias, revisadosEstaSemana, deltaRevisados: revisadosEstaSemana - revisadosSemanaAnterior, revisoesHoje, taxaRevisao, assuntoMaisFrequente, assuntoMaisFrequenteCount: maxCount };
   }
 
-  function ordenarErrosPorRevisao(erros){
-    return [...erros].sort((a,b) => a.proximaRevisao < b.proximaRevisao ? -1 : a.proximaRevisao > b.proximaRevisao ? 1 : 0);
-  }
-
-  function filaRevisao(erros, hojeIso){
-    return ordenarErrosPorRevisao(erros.filter(e => e.proximaRevisao <= hojeIso));
-  }
-
-  function ordenarErros(erros, criterio){
+  function ordenarErros(state, erros, criterio){
     const copia = [...erros];
     if(criterio === 'prioridade'){
       const peso = { alta:0, media:1, baixa:2 };
@@ -993,15 +1145,25 @@
     }
     if(criterio === 'assunto') return copia.sort((a,b) => a.assunto.localeCompare(b.assunto));
     if(criterio === 'recente') return copia.sort((a,b) => b.criadoEm.localeCompare(a.criadoEm));
-    return ordenarErrosPorRevisao(copia);
+    if(criterio === 'mais_errados'){
+      const errosCount = id => flashcardsDoErro(state, id).flatMap(f => f.historico||[]).filter(h => h.resultado==='errei').length;
+      return copia.sort((a,b) => errosCount(b.id) - errosCount(a.id));
+    }
+    // 'proxima_revisao' (padrão)
+    const proximaDoErro = id => {
+      const cards = flashcardsDoErro(state, id);
+      if(!cards.length) return '9999-12-31';
+      return cards.reduce((min,f) => f.proximaRevisao < min ? f.proximaRevisao : min, cards[0].proximaRevisao);
+    };
+    return copia.sort((a,b) => proximaDoErro(a.id) < proximaDoErro(b.id) ? -1 : proximaDoErro(a.id) > proximaDoErro(b.id) ? 1 : 0);
   }
   function diasAtrasoLabel(proximaRevisao, hojeIso){
     if(proximaRevisao > hojeIso) return `Próxima ${proximaRevisao}`;
     const dias = diasAte(proximaRevisao, hojeIso);
     return dias === 0 ? 'Vence hoje' : `Atrasada há ${dias} dia${dias===1?'':'s'}`;
   }
-  function iniciarSessaoRevisao(erros, hojeIso){
-    const fila = filaRevisao(erros, hojeIso).map(e => e.id);
+  function iniciarSessaoRevisao(state, hojeIso){
+    const fila = filaFlashcardsRevisao(state, hojeIso).map(f => f.id);
     if(!fila.length) return null;
     return { fila, indice: 0, revelado: false };
   }
@@ -1378,8 +1540,10 @@
       criarErro(state, {
         assunto: item.assunto,
         oQueErrei: item.oQueErrei,
-        regraCorreta: item.regraCorreta,
-        origemQuestao: !!item.origemQuestao,
+        baseLegal: item.regraCorreta,
+        origem: item.origemQuestao ? 'questao_prova' : 'leitura',
+        explicacao: '',
+        precisaCompletar: true,
       });
       adicionados++;
     });
@@ -1503,7 +1667,7 @@
     const estudados = diasEstudados(state.checkins, state.sessoes);
     const ciclo = diasDeCiclo(state.meta.cicloInicio, hojeIso);
     const piores = piores5(agregado);
-    const atrasados = filaRevisao(state.erros, hojeIso);
+    const atrasados = filaFlashcardsRevisao(state, hojeIso);
     const semanaId = semanaAtualId();
     const plano = obterPlano(state, semanaId);
     const diasSemana = diasRealizadosNaSemana(state.checkins, state.sessoes, semanaId);
@@ -1548,7 +1712,7 @@
     linhas.push('');
     linhas.push('## O que puxar pro próximo ciclo');
     linhas.push([
-      `- Revisões atrasadas (prioridade alta): ${atrasados.length ? atrasados.map(e => `${e.assunto} (${GRAU_LABEL[e.grau]}, venceu ${e.proximaRevisao})`).join('; ') : 'nenhuma'}`,
+      `- Revisões atrasadas (prioridade alta): ${atrasados.length ? atrasados.map(f => { const erro = obterErroDoFlashcard(state, f); return `${erro ? erro.assunto : '?'} (venceu ${f.proximaRevisao})`; }).join('; ') : 'nenhuma'}`,
       `- Piores assuntos por % de acerto: ${piores.length ? piores.map(p => `${p.assunto} (${p.pct}%)`).join(', ') : 'sem dados suficientes ainda'}`,
       `- Assuntos ainda não iniciados: ${naoIniciados.length ? naoIniciados.join(', ') : 'nenhum'}`,
     ].join('\n'));
@@ -1605,7 +1769,7 @@
     const hojeIso = hojeISO();
     const avisos = [];
 
-    const fila = filaRevisao(state.erros, hojeIso);
+    const fila = filaFlashcardsRevisao(state, hojeIso);
     if(fila.length) avisos.push(`${fila.length} revis${fila.length===1?'ão':'ões'} pendente${fila.length===1?'':'s'} no Caderno de Erros`);
 
     const semanaId = semanaAtualId();
@@ -1785,8 +1949,8 @@
     }
     return buckets;
   }
-  function revisoesNoPeriodo(erros, inicio, fim){
-    return erros.filter(e => e.ultimaRevisao && e.ultimaRevisao >= inicio && e.ultimaRevisao <= fim).length;
+  function revisoesNoPeriodo(flashcards, inicio, fim){
+    return flashcards.reduce((soma, f) => soma + (Array.isArray(f.historico) ? f.historico.filter(h => h.data >= inicio && h.data <= fim).length : 0), 0);
   }
   function tempoMedioPorSessao(sessoes){
     if(!sessoes.length) return 0;
@@ -1898,15 +2062,15 @@
     const acertos7 = agregado7.reduce((s,a)=>s+a.acertos,0);
     const pctAcerto7 = questoes7 ? Math.round((acertos7/questoes7)*100) : 0;
 
-    const fila = filaRevisao(state.erros, hojeIso);
-    const revisoesHojeCount = state.erros.filter(e => e.proximaRevisao === hojeIso).length;
+    const fila = filaFlashcardsRevisao(state, hojeIso);
+    const revisoesHojeCount = state.flashcards.filter(f => f.proximaRevisao === hojeIso).length;
 
     const agregadoGeral = agregarPorAssunto(state.checkins, state.sessoes);
     const piores = piores5(agregadoGeral);
     const piorAssunto = piores[0] || null;
 
     const atividades = atividadesDoDiaCombinadas(plano, state.conteudo, state.checkins, state.sessoes, hojeIso);
-    const proxima = proximaAtividadeDoDia(atividades, fila);
+    const proxima = proximaAtividadeDoDia(atividades, fila, state);
     const proximaInfo = proxima
       ? (proxima.origem === 'conteudo' ? { assunto: proxima.assunto, tipo: proxima.tipo || 'questoes' } : { assunto: proxima.erro.assunto, tipo: 'revisao' })
       : null;
@@ -2608,13 +2772,15 @@
   let errosFiltro = 'todos';
   let errosFiltroAssunto = 'todos';
   let errosFiltroConcurso = 'todos';
+  let errosFiltroTipo = 'todos';
+  let errosFiltroPrioridade = 'todas';
   let errosBusca = '';
   const errosExpandidos = new Set();
-  const errosRevisando = new Set();
   let erroModalAberto = null; // { modo: 'novo' } | { modo: 'editar', id }
   let erroMenuAberto = null;
-  let errosOrdenacao = 'atrasado';
-  let revisaoSessao = null; // { fila: [id,...], indice, revelado }
+  let errosOrdenacao = 'proxima_revisao';
+  let revisaoSessao = null; // { fila: [flashcardId,...], indice, revelado }
+  let flashcardModalErroId = null; // erroId aberto pra "+ Adicionar flashcard"
   let desempenhoCicloId = null;
   let desempenhoPeriodo = '90';
   let desempenhoConcurso = 'todos';
@@ -2772,12 +2938,16 @@
     else delete plano.metaMinutosPorDia[dataIso];
     return plano.metaMinutosPorDia[dataIso] ?? null;
   }
-  function proximaAtividadeDoDia(atividades, filaErros){
+  function proximaAtividadeDoDia(atividades, filaFlashcards, state){
     const atrasada = atividades.find(a => a.estado === 'atrasada');
     if(atrasada) return {origem:'conteudo', ...atrasada};
     const pendente = atividades.find(a => a.estado === 'pendente');
     if(pendente) return {origem:'conteudo', ...pendente};
-    if(filaErros.length) return {origem:'erro', erro: filaErros[0]};
+    if(filaFlashcards.length){
+      const flashcard = filaFlashcards[0];
+      const erro = obterErroDoFlashcard(state, flashcard);
+      if(erro) return {origem:'erro', erro, flashcard};
+    }
     return null;
   }
   function formatarDataExtenso(iso){
@@ -2805,8 +2975,8 @@
     const semanaId = semanaAtualId();
     const plano = obterPlano(state, semanaId);
     const atividades = atividadesDoDiaCombinadas(plano, state.conteudo, state.checkins, state.sessoes, hojeIso);
-    const fila = filaRevisao(state.erros, hojeIso);
-    const proxima = proximaAtividadeDoDia(atividades, fila);
+    const fila = filaFlashcardsRevisao(state, hojeIso);
+    const proxima = proximaAtividadeDoDia(atividades, fila, state);
     const sessoesDeHoje = state.sessoes.filter(s => s.data === hojeIso);
     const minutosHoje = minutosNoDia(ci, sessoesDeHoje);
     const planejadoMin = planejadoMinutosHoje(plano, hojeIso);
@@ -2880,12 +3050,12 @@
             <div class="item-icon tipo-revisao">${iconeTipo('revisao')}</div>
             <div class="hero-title-block">
               <h3>${escapeHtml(proxima.erro.assunto)}</h3>
-              <div class="hero-subtitle">Revisão — ${escapeHtml(GRAU_LABEL[proxima.erro.grau])}</div>
+              <div class="hero-subtitle">Revisão — Flashcard</div>
             </div>
             <button class="primary hero-cta" data-iniciar-timer="${escapeHtml(proxima.erro.assunto)}" data-tipo-sugerido="revisao" data-origem="proxima">${icone('play')} Iniciar estudo</button>
           </div>
           <div class="hero-meta">
-            <span class="status-pill ${proxima.erro.proximaRevisao < hojeIso ? 'atrasada' : 'pendente'}">${proxima.erro.proximaRevisao < hojeIso ? 'Atrasada' : 'Pendente'}</span>
+            <span class="status-pill ${proxima.flashcard.proximaRevisao < hojeIso ? 'atrasada' : 'pendente'}">${proxima.flashcard.proximaRevisao < hojeIso ? 'Atrasada' : 'Pendente'}</span>
           </div>
         </div>
       `
@@ -2958,18 +3128,20 @@
           <h3><span class="section-icon">${icone('refresh')}</span>Revisões de hoje</h3>
           ${fila.length ? `<button class="card-link" data-ir-erros>Ver todas →</button>` : ''}
         </div>
-        ${fila.length ? fila.map(e => {
-          const atrasado = e.proximaRevisao <= hojeIso;
+        ${fila.length ? fila.map(f => {
+          const erroDoCard = obterErroDoFlashcard(state, f);
+          if(!erroDoCard) return '';
+          const atrasado = f.proximaRevisao <= hojeIso;
           return `
-          <div class="revisao-item" data-erro-id="${e.id}" style="border-left:3px solid ${corDisciplina(e.assunto)};padding-left:8px;">
+          <div class="revisao-item" data-flashcard-id="${f.id}" style="border-left:3px solid ${corDisciplina(erroDoCard.assunto)};padding-left:8px;">
             <div class="item-icon tipo-revisao">${icone('refresh')}</div>
             <div class="revisao-info">
-              <div class="revisao-title">${escapeHtml(e.assunto)}</div>
-              <div class="revisao-meta">${escapeHtml(GRAU_LABEL[e.grau])} ${atrasado ? '· <span class="status-pill atrasada">Atrasada</span>' : `· próx. ${e.proximaRevisao}`}</div>
+              <div class="revisao-title">${escapeHtml(erroDoCard.assunto)}</div>
+              <div class="revisao-meta">${f.precisaCompletar ? 'Card incompleto' : 'Flashcard'} ${atrasado ? '· <span class="status-pill atrasada">Atrasada</span>' : `· próx. ${f.proximaRevisao}`}</div>
             </div>
             <div class="revisao-actions">
-              <button class="ok" data-acertei="${e.id}" title="Acertei">✓</button>
-              <button class="bad" data-errei="${e.id}" title="Errei">✗</button>
+              <button class="ok" data-acertei="${f.id}" title="Acertei">✓</button>
+              <button class="bad" data-errei="${f.id}" title="Errei">✗</button>
             </div>
           </div>`;
         }).join('') : `
@@ -3152,20 +3324,24 @@
     }
     app.querySelectorAll('button[data-acertei]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const e = state.erros.find(x => x.id === btn.dataset.acertei);
-        graduarAcerto(e);
-        incrementarContadorRevisoes(state);
-        avancarStatusPorAtividade(state, e.assunto, hojeISO());
+        const f = state.flashcards.find(x => x.id === btn.dataset.acertei);
+        if(f){
+          aplicarResultadoRevisao(f, 'bom');
+          incrementarContadorRevisoes(state);
+          const erroDoCard = obterErroDoFlashcard(state, f);
+          if(erroDoCard) avancarStatusPorAtividade(state, erroDoCard.assunto, hojeISO());
+        }
         saveState(state);
         render();
       });
     });
     app.querySelectorAll('button[data-errei]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const e = state.erros.find(x => x.id === btn.dataset.errei);
-        graduarErro(e);
-        incrementarContadorRevisoes(state);
-        avancarStatusPorAtividade(state, e.assunto, hojeISO());
+        const f = state.flashcards.find(x => x.id === btn.dataset.errei);
+        if(f){
+          aplicarResultadoRevisao(f, 'errei');
+          incrementarContadorRevisoes(state);
+        }
         saveState(state);
         render();
       });
@@ -3348,9 +3524,10 @@
   }
   function renderErros(){
     const hojeIso = hojeISO();
-    const stats = statsErros(state.erros, hojeIso);
-    const listaFiltrada = ordenarErros(filtrarErros(state, state.erros, { filtro: errosFiltro, assunto: errosFiltroAssunto, busca: errosBusca, concurso: errosFiltroConcurso, hojeIso }), errosOrdenacao);
-    const assuntosComErro = [...new Set(state.erros.map(e => e.assunto))].sort();
+    const stats = statsErros(state, hojeIso);
+    const listaFiltrada = ordenarErros(state, filtrarErros(state, state.erros, { filtro: errosFiltro, assunto: errosFiltroAssunto, busca: errosBusca, concurso: errosFiltroConcurso, tipoErro: errosFiltroTipo, prioridade: errosFiltroPrioridade, hojeIso }), errosOrdenacao);
+    const assuntosComErro = [...new Set(state.erros.map(e => e.disciplinaId || e.assunto))].sort();
+    const pendentesCount = filaFlashcardsRevisao(state, hojeIso).length;
 
     const headerHtml = `
       <div class="card">
@@ -3359,12 +3536,12 @@
             <div class="hoje-header-icon">${icone('notebook')}</div>
             <div>
               <h2>Caderno de Erros</h2>
-              <small class="muted">Registre seus erros, revise as regras corretas e acompanhe os assuntos que mais derrubam seu desempenho.</small>
+              <small class="muted">Registre o que errou como se fosse ensinar alguém — a revisão só funciona se o registro se basta sozinho.</small>
             </div>
           </div>
           <div class="erros-header-actions">
             <input type="text" id="erros-busca-input" placeholder="Buscar erro ou assunto..." value="${escapeHtml(errosBusca)}">
-            ${stats.pendentes ? `<button class="primary" id="erros-revisar-pendentes-btn">${icone('play')} Revisar pendentes (${stats.pendentes})</button>` : ''}
+            ${pendentesCount ? `<button class="primary" id="erros-revisar-pendentes-btn">${icone('play')} Revisar pendentes (${pendentesCount})</button>` : ''}
             <button class="primary" id="erros-novo-btn">+ Novo erro</button>
           </div>
         </div>
@@ -3374,17 +3551,28 @@
             <button class="mapa-filtro-btn ${errosFiltro==='todos'?'active':''}" data-erros-filtro="todos">Todos</button>
             <button class="mapa-filtro-btn ${errosFiltro==='pendentes'?'active':''}" data-erros-filtro="pendentes"><i class="mapa-dot" style="color:var(--status-pending)"></i>Pendentes</button>
             <button class="mapa-filtro-btn ${errosFiltro==='revisados'?'active':''}" data-erros-filtro="revisados"><i class="mapa-dot" style="color:var(--status-reviewed)"></i>Revisados</button>
-            <button class="mapa-filtro-btn ${errosFiltro==='alta_prioridade'?'active':''}" data-erros-filtro="alta_prioridade"><i class="mapa-dot" style="color:var(--status-high-priority)"></i>Alta prioridade</button>
+            <button class="mapa-filtro-btn ${errosFiltro==='ainda_errando'?'active':''}" data-erros-filtro="ainda_errando"><i class="mapa-dot" style="color:var(--status-high-priority)"></i>Só os que ainda erro</button>
           </div>
           <select id="erros-ordenar-select" class="erros-assunto-select">
-            <option value="atrasado" ${errosOrdenacao==='atrasado'?'selected':''}>Mais atrasado primeiro</option>
+            <option value="proxima_revisao" ${errosOrdenacao==='proxima_revisao'?'selected':''}>Próxima revisão</option>
+            <option value="mais_errados" ${errosOrdenacao==='mais_errados'?'selected':''}>Mais errados</option>
+            <option value="recente" ${errosOrdenacao==='recente'?'selected':''}>Mais recentes</option>
             <option value="prioridade" ${errosOrdenacao==='prioridade'?'selected':''}>Prioridade</option>
             <option value="assunto" ${errosOrdenacao==='assunto'?'selected':''}>Assunto (A-Z)</option>
-            <option value="recente" ${errosOrdenacao==='recente'?'selected':''}>Mais recente</option>
           </select>
+        </div>
+        <div class="mapa-filtros-row">
           <select id="erros-assunto-select" class="erros-assunto-select">
-            <option value="todos">Todos os assuntos</option>
+            <option value="todos">Todas as disciplinas</option>
             ${assuntosComErro.map(a => `<option value="${escapeHtml(a)}" ${errosFiltroAssunto===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}
+          </select>
+          <select id="erros-tipo-select" class="erros-assunto-select">
+            <option value="todos" ${errosFiltroTipo==='todos'?'selected':''}>Todos os tipos de erro</option>
+            ${Object.entries(TIPO_ERRO_LABEL).map(([v,l]) => `<option value="${v}" ${errosFiltroTipo===v?'selected':''}>${l}</option>`).join('')}
+          </select>
+          <select id="erros-prioridade-select" class="erros-assunto-select">
+            <option value="todas" ${errosFiltroPrioridade==='todas'?'selected':''}>Todas as prioridades</option>
+            ${Object.entries(PRIORIDADE_LABEL).map(([v,l]) => `<option value="${v}" ${errosFiltroPrioridade===v?'selected':''}>${l}</option>`).join('')}
           </select>
           <select id="erros-concurso-select" class="erros-assunto-select">
             <option value="todos" ${errosFiltroConcurso==='todos'?'selected':''}>Todos os concursos</option>
@@ -3422,50 +3610,52 @@
 
     const cardHtml = (e) => {
       const expandido = errosExpandidos.has(e.id);
-      const revisando = errosRevisando.has(e.id);
       const prioridade = prioridadeErro(e);
       const categoria = categoriaPorAssunto(e.assunto);
-      const atrasado = e.proximaRevisao <= hojeIso;
+      const cards = flashcardsDoErro(state, e.id);
+      const proximaRevisaoErro = cards.length ? cards.reduce((min,f) => f.proximaRevisao < min ? f.proximaRevisao : min, cards[0].proximaRevisao) : null;
+      const trechoExplicacao = e.explicacao ? (e.explicacao.length > 110 ? e.explicacao.slice(0,110)+'…' : e.explicacao) : '(sem explicação registrada ainda)';
       return `
-        <div class="erro-card ${expandido?'expandido':''}" style="border-left:3px solid ${corDisciplina(e.assunto)};">
+        <div class="erro-card ${expandido?'expandido':''}" style="border-left:3px solid ${corDisciplina(e.disciplinaId||e.assunto)};">
           <div class="erro-card-header" data-toggle-erro="${e.id}">
             <div class="item-icon tipo-teoria">${iconePorAssunto(e.assunto)}</div>
             <div class="erro-card-titulo">
               <div class="erro-card-assunto-row">
                 <b>${escapeHtml(e.assunto)}</b>
                 <span class="badge">${escapeHtml(categoria)}</span>
+                ${e.precisaCompletar ? `<span class="badge" style="background:var(--warn-soft);color:var(--warn);">Explicação pendente</span>` : ''}
               </div>
-              <div class="erro-card-preview muted">${escapeHtml(e.oQueErrei.length > 90 ? e.oQueErrei.slice(0,90)+'…' : e.oQueErrei)}</div>
+              <div class="erro-card-oque">${escapeHtml(e.oQueErrei)}</div>
+              <div class="erro-card-preview muted">${escapeHtml(trechoExplicacao)}</div>
             </div>
             <div class="erro-card-meta">
-              ${e.grau === 'corrigido'
-                ? `<span class="badge selo">${GRAU_LABEL.corrigido}</span>`
-                : `<span class="erro-prioridade-badge prioridade-${prioridade}">${PRIORIDADE_LABEL[prioridade]}</span>`}
-              <span class="erro-card-data">${icone('calendar')} ${diasAtrasoLabel(e.proximaRevisao, hojeIso)}</span>
+              <span class="erro-prioridade-badge prioridade-${prioridade}">${PRIORIDADE_LABEL[prioridade]}</span>
+              ${proximaRevisaoErro ? `<span class="erro-card-data">${icone('calendar')} ${diasAtrasoLabel(proximaRevisaoErro, hojeIso)}</span>` : ''}
             </div>
             <button class="erro-card-chevron" aria-label="Expandir">${expandido?'▲':'▼'}</button>
           </div>
           ${expandido ? `
             <div class="erro-card-body">
+              ${e.enunciadoResumo ? `<div class="erro-card-col"><div class="erro-card-col-titulo">Enunciado</div><p class="muted">${escapeHtml(e.enunciadoResumo)}</p></div>` : ''}
               <div class="erro-card-col">
-                <div class="erro-card-col-titulo erro-col-bad">✗ O que errei</div>
+                <div class="erro-card-col-titulo erro-col-bad">O que errei</div>
                 <p class="muted">${escapeHtml(e.oQueErrei)}</p>
               </div>
-              <div class="erro-card-col">
-                <div class="erro-card-col-titulo erro-col-ok">✓ Regra correta</div>
-                <p class="muted">${escapeHtml(e.regraCorreta)}</p>
+              <div class="erro-card-col" style="grid-column:1/-1;">
+                <div class="erro-card-col-titulo erro-col-ok">Explicação</div>
+                ${e.explicacao ? `<p>${escapeHtml(e.explicacao)}</p>` : `<p class="muted">Ainda não tem explicação completa registrada. <button class="card-link" data-editar-erro="${e.id}" style="display:inline;width:auto;min-height:auto;padding:0;">Completar agora →</button></p>`}
               </div>
+              ${e.pegadinha ? `<div class="erro-card-col erro-card-pegadinha" style="grid-column:1/-1;"><div class="erro-card-col-titulo">Pegadinha</div><p>${escapeHtml(e.pegadinha)}</p></div>` : ''}
             </div>
             <div class="erro-card-footer">
               <div class="erro-card-footer-info muted">
-                Registrado em ${escapeHtml(e.criadoEm)}
-                ${e.origemQuestao ? '<span class="badge">Questão de prova</span>' : ''}
+                Registrado em ${formatarData(e.criadoEm)} · ${ORIGEM_LABEL[e.origem]||e.origem}
+                ${e.fonte ? ` · ${escapeHtml(e.fonte)}` : ''}
+                ${e.baseLegal ? ` · Ref.: ${escapeHtml(e.baseLegal)}` : ''}
+                · ${cards.length} flashcard${cards.length===1?'':'s'}
               </div>
               <div class="erro-card-footer-actions">
-                ${revisando ? `
-                  <button class="ok" data-acertei="${e.id}">✓ Acertei</button>
-                  <button class="bad" data-errei="${e.id}">✗ Errei</button>
-                ` : `<button class="primary" data-revisar-agora="${e.id}">Revisar agora</button>`}
+                <button data-add-flashcard="${e.id}">+ Flashcard</button>
                 <button data-editar-erro="${e.id}">Editar</button>
                 <div class="erro-menu-wrap">
                   <button data-erro-menu="${e.id}">⋯</button>
@@ -3509,23 +3699,59 @@
       const erro = editando ? state.erros.find(e => e.id === erroModalAberto.id) : null;
       const assuntoInicial = editando ? erro.assunto : (state.conteudo[0]?.assunto || '');
       const contagemInicial = assuntoInicial ? contarErrosPorAssunto(state.erros, assuntoInicial, editando ? erro.id : null) : 0;
+      const explicacaoInicial = editando ? (erro.explicacao || '') : '';
       return `
         <div class="modal-backdrop" id="erro-modal-backdrop">
-          <div class="modal-panel">
+          <div class="modal-panel erro-form-panel">
             <h3>${editando ? 'Editar erro' : 'Novo erro'}</h3>
             <label>Assunto</label>
             <select id="erro-form-assunto">
               ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}" ${(erro?.assunto||'')===c.assunto?'selected':''}>${escapeHtml(c.assunto)}</option>`).join('')}
             </select>
             <small class="muted" id="erro-form-aviso">${contagemInicial ? `Você já tem ${contagemInicial} erro${contagemInicial===1?'':'s'} registrado${contagemInicial===1?'':'s'} para este assunto.` : ''}</small>
+            <div class="row">
+              <div>
+                <label>Origem</label>
+                <select id="erro-form-origem">
+                  ${Object.entries(ORIGEM_LABEL).map(([v,l]) => `<option value="${v}" ${(erro?.origem||'questao_prova')===v?'selected':''}>${l}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label>Fonte (opcional)</label>
+                <input type="text" id="erro-form-fonte" placeholder="banca/ano/prova" value="${editando ? escapeHtml(erro.fonte||'') : ''}">
+              </div>
+            </div>
+            <label>Enunciado resumido (opcional)</label>
+            <input type="text" id="erro-form-enunciado" placeholder="O que a questão cobrava, em 1-2 linhas" value="${editando ? escapeHtml(erro.enunciadoResumo||'') : ''}">
             <label>O que errei</label>
-            <textarea id="erro-form-oque">${editando ? escapeHtml(erro.oQueErrei) : ''}</textarea>
-            <label>Regra correta</label>
-            <textarea id="erro-form-regra">${editando ? escapeHtml(erro.regraCorreta) : ''}</textarea>
-            <label style="display:flex;align-items:center;min-height:44px;gap:8px;">
-              <input type="checkbox" id="erro-form-questao" style="width:auto;min-height:auto;flex-shrink:0;" ${erro?.origemQuestao?'checked':''}>
-              Veio de uma questão de prova
-            </label>
+            <textarea id="erro-form-oque" placeholder="Qual foi o equívoco especificamente">${editando ? escapeHtml(erro.oQueErrei) : ''}</textarea>
+            <label>Explicação completa</label>
+            <textarea id="erro-form-explicacao" class="erro-form-explicacao" placeholder="Escreva aqui o conteúdo como se fosse ensinar alguém. Ao revisar, você deve conseguir aprender só com este texto.">${escapeHtml(explicacaoInicial)}</textarea>
+            <div class="erro-form-contador" id="erro-form-contador">0 / ${EXPLICACAO_MIN_CHARS}</div>
+            <small class="muted" id="erro-form-erro-explicacao" style="color:var(--bad);display:none;"></small>
+            <details class="erro-form-exemplo">
+              <summary>Ver exemplo — ruim vs. bom</summary>
+              <p class="muted"><b>Ruim:</b> "Revisar base legal: Lei 9.433/1997"</p>
+              <p class="muted"><b>Bom:</b> "O CNRH arbitra conflitos sobre recursos hídricos em última instância administrativa, aprova o Plano Nacional de Recursos Hídricos e estabelece critérios gerais para outorga e cobrança. Pegadinha: o CNRH define critérios gerais — quem executa a outorga é o órgão gestor (ANA, no âmbito federal)."</p>
+            </details>
+            <label>Pegadinha (opcional)</label>
+            <textarea id="erro-form-pegadinha" placeholder="A distinção que a banca explora">${editando ? escapeHtml(erro.pegadinha||'') : ''}</textarea>
+            <label>Referência (opcional)</label>
+            <input type="text" id="erro-form-baselegal" placeholder="Só a referência. A explicação vai no campo acima." value="${editando ? escapeHtml(erro.baseLegal||'') : ''}">
+            <div class="row">
+              <div>
+                <label>Tipo de erro</label>
+                <select id="erro-form-tipo">
+                  ${Object.entries(TIPO_ERRO_LABEL).map(([v,l]) => `<option value="${v}" ${(erro?.tipoErro||'conteudo')===v?'selected':''}>${l}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label>Prioridade</label>
+                <select id="erro-form-prioridade">
+                  ${Object.entries(PRIORIDADE_LABEL).map(([v,l]) => `<option value="${v}" ${(erro?.prioridade||'media')===v?'selected':''}>${l}</option>`).join('')}
+                </select>
+              </div>
+            </div>
             <div class="row">
               <button id="erro-form-cancelar">Cancelar</button>
               <button class="primary" id="erro-form-salvar">${editando ? 'Salvar alterações' : 'Adicionar'}</button>
@@ -3534,9 +3760,30 @@
         </div>`;
     })() : '';
 
+    const flashcardModalHtml = flashcardModalErroId ? (() => {
+      const erroAlvo = state.erros.find(e => e.id === flashcardModalErroId);
+      if(!erroAlvo) return '';
+      return `
+        <div class="modal-backdrop" id="flashcard-modal-backdrop">
+          <div class="modal-panel">
+            <h3>Novo flashcard — ${escapeHtml(erroAlvo.assunto)}</h3>
+            <small class="muted">Frente e verso curtos, uma informação por card.</small>
+            <label>Frente</label>
+            <textarea id="flashcard-form-frente" placeholder="A pergunta ou o gatilho de memória"></textarea>
+            <label>Verso</label>
+            <textarea id="flashcard-form-verso" placeholder="A resposta"></textarea>
+            <div class="row">
+              <button id="flashcard-form-cancelar">Cancelar</button>
+              <button class="primary" id="flashcard-form-salvar">Adicionar flashcard</button>
+            </div>
+          </div>
+        </div>`;
+    })() : '';
+
     const sessaoModalHtml = revisaoSessao ? (() => {
-      const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
-      const terminou = revisaoSessao.indice >= revisaoSessao.fila.length || !erroAtual;
+      const fcAtual = state.flashcards.find(f => f.id === revisaoSessao.fila[revisaoSessao.indice]);
+      const terminou = revisaoSessao.indice >= revisaoSessao.fila.length || !fcAtual;
+      const erroAtual = fcAtual ? obterErroDoFlashcard(state, fcAtual) : null;
       return `
         <div class="modal-backdrop" id="revisao-sessao-backdrop">
           <div class="modal-panel revisao-sessao-panel">
@@ -3544,28 +3791,35 @@
               <div class="empty-state">
                 <div class="empty-state-icon">${icone('check-circle',28)}</div>
                 <b>Sessão concluída</b>
-                <p class="muted">Você revisou ${revisaoSessao.fila.length} erro${revisaoSessao.fila.length===1?'':'s'}.</p>
+                <p class="muted">Você revisou ${revisaoSessao.fila.length} flashcard${revisaoSessao.fila.length===1?'':'s'}.</p>
                 <button class="primary" id="revisao-sessao-fechar">Fechar</button>
               </div>
             ` : `
               <div class="revisao-sessao-progresso">${revisaoSessao.indice+1} de ${revisaoSessao.fila.length}</div>
               <div class="progress"><i style="width:${Math.round((revisaoSessao.indice)/revisaoSessao.fila.length*100)}%"></i></div>
-              <h3>${escapeHtml(erroAtual.assunto)}</h3>
+              ${fcAtual.precisaCompletar ? `
+                <div class="erro-form-erro" style="margin-top:var(--space-2);">
+                  Card incompleto — completar explicação.
+                  <button class="card-link" id="revisao-sessao-completar" style="display:inline;width:auto;min-height:auto;padding:0;">Editar erro de origem →</button>
+                </div>` : ''}
+              <h3>${escapeHtml(erroAtual?.assunto || '')}</h3>
               <div class="revisao-sessao-secao">
-                <div class="erro-card-col-titulo erro-col-bad">✗ O que errei</div>
-                <p>${escapeHtml(erroAtual.oQueErrei)}</p>
+                <p style="font-size:var(--text-lg);">${escapeHtml(fcAtual.frente)}</p>
               </div>
               ${revisaoSessao.revelado ? `
                 <div class="revisao-sessao-secao">
-                  <div class="erro-card-col-titulo erro-col-ok">✓ Regra correta</div>
-                  <p>${escapeHtml(erroAtual.regraCorreta)}</p>
+                  <div class="erro-card-col-titulo erro-col-ok">Resposta</div>
+                  <p>${escapeHtml(fcAtual.verso)}</p>
                 </div>
-                <div class="row">
-                  <button class="ok" id="revisao-sessao-acertei">✓ Acertei</button>
-                  <button class="bad" id="revisao-sessao-errei">✗ Errei</button>
+                <div class="revisao-sm2-row">
+                  <button class="bad" data-sm2="errei">Errei</button>
+                  <button data-sm2="dificil">Difícil</button>
+                  <button data-sm2="bom">Bom</button>
+                  <button class="ok" data-sm2="facil">Fácil</button>
                 </div>
+                <button class="card-link" id="revisao-sessao-ver-erro">Ver explicação completa →</button>
               ` : `
-                <button class="primary" id="revisao-sessao-revelar">Mostrar regra correta</button>
+                <button class="primary" id="revisao-sessao-revelar">Mostrar resposta</button>
               `}
               <button class="card-link" id="revisao-sessao-cancelar">Encerrar sessão</button>
             `}
@@ -3573,17 +3827,23 @@
         </div>`;
     })() : '';
 
-    return `<div class="erros-screen">${headerHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}${sessaoModalHtml}</div>`;
+    return `<div class="erros-screen">${headerHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}${flashcardModalHtml}${sessaoModalHtml}</div>`;
   }
 
   function attachErrosHandlers(){
-    const app = document.getElementById('app');
-
     document.querySelectorAll('[data-erros-filtro]').forEach(btn => {
       btn.addEventListener('click', () => { errosFiltro = btn.dataset.errosFiltro; render(); });
     });
     document.getElementById('erros-assunto-select')?.addEventListener('change', (e) => {
       errosFiltroAssunto = e.target.value;
+      render();
+    });
+    document.getElementById('erros-tipo-select')?.addEventListener('change', (e) => {
+      errosFiltroTipo = e.target.value;
+      render();
+    });
+    document.getElementById('erros-prioridade-select')?.addEventListener('change', (e) => {
+      errosFiltroPrioridade = e.target.value;
       render();
     });
     document.getElementById('erros-concurso-select')?.addEventListener('change', (e) => {
@@ -3610,34 +3870,16 @@
       });
     });
 
-    document.querySelectorAll('[data-revisar-agora]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        errosRevisando.add(btn.dataset.revisarAgora);
-        render();
-      });
-    });
-    app.querySelectorAll('button[data-acertei]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const e = state.erros.find(x => x.id === btn.dataset.acertei);
-        if(e){ graduarAcerto(e); incrementarContadorRevisoes(state); avancarStatusPorAtividade(state, e.assunto, hojeISO()); }
-        errosRevisando.delete(btn.dataset.acertei);
-        saveState(state);
-        render();
-      });
-    });
-    app.querySelectorAll('button[data-errei]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const e = state.erros.find(x => x.id === btn.dataset.errei);
-        if(e){ graduarErro(e); incrementarContadorRevisoes(state); avancarStatusPorAtividade(state, e.assunto, hojeISO()); }
-        errosRevisando.delete(btn.dataset.errei);
-        saveState(state);
-        render();
-      });
-    });
-
     document.querySelectorAll('[data-editar-erro]').forEach(btn => {
       btn.addEventListener('click', () => {
         erroModalAberto = { modo:'editar', id: btn.dataset.editarErro };
+        revisaoSessao = null;
+        render();
+      });
+    });
+    document.querySelectorAll('[data-add-flashcard]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        flashcardModalErroId = btn.dataset.addFlashcard;
         render();
       });
     });
@@ -3649,7 +3891,7 @@
     });
     document.querySelectorAll('[data-excluir-erro]').forEach(btn => {
       btn.addEventListener('click', () => {
-        if(!confirmarAcao('Excluir este erro registrado? Essa ação não pode ser desfeita.')) return;
+        if(!confirmarAcao('Excluir este erro registrado e seus flashcards? Essa ação não pode ser desfeita.')) return;
         excluirErro(state, btn.dataset.excluirErro);
         erroMenuAberto = null;
         saveState(state);
@@ -3679,44 +3921,104 @@
       const aviso = document.getElementById('erro-form-aviso');
       if(aviso) aviso.textContent = count ? `Você já tem ${count} erro${count===1?'':'s'} registrado${count===1?'':'s'} para este assunto.` : '';
     });
+    const explicacaoInput = document.getElementById('erro-form-explicacao');
+    const atualizarContadorExplicacao = () => {
+      const contador = document.getElementById('erro-form-contador');
+      if(!contador || !explicacaoInput) return;
+      const n = explicacaoInput.value.trim().length;
+      contador.textContent = `${n} / ${EXPLICACAO_MIN_CHARS}`;
+      contador.classList.toggle('ok', n >= EXPLICACAO_MIN_CHARS);
+    };
+    if(explicacaoInput){
+      atualizarContadorExplicacao();
+      explicacaoInput.addEventListener('input', atualizarContadorExplicacao);
+    }
     document.getElementById('erro-form-salvar')?.addEventListener('click', () => {
       const assunto = document.getElementById('erro-form-assunto').value;
+      const origem = document.getElementById('erro-form-origem').value;
+      const fonte = document.getElementById('erro-form-fonte').value.trim();
+      const enunciadoResumo = document.getElementById('erro-form-enunciado').value.trim();
       const oQueErrei = document.getElementById('erro-form-oque').value.trim();
-      const regraCorreta = document.getElementById('erro-form-regra').value.trim();
-      const origemQuestao = document.getElementById('erro-form-questao').checked;
-      if(!oQueErrei || !regraCorreta){ alert('Preencha "o que errei" e a "regra correta".'); return; }
+      const explicacao = document.getElementById('erro-form-explicacao').value.trim();
+      const pegadinha = document.getElementById('erro-form-pegadinha').value.trim();
+      const baseLegal = document.getElementById('erro-form-baselegal').value.trim();
+      const tipoErro = document.getElementById('erro-form-tipo').value;
+      const prioridade = document.getElementById('erro-form-prioridade').value;
+      const avisoEl = document.getElementById('erro-form-erro-explicacao');
+      if(!oQueErrei){ alert('Preencha "o que errei".'); return; }
+      const erroValidacao = validarExplicacao(explicacao);
+      if(erroValidacao){
+        if(avisoEl){ avisoEl.textContent = erroValidacao; avisoEl.style.display = 'block'; }
+        return;
+      }
+      if(avisoEl) avisoEl.style.display = 'none';
+      const dados = { assunto, disciplinaId: assunto, origem, fonte: fonte||null, enunciadoResumo, oQueErrei, explicacao, pegadinha: pegadinha||null, baseLegal: baseLegal||null, tipoErro, prioridade };
       if(erroModalAberto.modo === 'editar'){
-        atualizarErro(state, erroModalAberto.id, { assunto, oQueErrei, regraCorreta, origemQuestao });
+        atualizarErro(state, erroModalAberto.id, dados);
       } else {
-        criarErro(state, { assunto, oQueErrei, regraCorreta, origemQuestao });
+        criarErro(state, dados);
       }
       saveState(state);
       erroModalAberto = null;
       render();
     });
 
+    document.getElementById('flashcard-modal-backdrop')?.addEventListener('click', (e) => {
+      if(e.target.id === 'flashcard-modal-backdrop'){ flashcardModalErroId = null; render(); }
+    });
+    document.getElementById('flashcard-form-cancelar')?.addEventListener('click', () => {
+      flashcardModalErroId = null;
+      render();
+    });
+    document.getElementById('flashcard-form-salvar')?.addEventListener('click', () => {
+      const frente = document.getElementById('flashcard-form-frente').value.trim();
+      const verso = document.getElementById('flashcard-form-verso').value.trim();
+      if(!frente || !verso){ alert('Preencha frente e verso do flashcard.'); return; }
+      criarFlashcard(state, flashcardModalErroId, { frente, verso, precisaCompletar: false });
+      saveState(state);
+      flashcardModalErroId = null;
+      render();
+    });
+
     document.getElementById('erros-revisar-pendentes-btn')?.addEventListener('click', () => {
-      revisaoSessao = iniciarSessaoRevisao(state.erros, hojeISO());
+      revisaoSessao = iniciarSessaoRevisao(state, hojeISO());
       render();
     });
     document.getElementById('revisao-sessao-revelar')?.addEventListener('click', () => {
       revisaoSessao.revelado = true;
       render();
     });
-    document.getElementById('revisao-sessao-acertei')?.addEventListener('click', () => {
-      const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
-      if(erroAtual){ graduarAcerto(erroAtual); incrementarContadorRevisoes(state); avancarStatusPorAtividade(state, erroAtual.assunto, hojeISO()); }
-      saveState(state);
-      revisaoSessao.indice++;
-      revisaoSessao.revelado = false;
+    document.querySelectorAll('[data-sm2]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const fcAtual = state.flashcards.find(f => f.id === revisaoSessao.fila[revisaoSessao.indice]);
+        if(fcAtual){
+          aplicarResultadoRevisao(fcAtual, btn.dataset.sm2);
+          incrementarContadorRevisoes(state);
+          const erroDoCard = obterErroDoFlashcard(state, fcAtual);
+          if(erroDoCard && (btn.dataset.sm2==='bom'||btn.dataset.sm2==='facil')) avancarStatusPorAtividade(state, erroDoCard.assunto, hojeISO());
+        }
+        saveState(state);
+        revisaoSessao.indice++;
+        revisaoSessao.revelado = false;
+        render();
+      });
+    });
+    document.getElementById('revisao-sessao-completar')?.addEventListener('click', () => {
+      const fcAtual = state.flashcards.find(f => f.id === revisaoSessao.fila[revisaoSessao.indice]);
+      const erroDoCard = fcAtual ? obterErroDoFlashcard(state, fcAtual) : null;
+      if(erroDoCard){
+        erroModalAberto = { modo:'editar', id: erroDoCard.id };
+        revisaoSessao = null;
+      }
       render();
     });
-    document.getElementById('revisao-sessao-errei')?.addEventListener('click', () => {
-      const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
-      if(erroAtual){ graduarErro(erroAtual); incrementarContadorRevisoes(state); avancarStatusPorAtividade(state, erroAtual.assunto, hojeISO()); }
-      saveState(state);
-      revisaoSessao.indice++;
-      revisaoSessao.revelado = false;
+    document.getElementById('revisao-sessao-ver-erro')?.addEventListener('click', () => {
+      const fcAtual = state.flashcards.find(f => f.id === revisaoSessao.fila[revisaoSessao.indice]);
+      const erroDoCard = fcAtual ? obterErroDoFlashcard(state, fcAtual) : null;
+      if(erroDoCard){
+        errosExpandidos.add(erroDoCard.id);
+        revisaoSessao = null;
+      }
       render();
     });
     document.getElementById('revisao-sessao-fechar')?.addEventListener('click', () => {
@@ -4054,8 +4356,8 @@
     const horasAnt = totalHorasEstudadas(checkinsAnt, sessoesAnt);
     const sequenciaAtual = calcularSequencia(state.checkins, state.sessoes, hojeIso);
     const sequenciaAnt = calcularSequencia(state.checkins, state.sessoes, addDays(range.inicio,-1));
-    const revisoesP = revisoesNoPeriodo(state.erros, range.inicio, range.fim);
-    const revisoesAnt = rangeAnt ? revisoesNoPeriodo(state.erros, rangeAnt.inicio, rangeAnt.fim) : 0;
+    const revisoesP = revisoesNoPeriodo(state.flashcards, range.inicio, range.fim);
+    const revisoesAnt = rangeAnt ? revisoesNoPeriodo(state.flashcards, rangeAnt.inicio, rangeAnt.fim) : 0;
     const tempoMedioP = tempoMedioPorSessao(sessoesP);
     const tempoMedioAnt = tempoMedioPorSessao(sessoesAnt);
 
@@ -4072,7 +4374,7 @@
     });
     const sparkHoras = bucket((i,f) => totalHorasEstudadas(filtrarPorConcurso(state, filtrarPorPeriodo(state.checkins,i,f), desempenhoConcurso), filtrarPorConcurso(state, filtrarPorPeriodo(state.sessoes,i,f), desempenhoConcurso)));
     const sparkDias = bucket((i,f) => diasEstudados(filtrarPorPeriodo(state.checkins,i,f), filtrarPorPeriodo(state.sessoes,i,f)));
-    const sparkRevisoes = bucket((i,f) => revisoesNoPeriodo(state.erros, i, f));
+    const sparkRevisoes = bucket((i,f) => revisoesNoPeriodo(state.flashcards, i, f));
     const sparkTempoMedio = bucket((i,f) => tempoMedioPorSessao(filtrarPorConcurso(state, filtrarPorPeriodo(state.sessoes,i,f), desempenhoConcurso)));
 
     const kpiCard = (label, valor, spark, cor, delta, sufixo) => `
