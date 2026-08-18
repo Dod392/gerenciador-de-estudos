@@ -5,45 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gerenciador de Estudos</title>
 <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#0d1712">
+<meta name="theme-color" content="#f5f6fa">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    /* Vade Mecum — capa de livro jurídico: verde-tinta, lombada dourada, carimbo de aprovado */
-    --bg:#0d1712; --surface:#152019; --card:#1b2921;
-    --fg:#ece7d8; --muted:#8a9186;
-    --accent:#b8863a; --accent-fg:#0d1712;
-    --ok:#3f7a52; --warn:#c99a3f; --bad:#b5482f;
-    --border:#2c3a30;
+    /* Lumen — painel claro e denso, violeta como único motor de interação (ver DESIGN.md) */
+    --bg:#f5f6fa; --surface:#ffffff; --card:#ffffff;
+    --fg:#14161c; --muted:#5a6478;
+    --accent:#6246e8; --accent-hover:#5238d6; --accent-soft:#efebff; --accent-fg:#ffffff;
+    --ok:#05805a; --ok-soft:#e3f5ee; --warn:#a9640b; --warn-soft:#fdf1df; --bad:#c81e2c; --bad-soft:#fce9ea;
+    --border:#e5e7f0; --border-strong:#cbcfde;
+    --subject-1:#6246e8; --subject-2:#0e8f9e; --subject-3:#c2410c;
+    --subject-4:#1d6fd6; --subject-5:#9333a8; --subject-6:#4d7c0f;
     --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-6:24px; --space-8:32px;
     --radius-sm:8px; --radius:12px; --radius-lg:16px;
-    --text-xs:12px; --text-sm:13px; --text-base:14px; --text-lg:16px; --text-xl:20px; --text-2xl:28px;
-    --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow:0 4px 16px rgba(0,0,0,.4);
-    --tap:48px;
-    --font-display:'Source Serif 4',Georgia,serif;
-    --font-body:'IBM Plex Sans',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
-    --hoje-border:#33453a; --hoje-shadow-card:0 4px 12px rgba(0,0,0,.4); --hoje-text-secondary:#a8ad9f;
-    --status-not-started:#6b7280; --status-in-progress:#c99a3f; --status-review:#8a6bb0; --status-completed:#3f7a52;
-    --status-pending:#c99a3f; --status-reviewed:#3f7a52; --status-high-priority:#b5482f;
-  }
-  :root[data-theme="light"]{
-    /* mesma identidade, folha do livro em vez da capa */
-    --bg:#f2ead4; --surface:#faf6e9; --card:#fbf8ee;
-    --fg:#241f14; --muted:#6b6350;
-    --accent:#8a5a1f; --accent-fg:#fbf8ee;
-    --ok:#2c6b41; --warn:#8a5a1f; --bad:#96341c;
-    --border:#ddd3b4;
-    --shadow-sm:0 1px 2px rgba(36,31,20,.10); --shadow:0 4px 16px rgba(36,31,20,.14);
-    --hoje-border:#ddd3b4; --hoje-shadow-card:0 4px 12px rgba(36,31,20,.08); --hoje-text-secondary:#6b6350;
+    --text-xs:12px; --text-sm:13px; --text-base:15px; --text-lg:16px; --text-xl:20px; --text-2xl:28px;
+    --shadow-sm:0 1px 2px rgba(20,22,28,.04), 0 4px 12px rgba(20,22,28,.04);
+    --shadow:0 12px 32px rgba(20,22,28,.14);
+    --tap:44px;
+    --font-display:'Plus Jakarta Sans',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-body:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-mono:'Inter',system-ui,sans-serif;
+    --hoje-border:#e5e7f0; --hoje-shadow-card:var(--shadow-sm); --hoje-text-secondary:#5a6478;
+    --status-not-started:#5a6478; --status-in-progress:#a9640b; --status-review:#9333a8; --status-completed:#05805a;
+    --status-pending:#a9640b; --status-reviewed:#05805a; --status-high-priority:#c81e2c;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
-    font-family:var(--font-body);}
-  h1,h2,h3{font-family:var(--font-display);letter-spacing:.01em;}
-  .stat-value{font-family:var(--font-mono);font-weight:500;}
+    font-family:var(--font-body);font-variant-numeric:tabular-nums;}
+  h1,h2,h3{font-family:var(--font-display);letter-spacing:-0.02em;font-weight:700;}
+  .stat-value{font-family:var(--font-mono);font-weight:700;letter-spacing:-0.03em;}
   body{padding-bottom:calc(72px + env(safe-area-inset-bottom));}
   #app{max-width:480px;margin:0 auto;padding:var(--gap);}
   h1,h2,h3{margin:0 0 8px;}
@@ -75,7 +68,7 @@
 
   #layout{display:flex;min-height:100vh;}
   #main{flex:1;min-width:0;}
-  #app{max-width:1280px;margin:0 auto;padding:var(--space-6);}
+  #app{max-width:1180px;margin:0 auto;padding:var(--space-6);}
   #sidebar{display:none;}
   #mais-sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:20;display:flex;align-items:flex-end;}
   #mais-sheet.hidden{display:none;}
@@ -88,7 +81,13 @@
   .stat-card{position:relative;}
   .stat-card .stat-label{font-size:var(--text-xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
   .stat-card .stat-value{font-size:var(--text-2xl);font-weight:650;margin-top:4px;}
+  .icone{display:inline-block;vertical-align:-3px;flex-shrink:0;}
   .stat-card .stat-icon{position:absolute;top:var(--space-4);right:var(--space-4);opacity:.5;font-size:18px;}
+  .stat-icon .icone{width:18px;height:18px;}
+  .empty-state-icon .icone{width:24px;height:24px;}
+  .dashboard-quick-icon .icone,.config-action-icon .icone{width:20px;height:20px;}
+  .hoje-header-icon .icone{width:20px;height:20px;}
+  .item-icon .icone{width:18px;height:18px;}
   .progress{height:8px;border-radius:999px;background:var(--border);overflow:hidden;margin-top:6px;}
   .progress > i{display:block;height:100%;background:var(--accent);}
   table.data{width:100%;border-collapse:collapse;font-size:var(--text-sm);}
@@ -203,12 +202,8 @@
   .mapa-status-badge.status-not-started{background:var(--status-not-started);color:#fff;}
   .mapa-status-badge.status-in-progress{background:var(--status-in-progress);color:#1a1206;}
   .mapa-status-badge.status-review{background:var(--status-review);color:#fff;}
-  .selo{background:transparent !important;color:var(--status-completed);
-    border:2px solid currentColor;border-radius:3px;font-family:var(--font-mono);font-weight:600;
-    letter-spacing:.06em;text-transform:uppercase;transform:rotate(-2deg);position:relative;}
-  .selo::after{content:'';position:absolute;inset:2px;
-    border:1px solid currentColor;border-radius:2px;opacity:.5;pointer-events:none;}
-  .mapa-status-badge.status-completed{background:transparent;color:var(--status-completed);}
+  .selo{background:var(--ok-soft) !important;color:var(--ok);font-weight:600;}
+  .mapa-status-badge.status-completed{background:var(--ok-soft);color:var(--ok);}
   .mapa-card-concursos{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
   .mapa-concurso-badge{background:rgba(79,157,222,.18);color:var(--accent);border:none;}
   .mapa-card-pct{position:absolute;bottom:var(--space-3);right:var(--space-3);font-size:var(--text-xs);color:var(--muted);}
@@ -589,7 +584,7 @@
 <body>
   <div id="layout">
     <aside id="sidebar">
-      <div id="sidebar-brand">📚 <span class="brand-text">Estudos</span></div>
+      <div id="sidebar-brand"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6c-2-1.5-5-2-8-1v13c3-1 6-.5 8 1 2-1.5 5-2 8-1V5c-3-1-6-.5-8 1zM12 6v13"/></svg> <span class="brand-text">Estudos</span></div>
       <nav id="sidebar-nav"></nav>
       <button id="sidebar-toggle" title="Recolher menu">«</button>
     </aside>
@@ -604,6 +599,55 @@
   /* === HELPERS (Tarefa 2) === */
   function escapeHtml(str){
     return String(str ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+
+  /* === ÍCONES (linha única, sem emoji — ver DESIGN.md) === */
+  const ICONES = {
+    calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    'alarm-clock': '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M5 3 3 5M19 3l2 2M8 2h8"/>',
+    play: '<path d="M6 4l14 8-14 8V4z"/>',
+    'check-circle': '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9"/>',
+    circle: '<circle cx="12" cy="12" r="7"/>',
+    'book-open': '<path d="M12 6c-2-1.5-5-2-8-1v13c3-1 6-.5 8 1 2-1.5 5-2 8-1V5c-3-1-6-.5-8 1zM12 6v13"/>',
+    book: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
+    notebook: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v18M4 8h2M4 12h2M4 16h2"/>',
+    target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".5" fill="currentColor"/>',
+    'help-circle': '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.5 2.5 0 0 1 4.8.8c0 1.6-2.3 2-2.3 3.5M12 17h.01"/>',
+    'bar-chart': '<path d="M5 21V10M12 21V4M19 21v-7"/>',
+    'trending-up': '<path d="M4 16l6-6 4 4 6-8M20 6h-4M20 6v4"/>',
+    refresh: '<path d="M21 8a9 9 0 0 0-15.5-5.3L3 5M3 3v4h4M3 16a9 9 0 0 0 15.5 5.3L21 19M21 21v-4h-4"/>',
+    map: '<path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2z"/><path d="M9 3v16M15 5v16"/>',
+    bell: '<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+    'alert-triangle': '<path d="M12 3 2 20h20L12 3z"/><path d="M12 10v5M12 18h.01"/>',
+    trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+    landmark: '<path d="M4 21h16M5 21V10M9 21V10M15 21V10M19 21V10M3 10l9-6 9 6"/>',
+    'file-text': '<path d="M6 3h9l3 3v15H6z"/><path d="M9 12h6M9 16h6"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
+    database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+    package: '<path d="M12 3 3 7.5 12 12l9-4.5L12 3z"/><path d="M3 7.5v9L12 21l9-4.5v-9M12 12v9"/>',
+    save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3M8 14h8v7"/>',
+    cloud: '<path d="M7 18a4.5 4.5 0 0 1-.5-9A5.5 5.5 0 0 1 17 8a4 4 0 0 1-1 8H7z"/>',
+    download: '<path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/>',
+    shield: '<path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6l7-3z"/>',
+    folder: '<path d="M3 6h6l2 2h10v11H3z"/>',
+    flag: '<path d="M5 3v18M5 4h13l-3 4 3 4H5"/>',
+    search: '<circle cx="10" cy="10" r="6"/><path d="M18 18l-3.5-3.5"/>',
+    link: '<path d="M9 15l6-6"/><path d="M8 12 6 14a3.5 3.5 0 0 0 5 5l3-3"/><path d="M16 12l2-2a3.5 3.5 0 0 0-5-5l-3 3"/>',
+    'graduation-cap': '<path d="M2 9l10-4 10 4-10 4-10-4z"/><path d="M6 11v5c0 1.5 2.5 3 6 3s6-1.5 6-3v-5M20 9v6"/>',
+    lightbulb: '<path d="M9 18h6M10 21h4M7 9a5 5 0 1 1 8.5 3.5c-.8.8-1.5 1.7-1.5 3.5h-6c0-1.8-.7-2.7-1.5-3.5A5 5 0 0 1 7 9z"/>',
+    flame: '<path d="M12 2c1 4-4 5-4 9a4 4 0 0 0 8 0c1.5 1 2 2.5 2 4a6 6 0 0 1-12 0c0-5 3-6 3-9 0-1.5.5-3 3-4z"/>',
+    zap: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/>',
+    edit: '<path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M14 6l4 4"/>',
+    droplet: '<path d="M12 2c3 5 7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 4-8 7-13z"/>',
+    sliders: '<path d="M4 6h10M18 6h2M4 18h2M10 18h10M4 12h16"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="18" r="2"/><circle cx="12" cy="12" r="2" fill="none"/>',
+    compass: '<circle cx="12" cy="12" r="9"/><path d="M15 9l-2 6-6 2 2-6 6-2z"/>',
+    'clipboard-list': '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM8 11h8M8 15h8"/>',
+  };
+  function icone(nome, tamanho){
+    const conteudo = ICONES[nome] || ICONES.circle;
+    const px = tamanho || 16;
+    return `<svg class="icone" width="${px}" height="${px}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${conteudo}</svg>`;
   }
   function hojeISO(){
     const d = new Date();
@@ -640,11 +684,6 @@
   function corVar(nome){
     return getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
   }
-  function aplicarTema(tema){
-    document.documentElement.dataset.theme = tema === 'claro' ? 'light' : 'dark';
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if(meta) meta.setAttribute('content', tema === 'claro' ? '#f5f6f8' : '#0b0d11');
-  }
   function confirmarAcao(mensagem){
     if(state?.preferencias?.confirmacoes === false) return true;
     return confirm(mensagem);
@@ -672,7 +711,7 @@
       sessaoEmAndamento: null,
       ciclos: [{ id: 'ciclo-1', nome: '1º Ciclo', inicio: hojeISO() }],
       contadorRevisoes: 0,
-      preferencias: { tema: 'escuro', formatoData: 'DD/MM/AAAA', confirmacoes: true, notificacoes: true },
+      preferencias: { formatoData: 'DD/MM/AAAA', confirmacoes: true, notificacoes: true },
       ultimoBackup: null,
     };
   }
@@ -798,7 +837,6 @@
     if(!Array.isArray(s.ciclos) || !s.ciclos.length) s.ciclos = [{ id: 'ciclo-1', nome: '1º Ciclo', inicio: s.meta?.cicloInicio || hojeISO() }];
     if(typeof s.contadorRevisoes !== 'number') s.contadorRevisoes = 0;
     if(!s.preferencias || typeof s.preferencias !== 'object') s.preferencias = {};
-    if(s.preferencias.tema !== 'claro' && s.preferencias.tema !== 'escuro') s.preferencias.tema = 'escuro';
     if(!['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'].includes(s.preferencias.formatoData)) s.preferencias.formatoData = 'DD/MM/AAAA';
     if(typeof s.preferencias.confirmacoes !== 'boolean') s.preferencias.confirmacoes = true;
     if(typeof s.preferencias.notificacoes !== 'boolean') s.preferencias.notificacoes = true;
@@ -977,12 +1015,12 @@
   }
   function iconePorAssunto(nome){
     const n = nome.toLowerCase();
-    if(n.includes('água') || n.includes('agua') || n.includes('hídric') || n.includes('hidric')) return '💧';
-    if(n.includes('resíduo') || n.includes('residuo') || n.includes('esgoto')) return '🗑️';
-    if(n.includes('licenciamento')) return '🏛️';
-    if(n.includes('conama') || n.includes('nbr') || n.includes('pnrs') || n.includes('pnma') || n.includes('snuc') || n.includes('pnrh') || n.includes('lc ')) return '📜';
-    if(n.includes('inglês') || n.includes('ingles') || n.includes('português') || n.includes('portugues')) return '🗣️';
-    return '📘';
+    if(n.includes('água') || n.includes('agua') || n.includes('hídric') || n.includes('hidric')) return icone('droplet');
+    if(n.includes('resíduo') || n.includes('residuo') || n.includes('esgoto')) return icone('trash');
+    if(n.includes('licenciamento')) return icone('landmark');
+    if(n.includes('conama') || n.includes('nbr') || n.includes('pnrs') || n.includes('pnma') || n.includes('snuc') || n.includes('pnrh') || n.includes('lc ')) return icone('file-text');
+    if(n.includes('inglês') || n.includes('ingles') || n.includes('português') || n.includes('portugues')) return icone('book-open');
+    return icone('book');
   }
   function adicionarAssunto(state, nome){
     const trimmed = (nome || '').trim();
@@ -1021,7 +1059,7 @@
       <div class="card">
         <div class="mapa-header-row">
           <div class="planejamento-header">
-            <div class="hoje-header-icon">🗺️</div>
+            <div class="hoje-header-icon">${icone('map')}</div>
             <div>
               <h2>Mapa de Conteúdo</h2>
               <small class="muted">Toque no status pra avançar; toque no concurso pra trocar.</small>
@@ -1054,12 +1092,12 @@
         </div>
 
         <div class="kpi-grid mapa-resumo-grid">
-          <div class="card stat-card"><div class="stat-label">Total de assuntos</div><div class="stat-value">${listaCompleta.length}</div><div class="stat-icon">📚</div></div>
+          <div class="card stat-card"><div class="stat-label">Total de assuntos</div><div class="stat-value">${listaCompleta.length}</div><div class="stat-icon">${icone('book-open')}</div></div>
           <div class="card stat-card"><div class="stat-label">Não iniciados</div><div class="stat-value">${totalPorStatus.nao_iniciado||0}</div><div class="stat-icon" style="color:var(--status-not-started)">●</div></div>
           <div class="card stat-card"><div class="stat-label">Em andamento</div><div class="stat-value">${totalPorStatus.estudado||0}</div><div class="stat-icon" style="color:var(--status-in-progress)">●</div></div>
           <div class="card stat-card"><div class="stat-label">Em revisão</div><div class="stat-value">${totalPorStatus.revisado||0}</div><div class="stat-icon" style="color:var(--status-review)">●</div></div>
           <div class="card stat-card"><div class="stat-label">Concluídos</div><div class="stat-value">${totalPorStatus.dominado||0}</div><div class="stat-icon" style="color:var(--status-completed)">●</div></div>
-          <div class="card stat-card"><div class="stat-label">Progresso geral</div><div class="stat-value">${progressoGeral}%</div><div class="stat-icon">🎯</div></div>
+          <div class="card stat-card"><div class="stat-label">Progresso geral</div><div class="stat-value">${progressoGeral}%</div><div class="stat-icon">${icone('target')}</div></div>
         </div>
       </div>`;
 
@@ -1706,7 +1744,7 @@
       <div class="card">
         <div class="dashboard-hero-row">
           <div class="planejamento-header">
-            <div class="hoje-header-icon">📅</div>
+            <div class="hoje-header-icon">${icone('calendar')}</div>
             <div>
               <h2>${dias} dias até a prova</h2>
               <small class="muted">${cicloAtivo ? escapeHtml(cicloAtivo.nome) : ''}${anoProva ? ` • prova em ${anoProva}` : ''} • ciclo atual em andamento</small>
@@ -1725,22 +1763,22 @@
     const kpiHtml = `
       <div class="kpi-grid">
         <div class="card stat-card dashboard-kpi-card">
-          <div class="stat-label">Horas na semana</div><div class="stat-value">${horasFeitas}h</div><div class="stat-icon" style="color:#3b82f6">⏱️</div>
+          <div class="stat-label">Horas na semana</div><div class="stat-value">${horasFeitas}h</div><div class="stat-icon" style="color:#3b82f6">${icone('clock')}</div>
           <div class="dashboard-kpi-meta">meta: ${horasAlvo}h</div>
           <div class="progress"><i style="width:${horasAlvo?Math.min(100,Math.round(horasFeitas/horasAlvo*100)):0}%;background:#3b82f6"></i></div>
         </div>
         <div class="card stat-card dashboard-kpi-card">
-          <div class="stat-label">Questões na semana</div><div class="stat-value">${questoesSemana}</div><div class="stat-icon" style="color:#10b981">❓</div>
+          <div class="stat-label">Questões na semana</div><div class="stat-value">${questoesSemana}</div><div class="stat-icon" style="color:#10b981">${icone('help-circle')}</div>
           <div class="dashboard-kpi-meta" style="color:var(--ok)">+${questoesHoje} hoje</div>
           <div class="progress"><i style="width:${questoesSemana?Math.min(100,Math.round(questoesHoje/Math.max(1,questoesSemana)*100)):0}%;background:#10b981"></i></div>
         </div>
         <div class="card stat-card dashboard-kpi-card">
-          <div class="stat-label">% de acerto</div><div class="stat-value">${pctAcerto7}%</div><div class="stat-icon" style="color:#a855f7">🎯</div>
+          <div class="stat-label">% de acerto</div><div class="stat-value">${pctAcerto7}%</div><div class="stat-icon" style="color:#a855f7">${icone('target')}</div>
           <div class="dashboard-kpi-meta">últimos 7 dias</div>
           <div class="progress"><i style="width:${pctAcerto7}%;background:#a855f7"></i></div>
         </div>
         <div class="card stat-card dashboard-kpi-card">
-          <div class="stat-label">Revisões pendentes</div><div class="stat-value">${fila.length}</div><div class="stat-icon" style="color:#f59e0b">🔔</div>
+          <div class="stat-label">Revisões pendentes</div><div class="stat-value">${fila.length}</div><div class="stat-icon" style="color:#f59e0b">${icone('bell')}</div>
           <div class="dashboard-kpi-meta" style="color:var(--warn)">${revisoesHojeCount} vence${revisoesHojeCount===1?'':'m'} hoje</div>
           <div class="progress"><i style="width:${fila.length?100:0}%;background:#f59e0b"></i></div>
         </div>
@@ -1748,7 +1786,7 @@
 
     const progressoSemanaHtml = `
       <div class="card">
-        <h3><span class="section-icon">📊</span>Seu progresso esta semana</h3>
+        <h3><span class="section-icon">${icone('bar-chart')}</span>Seu progresso esta semana</h3>
         <div class="dashboard-progresso-row">
           <div class="dashboard-progresso-label">Horas estudadas</div>
           <div class="progress"><i style="width:${pctMetaSemanal}%"></i></div>
@@ -1762,14 +1800,14 @@
           <div class="dashboard-progresso-valor">${diasFeitos} / ${diasAlvo}</div>
         </div>
         <div class="dashboard-badge-row">
-          <span class="dashboard-badge" style="color:#f59e0b;border-color:#f59e0b">🔥 Sequência: ${calcularSequencia(state.checkins, state.sessoes, hojeIso)} dias</span>
-          <span class="dashboard-badge" style="color:#3b82f6;border-color:#3b82f6">📅 Cronograma: ${pctCronograma(state.conteudo)}%</span>
+          <span class="dashboard-badge" style="color:#f59e0b;border-color:#f59e0b">${icone('flame')} Sequência: ${calcularSequencia(state.checkins, state.sessoes, hojeIso)} dias</span>
+          <span class="dashboard-badge" style="color:#3b82f6;border-color:#3b82f6">${icone('calendar')} Cronograma: ${pctCronograma(state.conteudo)}%</span>
         </div>
       </div>`;
 
     const hojeCardHtml = `
       <div class="card">
-        <h3><span class="section-icon">☀️</span>Hoje</h3>
+        <h3><span class="section-icon">${icone('target')}</span>Hoje</h3>
         ${state.sessaoEmAndamento ? `
           <small class="muted">Sessão em andamento</small>
           <h3 style="margin-top:2px;">${escapeHtml(state.sessaoEmAndamento.assunto || 'Estudo livre')}</h3>
@@ -1782,18 +1820,18 @@
         ` : `<p class="muted">Nada planejado ainda pra hoje.</p>`}
         <div class="row">
           <button class="primary" data-ir-hoje>Ir para Hoje →</button>
-          ${state.sessaoEmAndamento ? `<button data-ir-hoje>Continuar sessão ▶</button>` : ''}
+          ${state.sessaoEmAndamento ? `<button data-ir-hoje>Continuar sessão ${icone('play')}</button>` : ''}
         </div>
         <div class="row" style="margin-top:var(--space-2);">
-          <button class="card-link" data-ir-erros style="width:auto;">🔔 Revisões de hoje <b style="margin:0 4px;">${fila.length}</b> →</button>
-          <button class="card-link" data-ir-hoje style="width:auto;">❓ Questões hoje <b style="margin:0 4px;">${questoesHoje}</b> →</button>
+          <button class="card-link" data-ir-erros style="width:auto;">${icone('bell')} Revisões de hoje <b style="margin:0 4px;">${fila.length}</b> →</button>
+          <button class="card-link" data-ir-hoje style="width:auto;">${icone('help-circle')} Questões hoje <b style="margin:0 4px;">${questoesHoje}</b> →</button>
         </div>
       </div>`;
 
     const chartHtml = `
       <div class="card">
         <div class="card-header-row">
-          <h3><span class="section-icon">📊</span>Últimos 7 dias</h3>
+          <h3><span class="section-icon">${icone('bar-chart')}</span>Últimos 7 dias</h3>
           <small class="muted">Total: ${horasFeitas}h</small>
         </div>
         <canvas id="chart-horas-semana" height="220"></canvas>
@@ -1801,21 +1839,21 @@
 
     const atencaoHtml = `
       <div class="card">
-        <h3><span class="section-icon">⚠️</span>Atenção</h3>
-        ${piorAssunto ? `<button class="dashboard-atencao-item" data-ir-desempenho><span class="dashboard-atencao-icon">🎯</span><span class="dashboard-atencao-texto">${escapeHtml(piorAssunto.assunto)} com ${piorAssunto.pct}% de acerto</span><span class="dashboard-atencao-seta">›</span></button>` : ''}
-        ${fila.length ? `<button class="dashboard-atencao-item" data-ir-erros><span class="dashboard-atencao-icon">⏰</span><span class="dashboard-atencao-texto">${fila.length} revis${fila.length===1?'ão':'ões'} pendente${fila.length===1?'':'s'}</span><span class="dashboard-atencao-seta">›</span></button>` : ''}
-        <button class="dashboard-atencao-item" data-ir-planejamento><span class="dashboard-atencao-icon">📈</span><span class="dashboard-atencao-texto">Meta semanal em ${pctMetaSemanal}%</span><span class="dashboard-atencao-seta">›</span></button>
+        <h3><span class="section-icon">${icone('alert-triangle')}</span>Atenção</h3>
+        ${piorAssunto ? `<button class="dashboard-atencao-item" data-ir-desempenho><span class="dashboard-atencao-icon">${icone('target')}</span><span class="dashboard-atencao-texto">${escapeHtml(piorAssunto.assunto)} com ${piorAssunto.pct}% de acerto</span><span class="dashboard-atencao-seta">›</span></button>` : ''}
+        ${fila.length ? `<button class="dashboard-atencao-item" data-ir-erros><span class="dashboard-atencao-icon">${icone('alarm-clock')}</span><span class="dashboard-atencao-texto">${fila.length} revis${fila.length===1?'ão':'ões'} pendente${fila.length===1?'':'s'}</span><span class="dashboard-atencao-seta">›</span></button>` : ''}
+        <button class="dashboard-atencao-item" data-ir-planejamento><span class="dashboard-atencao-icon">${icone('trending-up')}</span><span class="dashboard-atencao-texto">Meta semanal em ${pctMetaSemanal}%</span><span class="dashboard-atencao-seta">›</span></button>
         ${!piorAssunto && !fila.length ? '<p class="muted">Tudo em dia — sem alertas.</p>' : ''}
       </div>`;
 
     const cicloAtualHtml = `
       <div class="card">
-        <h3><span class="section-icon">🔄</span>Ciclo atual</h3>
+        <h3><span class="section-icon">${icone('refresh')}</span>Ciclo atual</h3>
         <div class="dashboard-status-badges">
-          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-not-started)">⭕</div><b>${statusCounts.nao_iniciado}</b><small>Não iniciados</small></div>
-          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-in-progress)">🔵</div><b>${statusCounts.estudado}</b><small>Em andamento</small></div>
-          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-review)">🟡</div><b>${statusCounts.revisado}</b><small>Em revisão</small></div>
-          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-completed)">✅</div><b>${statusCounts.dominado}</b><small>Concluídos</small></div>
+          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-not-started)">${icone('circle')}</div><b>${statusCounts.nao_iniciado}</b><small>Não iniciados</small></div>
+          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-in-progress)">${icone('circle')}</div><b>${statusCounts.estudado}</b><small>Em andamento</small></div>
+          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-review)">${icone('circle')}</div><b>${statusCounts.revisado}</b><small>Em revisão</small></div>
+          <div class="dashboard-status-badge"><div class="stat-icon" style="color:var(--status-completed)">${icone('check-circle')}</div><b>${statusCounts.dominado}</b><small>Concluídos</small></div>
         </div>
         <div class="dashboard-status-bar">
           <span style="width:${statusCounts.nao_iniciado/totalConteudo*100}%;background:var(--status-not-started)"></span>
@@ -1827,12 +1865,12 @@
 
     const acessoRapidoHtml = `
       <div class="card">
-        <h3><span class="section-icon">⚡</span>Acesso rápido</h3>
+        <h3><span class="section-icon">${icone('zap')}</span>Acesso rápido</h3>
         <div class="dashboard-quick-grid">
-          <button class="dashboard-quick-btn" data-ir-planejamento><span class="dashboard-quick-icon">📅</span><b>Planejar semana</b><small>Organize seu estudo</small></button>
-          <button class="dashboard-quick-btn" data-ir-erros><span class="dashboard-quick-icon">📝</span><b>Registrar erro</b><small>Revise e aprenda</small></button>
-          <button class="dashboard-quick-btn" data-ir-desempenho><span class="dashboard-quick-icon">📊</span><b>Ver desempenho</b><small>Acompanhe seus dados</small></button>
-          <button class="dashboard-quick-btn" data-ir-mapa><span class="dashboard-quick-icon">🗺️</span><b>Mapa de conteúdo</b><small>Veja seu progresso</small></button>
+          <button class="dashboard-quick-btn" data-ir-planejamento><span class="dashboard-quick-icon">${icone('calendar')}</span><b>Planejar semana</b><small>Organize seu estudo</small></button>
+          <button class="dashboard-quick-btn" data-ir-erros><span class="dashboard-quick-icon">${icone('edit')}</span><b>Registrar erro</b><small>Revise e aprenda</small></button>
+          <button class="dashboard-quick-btn" data-ir-desempenho><span class="dashboard-quick-icon">${icone('bar-chart')}</span><b>Ver desempenho</b><small>Acompanhe seus dados</small></button>
+          <button class="dashboard-quick-btn" data-ir-mapa><span class="dashboard-quick-icon">${icone('map')}</span><b>Mapa de conteúdo</b><small>Veja seu progresso</small></button>
         </div>
       </div>`;
 
@@ -1918,12 +1956,12 @@
       </div>
     ` : (
       state.sessoes.length === 0
-        ? `<div class="empty-state"><div class="empty-state-icon">📅</div><p>Nenhuma sessão registrada ainda.</p><small>Registre suas sessões de estudo para acompanhar seu progresso.</small></div>`
-        : `<div class="empty-state"><div class="empty-state-icon">🔎</div><p>Nenhuma sessão encontrada.</p><small>Tente ajustar a busca ou o filtro de tipo.</small></div>`
+        ? `<div class="empty-state"><div class="empty-state-icon">${icone('calendar')}</div><p>Nenhuma sessão registrada ainda.</p><small>Registre suas sessões de estudo para acompanhar seu progresso.</small></div>`
+        : `<div class="empty-state"><div class="empty-state-icon">${icone('search')}</div><p>Nenhuma sessão encontrada.</p><small>Tente ajustar a busca ou o filtro de tipo.</small></div>`
     );
     const sessoesHtml = `
       <div class="card">
-        <h3>📅 Sessões registradas</h3>
+        <h3>${icone('calendar')} Sessões registradas</h3>
         <small class="muted">Gerencie suas sessões de estudo registradas. Alterações aqui afetam Hoje, Dashboard e Desempenho.</small>
         <div class="config-sessoes-filtros">
           <input type="text" id="config-sessao-busca" placeholder="Buscar sessões..." value="${escapeHtml(configSessaoBusca)}">
@@ -1996,7 +2034,7 @@
     return `
       <div class="card">
         <div class="config-header-row">
-          <span class="config-header-icon">⚙️</span>
+          <span class="config-header-icon">${icone('settings')}</span>
           <div>
             <h2>Configurações</h2>
             <small class="muted">Gerencie seus dados, personalização e manutenção do sistema.</small>
@@ -2008,19 +2046,19 @@
         <div class="card stat-card">
           <div class="stat-label">Último backup</div>
           <div class="stat-value">${ultimoBackupValor}</div>
-          <div class="stat-icon" style="color:var(--accent)">🕐</div>
+          <div class="stat-icon" style="color:var(--accent)">${icone('clock')}</div>
           <div class="stat-sub">${ultimoBackupSub}</div>
         </div>
         <div class="card stat-card">
           <div class="stat-label">Armazenamento</div>
           <div class="stat-value">Dados locais</div>
-          <div class="stat-icon" style="color:var(--accent)">💽</div>
+          <div class="stat-icon" style="color:var(--accent)">${icone('database')}</div>
           <div class="stat-sub">Somente neste aparelho</div>
         </div>
         <div class="card stat-card">
           <div class="stat-label">Versão do app</div>
           <div class="stat-value">${APP_VERSION}</div>
-          <div class="stat-icon" style="color:var(--accent)">📦</div>
+          <div class="stat-icon" style="color:var(--accent)">${icone('package')}</div>
           <div class="stat-sub">Você está atualizado</div>
         </div>
       </div>
@@ -2028,21 +2066,21 @@
       <div class="grid-hoje">
         <div>
           <div class="card">
-            <h3>💾 Dados e backup</h3>
+            <h3>${icone('save')} Dados e backup</h3>
             <small class="muted">Faça backup, exporte seus dados ou importe um backup para restaurar.</small>
             <div class="card-grid" style="margin-top:var(--space-3);">
               <button type="button" class="config-action-card" id="btn-export-backup">
-                <span class="config-action-icon">☁️</span>
+                <span class="config-action-icon">${icone('cloud')}</span>
                 <span class="config-action-text"><b>Exportar backup</b><small>Salve um backup completo dos seus dados.</small></span>
                 <span class="config-action-arrow">›</span>
               </button>
               <button type="button" class="config-action-card" id="btn-import-backup-trigger">
-                <span class="config-action-icon">📥</span>
+                <span class="config-action-icon">${icone('download')}</span>
                 <span class="config-action-text"><b>Importar backup</b><small>Restaure seus dados a partir de um arquivo de backup.</small></span>
                 <span class="config-action-arrow">›</span>
               </button>
               <button type="button" class="config-action-card" id="btn-export-md">
-                <span class="config-action-icon">📄</span>
+                <span class="config-action-icon">${icone('file-text')}</span>
                 <span class="config-action-text"><b>Exportar Markdown</b><small>Exporte seus dados em Markdown.</small></span>
               </button>
               <button type="button" class="config-action-card" id="btn-copy-json">
@@ -2061,15 +2099,11 @@
 
         <div>
           <div class="card">
-            <h3>🎨 Preferências</h3>
+            <h3>${icone('sliders')} Preferências</h3>
             <small class="muted">Personalize sua experiência no app.</small>
             <div class="config-pref-list" style="margin-top:var(--space-3);">
               <div class="config-pref-item">
-                <div class="config-pref-text"><b>🌙 Tema escuro</b><small>Aparência escura do aplicativo.</small></div>
-                <label class="switch"><input type="checkbox" id="pref-tema-toggle" ${prefs.tema==='escuro'?'checked':''}><span class="switch-slider"></span></label>
-              </div>
-              <div class="config-pref-item">
-                <div class="config-pref-text"><b>📅 Formato de data</b><small>Escolha como as datas são exibidas.</small></div>
+                <div class="config-pref-text"><b>${icone('calendar')} Formato de data</b><small>Escolha como as datas são exibidas.</small></div>
                 <select id="pref-formato-data" class="config-pref-select">
                   <option value="DD/MM/AAAA" ${prefs.formatoData==='DD/MM/AAAA'?'selected':''}>DD/MM/AAAA</option>
                   <option value="MM/DD/AAAA" ${prefs.formatoData==='MM/DD/AAAA'?'selected':''}>MM/DD/AAAA</option>
@@ -2077,34 +2111,34 @@
                 </select>
               </div>
               <div class="config-pref-item">
-                <div class="config-pref-text"><b>✅ Confirmações</b><small>Exibir confirmações antes de ações críticas.</small></div>
+                <div class="config-pref-text"><b>${icone('check-circle')} Confirmações</b><small>Exibir confirmações antes de ações críticas.</small></div>
                 <label class="switch"><input type="checkbox" id="pref-confirmacoes-toggle" ${prefs.confirmacoes?'checked':''}><span class="switch-slider"></span></label>
               </div>
               <div class="config-pref-item">
-                <div class="config-pref-text"><b>🔔 Notificações</b><small>Receber lembretes e alertas do app.</small></div>
+                <div class="config-pref-text"><b>${icone('bell')} Notificações</b><small>Receber lembretes e alertas do app.</small></div>
                 <label class="switch"><input type="checkbox" id="pref-notificacoes-toggle" ${prefs.notificacoes?'checked':''}><span class="switch-slider"></span></label>
               </div>
             </div>
             <details class="config-avancado">
               <summary>Avançado</summary>
               <small class="muted">Configurações e ferramentas avançadas de manutenção.</small>
-              <button type="button" id="btn-forcar-atualizacao" style="margin-top:var(--space-3);">🔄 Forçar atualização do app</button>
+              <button type="button" id="btn-forcar-atualizacao" style="margin-top:var(--space-3);">${icone('refresh')} Forçar atualização do app</button>
               <small class="muted">Limpa o cache local do app (não mexe nos seus dados) e recarrega a versão mais recente. Use se a tela parecer desatualizada após uma atualização.</small>
             </details>
           </div>
 
           <div class="card config-danger-card">
-            <h3>⚠️ Zona de perigo</h3>
+            <h3>${icone('alert-triangle')} Zona de perigo</h3>
             <small class="muted">Atenção: esta ação é irreversível.</small>
             <div class="config-danger-inner">
               <b>Limpar todos os dados</b>
               <p>Todos os seus dados de estudo serão removidos deste aparelho.</p>
               <label>Digite EXCLUIR para confirmar</label>
               <input type="text" id="config-excluir-input" placeholder="Digite EXCLUIR para confirmar" value="${escapeHtml(configExcluirTexto)}" autocomplete="off">
-              <button class="bad" id="btn-limpar-dados" ${configExcluirTexto.trim()==='EXCLUIR' ? '' : 'disabled'}>🗑 Limpar todos os dados</button>
+              <button class="bad" id="btn-limpar-dados" ${configExcluirTexto.trim()==='EXCLUIR' ? '' : 'disabled'}>${icone('trash')} Limpar todos os dados</button>
             </div>
             <div class="config-danger-warn">
-              <span>🛡️ Recomendamos fazer um backup antes de prosseguir.</span>
+              <span>${icone('shield')} Recomendamos fazer um backup antes de prosseguir.</span>
               <button type="button" class="card-link" id="btn-export-antes">Exportar backup antes</button>
             </div>
           </div>
@@ -2155,12 +2189,6 @@
       render();
     });
 
-    document.getElementById('pref-tema-toggle')?.addEventListener('change', (e) => {
-      state.preferencias.tema = e.target.checked ? 'escuro' : 'claro';
-      aplicarTema(state.preferencias.tema);
-      saveState(state);
-      render();
-    });
     document.getElementById('pref-formato-data')?.addEventListener('change', (e) => {
       state.preferencias.formatoData = e.target.value;
       saveState(state);
@@ -2261,13 +2289,13 @@
 
   /* === RENDER === */
   const NAV_ITEMS = [
-    {id:'dashboard', label:'Dashboard', icon:'📊'},
-    {id:'hoje', label:'Hoje', icon:'✅'},
-    {id:'planejamento', label:'Planejamento', icon:'🗓️'},
-    {id:'mapa', label:'Mapa de Conteúdo', icon:'🗺️'},
-    {id:'erros', label:'Caderno de Erros', icon:'📓'},
-    {id:'desempenho', label:'Desempenho', icon:'📈'},
-    {id:'config', label:'Configurações', icon:'⚙️'},
+    {id:'dashboard', label:'Dashboard', icon:icone('bar-chart')},
+    {id:'hoje', label:'Hoje', icon:icone('check-circle')},
+    {id:'planejamento', label:'Planejamento', icon:icone('calendar')},
+    {id:'mapa', label:'Mapa de Conteúdo', icon:icone('map')},
+    {id:'erros', label:'Caderno de Erros', icon:icone('notebook')},
+    {id:'desempenho', label:'Desempenho', icon:icone('trending-up')},
+    {id:'config', label:'Configurações', icon:icone('settings')},
   ];
   const MOBILE_PRIMARY = ['hoje', 'planejamento', 'desempenho'];
   let currentTab = (window.matchMedia && window.matchMedia('(min-width:900px)').matches) ? 'dashboard' : 'hoje';
@@ -2470,7 +2498,7 @@
     return `${weekday} ${day} de ${month}`;
   }
   function iconeTipo(tipo){
-    return {questoes:'❓', teoria:'📘', revisao:'🔁', anki:'🗂️'}[tipo] || '📄';
+    return {questoes:icone('help-circle'), teoria:icone('book'), revisao:icone('refresh'), anki:icone('folder')}[tipo] || icone('file-text');
   }
   function formatarDuracaoMin(totalMinRaw){
     const totalMin = Math.round(totalMinRaw);
@@ -2501,14 +2529,14 @@
       <div class="card">
         <div class="hoje-header-row">
           <div class="hoje-header">
-            <div class="hoje-header-icon">📅</div>
+            <div class="hoje-header-icon">${icone('calendar')}</div>
             <div>
               <h2>Hoje, ${formatarDataExtenso(hojeIso).replace(/^./, c => c.toUpperCase())}</h2>
               <small class="muted">${diasTexto}</small>
             </div>
           </div>
           <div class="hoje-header-actions">
-            <button class="primary" id="btn-iniciar-sessao">▶ Iniciar sessão</button>
+            <button class="primary" id="btn-iniciar-sessao">${icone('play')} Iniciar sessão</button>
             <button id="btn-registrar-global">+ Registrar estudo</button>
           </div>
         </div>
@@ -2519,7 +2547,7 @@
 
     const timerHtml = state.sessaoEmAndamento ? `
       <div class="card hero-card" id="timer-card">
-        <div class="hero-eyebrow">⏱️ Sessão em andamento</div>
+        <div class="hero-eyebrow">${icone('clock')} Sessão em andamento</div>
         <div class="hero-top">
           <div class="item-icon tipo-${state.sessaoEmAndamento.tipo || 'questoes'}">${iconeTipo(state.sessaoEmAndamento.tipo)}</div>
           <div class="hero-title-block">
@@ -2534,30 +2562,30 @@
     const heroHtml = proxima ? (
       proxima.origem === 'conteudo' ? `
         <div class="card hero-card">
-          <div class="hero-eyebrow">🎯 Próxima atividade</div>
+          <div class="hero-eyebrow">${icone('target')} Próxima atividade</div>
           <div class="hero-top">
             <div class="item-icon tipo-${proxima.tipo || 'questoes'}">${iconeTipo(proxima.tipo || 'questoes')}</div>
             <div class="hero-title-block">
               <h3>${escapeHtml(proxima.assunto)}</h3>
               ${proxima.statusLabel ? `<div class="hero-subtitle">${escapeHtml(proxima.statusLabel)}</div>` : ''}
             </div>
-            <button class="primary hero-cta" data-iniciar-timer="${escapeHtml(proxima.assunto)}" data-tipo-sugerido="${proxima.tipo || 'questoes'}" data-origem="proxima">▶ Iniciar estudo</button>
+            <button class="primary hero-cta" data-iniciar-timer="${escapeHtml(proxima.assunto)}" data-tipo-sugerido="${proxima.tipo || 'questoes'}" data-origem="proxima">${icone('play')} Iniciar estudo</button>
           </div>
           ${(proxima.tag || proxima.estado==='atrasada') ? `<div class="hero-meta">
-            ${proxima.tag ? `<span class="badge">🏛 ${escapeHtml(proxima.tag)}</span>` : ''}
+            ${proxima.tag ? `<span class="badge">${icone('landmark')} ${escapeHtml(proxima.tag)}</span>` : ''}
             ${proxima.estado==='atrasada' ? `<span class="status-pill atrasada">Atrasada</span>` : ''}
           </div>` : ''}
         </div>
       ` : `
         <div class="card hero-card">
-          <div class="hero-eyebrow">🎯 Próxima atividade</div>
+          <div class="hero-eyebrow">${icone('target')} Próxima atividade</div>
           <div class="hero-top">
             <div class="item-icon tipo-revisao">${iconeTipo('revisao')}</div>
             <div class="hero-title-block">
               <h3>${escapeHtml(proxima.erro.assunto)}</h3>
               <div class="hero-subtitle">Revisão — ${escapeHtml(GRAU_LABEL[proxima.erro.grau])}</div>
             </div>
-            <button class="primary hero-cta" data-iniciar-timer="${escapeHtml(proxima.erro.assunto)}" data-tipo-sugerido="revisao" data-origem="proxima">▶ Iniciar estudo</button>
+            <button class="primary hero-cta" data-iniciar-timer="${escapeHtml(proxima.erro.assunto)}" data-tipo-sugerido="revisao" data-origem="proxima">${icone('play')} Iniciar estudo</button>
           </div>
           <div class="hero-meta">
             <span class="status-pill ${proxima.erro.proximaRevisao < hojeIso ? 'atrasada' : 'pendente'}">${proxima.erro.proximaRevisao < hojeIso ? 'Atrasada' : 'Pendente'}</span>
@@ -2565,11 +2593,11 @@
         </div>
       `
     ) : (atividades.length ? `
-        <div class="card hero-card"><div class="empty-state"><div class="empty-state-icon">🎉</div><b>Tudo em dia por aqui</b><p class="muted">Você concluiu tudo que planejou pra hoje.</p></div></div>
+        <div class="card hero-card"><div class="empty-state"><div class="empty-state-icon">${icone('check-circle',28)}</div><b>Tudo em dia por aqui</b><p class="muted">Você concluiu tudo que planejou pra hoje.</p></div></div>
       ` : `
         <div class="card hero-card">
           <div class="empty-state">
-            <div class="empty-state-icon">🧭</div>
+            <div class="empty-state-icon">${icone('compass')}</div>
             <b>Nada planejado ainda</b>
             <p class="muted">Defina sua meta da semana ou comece uma sessão livre.</p>
             <div class="row">
@@ -2583,7 +2611,7 @@
     const planoHtml = `
       <div class="card">
         <div class="card-header-row">
-          <h3><span class="section-icon">📋</span>Plano de hoje</h3>
+          <h3><span class="section-icon">${icone('clipboard-list')}</span>Plano de hoje</h3>
           ${atividades.length ? `<button class="card-link" data-ir-planejamento>Ver planejamento →</button>` : ''}
         </div>
         ${atividades.length ? `<div class="activity-list">
@@ -2620,7 +2648,7 @@
         <button class="add-activity-row" data-ir-planejamento>+ Adicionar atividade ao plano</button>
         ` : `
         <div class="empty-state">
-          <div class="empty-state-icon">🗓️</div>
+          <div class="empty-state-icon">${icone('calendar')}</div>
           <p><b>Nenhum estudo planejado para hoje</b></p>
           <button data-ir-planejamento>Ir para Planejamento</button>
         </div>`}
@@ -2630,14 +2658,14 @@
     const revisoesHtml = `
       <div class="card">
         <div class="card-header-row">
-          <h3><span class="section-icon">🔄</span>Revisões de hoje</h3>
+          <h3><span class="section-icon">${icone('refresh')}</span>Revisões de hoje</h3>
           ${fila.length ? `<button class="card-link" data-ir-erros>Ver todas →</button>` : ''}
         </div>
         ${fila.length ? fila.map(e => {
           const atrasado = e.proximaRevisao <= hojeIso;
           return `
           <div class="revisao-item" data-erro-id="${e.id}">
-            <div class="item-icon tipo-revisao">🔁</div>
+            <div class="item-icon tipo-revisao">${icone('refresh')}</div>
             <div class="revisao-info">
               <div class="revisao-title">${escapeHtml(e.assunto)}</div>
               <div class="revisao-meta">${escapeHtml(GRAU_LABEL[e.grau])} ${atrasado ? '· <span class="status-pill atrasada">Atrasada</span>' : `· próx. ${e.proximaRevisao}`}</div>
@@ -2649,7 +2677,7 @@
           </div>`;
         }).join('') : `
         <div class="empty-state">
-          <div class="empty-state-icon">✅</div>
+          <div class="empty-state-icon">${icone('check-circle')}</div>
           <p><b>Revisões em dia!</b></p>
         </div>`}
       </div>
@@ -2657,12 +2685,12 @@
 
     const resumoHtml = `
       <div class="card">
-        <h3><span class="section-icon">📈</span>Resumo do dia</h3>
+        <h3><span class="section-icon">${icone('trending-up')}</span>Resumo do dia</h3>
         <div class="resumo-grid">
-          <div class="card stat-card"><div class="stat-label">Planejado</div><div class="stat-value">${formatarDuracaoMin(planejadoMin)}</div><div class="stat-icon">⏱️</div></div>
-          <div class="card stat-card"><div class="stat-label">Estudado</div><div class="stat-value">${formatarDuracaoMin(minutosHoje)}</div><div class="stat-icon">🔄</div></div>
-          <div class="card stat-card"><div class="stat-label">Atividades</div><div class="stat-value">${concluidas}/${atividades.length}</div><div class="stat-icon">✅</div></div>
-          <div class="card stat-card"><div class="stat-label">Questões</div><div class="stat-value">${questoesHoje}</div><div class="stat-icon">❓</div></div>
+          <div class="card stat-card"><div class="stat-label">Planejado</div><div class="stat-value">${formatarDuracaoMin(planejadoMin)}</div><div class="stat-icon">${icone('clock')}</div></div>
+          <div class="card stat-card"><div class="stat-label">Estudado</div><div class="stat-value">${formatarDuracaoMin(minutosHoje)}</div><div class="stat-icon">${icone('refresh')}</div></div>
+          <div class="card stat-card"><div class="stat-label">Atividades</div><div class="stat-value">${concluidas}/${atividades.length}</div><div class="stat-icon">${icone('check-circle')}</div></div>
+          <div class="card stat-card"><div class="stat-label">Questões</div><div class="stat-value">${questoesHoje}</div><div class="stat-icon">${icone('help-circle')}</div></div>
         </div>
       </div>
     `;
@@ -2742,7 +2770,7 @@
           </select>
           <div class="row">
             <button id="iniciar-cancelar">Cancelar</button>
-            <button id="iniciar-confirmar" class="primary">▶ Iniciar</button>
+            <button id="iniciar-confirmar" class="primary">${icone('play')} Iniciar</button>
           </div>
         </div>
       </div>
@@ -2750,7 +2778,7 @@
 
     const fechamentoHtml = `
       <div class="card hoje-closing">
-        <h3><span class="section-icon">🚩</span>Fechamento do dia</h3>
+        <h3><span class="section-icon">${icone('flag')}</span>Fechamento do dia</h3>
         <div class="fechamento-row">
           <p class="muted" style="margin:0;">Como foi seu estudo hoje?</p>
           <div class="fechamento-actions">
@@ -3025,7 +3053,7 @@
       <div class="card">
         <div class="erros-header-row">
           <div class="planejamento-header">
-            <div class="hoje-header-icon">📓</div>
+            <div class="hoje-header-icon">${icone('notebook')}</div>
             <div>
               <h2>Caderno de Erros</h2>
               <small class="muted">Registre seus erros, revise as regras corretas e acompanhe os assuntos que mais derrubam seu desempenho.</small>
@@ -3033,7 +3061,7 @@
           </div>
           <div class="erros-header-actions">
             <input type="text" id="erros-busca-input" placeholder="Buscar erro ou assunto..." value="${escapeHtml(errosBusca)}">
-            ${stats.pendentes ? `<button class="primary" id="erros-revisar-pendentes-btn">▶ Revisar pendentes (${stats.pendentes})</button>` : ''}
+            ${stats.pendentes ? `<button class="primary" id="erros-revisar-pendentes-btn">${icone('play')} Revisar pendentes (${stats.pendentes})</button>` : ''}
             <button class="primary" id="erros-novo-btn">+ Novo erro</button>
           </div>
         </div>
@@ -3065,25 +3093,25 @@
           <div class="card stat-card">
             <div class="stat-label">Total de erros</div>
             <div class="stat-value">${stats.total}</div>
-            <div class="stat-icon">📚</div>
+            <div class="stat-icon">${icone('book-open')}</div>
             ${stats.criadosUltimos7Dias ? `<div class="erros-stat-delta positivo">+${stats.criadosUltimos7Dias} desde a semana passada</div>` : ''}
           </div>
           <div class="card stat-card">
             <div class="stat-label">Pendentes de revisão</div>
             <div class="stat-value">${stats.pendentes}</div>
-            <div class="stat-icon" style="color:var(--status-pending)">⏱️</div>
+            <div class="stat-icon" style="color:var(--status-pending)">${icone('clock')}</div>
             <div class="erros-stat-delta">${stats.total ? Math.round(stats.pendentes/stats.total*100) : 0}% do total</div>
           </div>
           <div class="card stat-card">
             <div class="stat-label">Revisados esta semana</div>
             <div class="stat-value">${stats.revisadosEstaSemana}</div>
-            <div class="stat-icon" style="color:var(--status-reviewed)">✅</div>
+            <div class="stat-icon" style="color:var(--status-reviewed)">${icone('check-circle')}</div>
             ${stats.deltaRevisados ? `<div class="erros-stat-delta ${stats.deltaRevisados>0?'positivo':'negativo'}">${stats.deltaRevisados>0?'+':''}${stats.deltaRevisados} desde a semana passada</div>` : ''}
           </div>
           <div class="card stat-card">
             <div class="stat-label">Assunto mais crítico</div>
             <div class="stat-value" style="font-size:var(--text-lg);">${stats.assuntoMaisFrequente ? escapeHtml(stats.assuntoMaisFrequente) : '—'}</div>
-            <div class="stat-icon">⚠️</div>
+            <div class="stat-icon">${icone('alert-triangle')}</div>
             ${stats.assuntoMaisFrequente ? `<div class="erros-stat-delta">${stats.assuntoMaisFrequenteCount} erro${stats.assuntoMaisFrequenteCount===1?'':'s'} registrado${stats.assuntoMaisFrequenteCount===1?'':'s'}</div>` : ''}
           </div>
         </div>
@@ -3108,9 +3136,9 @@
             </div>
             <div class="erro-card-meta">
               ${e.grau === 'corrigido'
-                ? `<span class="badge selo" style="color:var(--ok);">${GRAU_LABEL.corrigido}</span>`
+                ? `<span class="badge selo">${GRAU_LABEL.corrigido}</span>`
                 : `<span class="erro-prioridade-badge prioridade-${prioridade}">${PRIORIDADE_LABEL[prioridade]}</span>`}
-              <span class="erro-card-data">📅 ${diasAtrasoLabel(e.proximaRevisao, hojeIso)}</span>
+              <span class="erro-card-data">${icone('calendar')} ${diasAtrasoLabel(e.proximaRevisao, hojeIso)}</span>
             </div>
             <button class="erro-card-chevron" aria-label="Expandir">${expandido?'▲':'▼'}</button>
           </div>
@@ -3148,7 +3176,7 @@
 
     const listaHtml = `
       <div class="erros-lista">
-        ${listaFiltrada.length ? listaFiltrada.map(cardHtml).join('') : `<div class="card"><div class="empty-state"><div class="empty-state-icon">🔍</div><p class="muted">Nenhum erro encontrado com esses filtros.</p></div></div>`}
+        ${listaFiltrada.length ? listaFiltrada.map(cardHtml).join('') : `<div class="card"><div class="empty-state"><div class="empty-state-icon">${icone('search')}</div><p class="muted">Nenhum erro encontrado com esses filtros.</p></div></div>`}
         <button class="add-activity-row" id="erros-novo-rodape">+ Adicionar novo erro</button>
         <p class="muted" style="text-align:center;font-size:var(--text-sm);margin-top:-8px;">Registre um erro para acompanhar e não repetir mais.</p>
       </div>`;
@@ -3156,7 +3184,7 @@
     const sidebarHtml = `
       <div>
         <div class="card">
-          <h3><span class="section-icon">🔗</span>Resumo rápido</h3>
+          <h3><span class="section-icon">${icone('link')}</span>Resumo rápido</h3>
           <div class="resumo-meta-item"><div><b>${stats.pendentes}</b><br><small class="muted">Total pendentes</small></div></div>
           <div class="resumo-meta-item"><div><b>${stats.revisoesHoje}</b><br><small class="muted">Revisões hoje</small></div></div>
           <div class="resumo-meta-item"><div><b>${stats.revisadosEstaSemana}</b><br><small class="muted">Revisados esta semana</small></div></div>
@@ -3165,7 +3193,7 @@
           ${stats.assuntoMaisFrequente ? `<div class="resumo-meta-item"><div><b>${escapeHtml(stats.assuntoMaisFrequente)}</b><br><small class="muted">Assunto mais frequente — ${stats.assuntoMaisFrequenteCount} erros</small></div></div>` : ''}
         </div>
         <div class="card">
-          <h3><span class="section-icon">🎓</span>Como registrar um bom erro</h3>
+          <h3><span class="section-icon">${icone('graduation-cap')}</span>Como registrar um bom erro</h3>
           <div class="erros-dica"><b>Seja específico</b><p class="muted">Descreva exatamente o que errou e onde teve dúvida.</p></div>
           <div class="erros-dica"><b>Explique o porquê</b><p class="muted">Entenda e registre a regra correta com suas próprias palavras.</p></div>
           <div class="erros-dica"><b>Revise com espaçamento</b><p class="muted">Agende revisões para fixar e evitar repetir o erro.</p></div>
@@ -3211,8 +3239,8 @@
           <div class="modal-panel revisao-sessao-panel">
             ${terminou ? `
               <div class="empty-state">
-                <div class="empty-state-icon">🎉</div>
-                <b>Sessão concluída!</b>
+                <div class="empty-state-icon">${icone('check-circle',28)}</div>
+                <b>Sessão concluída</b>
                 <p class="muted">Você revisou ${revisaoSessao.fila.length} erro${revisaoSessao.fila.length===1?'':'s'}.</p>
                 <button class="primary" id="revisao-sessao-fechar">Fechar</button>
               </div>
@@ -3425,7 +3453,7 @@
       <div class="card">
         <div class="planejamento-header-row">
           <div class="planejamento-header">
-            <div class="hoje-header-icon">📅</div>
+            <div class="hoje-header-icon">${icone('calendar')}</div>
             <div>
               <h2>Planejamento</h2>
               <div class="planejamento-nav">
@@ -3437,9 +3465,9 @@
           </div>
         </div>
         <div class="resumo-grid planejamento-badges">
-          <div class="card stat-card"><div class="stat-label">Dias planejados</div><div class="stat-value">${diasAlvoAtual}/7</div><div class="stat-icon">📅</div></div>
-          <div class="card stat-card"><div class="stat-label">Horas planejadas</div><div class="stat-value">${horasAlvoAtual}h</div><div class="stat-icon">⏱️</div></div>
-          <div class="card stat-card"><div class="stat-label">Assuntos selecionados</div><div class="stat-value">${assuntosAtuais.length}</div><div class="stat-icon">📚</div></div>
+          <div class="card stat-card"><div class="stat-label">Dias planejados</div><div class="stat-value">${diasAlvoAtual}/7</div><div class="stat-icon">${icone('calendar')}</div></div>
+          <div class="card stat-card"><div class="stat-label">Horas planejadas</div><div class="stat-value">${horasAlvoAtual}h</div><div class="stat-icon">${icone('clock')}</div></div>
+          <div class="card stat-card"><div class="stat-label">Assuntos selecionados</div><div class="stat-value">${assuntosAtuais.length}</div><div class="stat-icon">${icone('book-open')}</div></div>
         </div>
         <div class="planejamento-progresso">
           <div class="planejamento-progresso-label"><span>Progresso da semana — dias</span><b>${diasFeitos}/${diasAlvoAtual}</b></div>
@@ -3578,9 +3606,9 @@
     const resumoMetaHtml = `
       <div class="card">
         <h3>Resumo da meta</h3>
-        <div class="resumo-meta-item"><span class="stat-icon">📅</span><div><b>${diasAlvoAtual}</b><br><small class="muted">de 7 dias da semana</small></div></div>
-        <div class="resumo-meta-item"><span class="stat-icon">⏱️</span><div><b>${horasAlvoAtual}h</b><br><small class="muted">de estudo na semana</small></div></div>
-        <div class="resumo-meta-item"><span class="stat-icon">📚</span><div><b>${assuntosAtuais.length}</b><br><small class="muted">assuntos-alvo</small></div></div>
+        <div class="resumo-meta-item"><span class="stat-icon">${icone('calendar')}</span><div><b>${diasAlvoAtual}</b><br><small class="muted">de 7 dias da semana</small></div></div>
+        <div class="resumo-meta-item"><span class="stat-icon">${icone('clock')}</span><div><b>${horasAlvoAtual}h</b><br><small class="muted">de estudo na semana</small></div></div>
+        <div class="resumo-meta-item"><span class="stat-icon">${icone('book-open')}</span><div><b>${assuntosAtuais.length}</b><br><small class="muted">assuntos-alvo</small></div></div>
       </div>`;
 
     return `
@@ -3758,7 +3786,7 @@
       <div class="card">
         <div class="erros-header-row">
           <div class="planejamento-header">
-            <div class="hoje-header-icon">📈</div>
+            <div class="hoje-header-icon">${icone('trending-up')}</div>
             <div>
               <h2>Desempenho</h2>
               <small class="muted">Acompanhe sua evolução por ciclo, disciplina e consistência.</small>
@@ -3917,7 +3945,7 @@
           const insight = gerarInsightAutomatico(piores);
           return `
             <div class="card desempenho-insight-card">
-              <h3><span class="section-icon">✨</span>Insight automático</h3>
+              <h3><span class="section-icon">${icone('lightbulb')}</span>Insight automático</h3>
               ${insight ? `<p>${escapeHtml(insight)}</p><div class="row"><button class="primary" data-ir-planejamento>Ver plano sugerido</button><button data-ir-erros>Revisar no Caderno de Erros</button></div>` : '<p class="muted">Registre mais questões no período pra receber um insight.</p>'}
             </div>`;
         })()}
@@ -3926,7 +3954,7 @@
           ${state.metaAcertoAlvo ? `
             <div class="desempenho-meta-valor"><span class="muted">% de acerto alvo</span><b>${pctAcertoP}%</b><span class="muted">${state.metaAcertoAlvo}%</span></div>
             <div class="progress"><i style="width:${Math.min(100, Math.round((pctAcertoP/state.metaAcertoAlvo)*100))}%;background:#a855f7"></i></div>
-            <p class="muted" style="margin-top:6px;">${pctAcertoP >= state.metaAcertoAlvo ? 'Meta atingida! 🎉' : `Faltam ${Math.round((state.metaAcertoAlvo-pctAcertoP)*10)/10} p.p. para sua meta`}</p>
+            <p class="muted" style="margin-top:6px;">${pctAcertoP >= state.metaAcertoAlvo ? 'Meta atingida.' : `Faltam ${Math.round((state.metaAcertoAlvo-pctAcertoP)*10)/10} p.p. para sua meta`}</p>
           ` : '<p class="muted">Nenhuma meta de acerto definida ainda.</p>'}
           ${desempenhoMetaAberto ? `
             <div class="desempenho-meta-form">
@@ -4082,7 +4110,6 @@
 
   attachSidebarHandlers();
   attachTabsHandlers();
-  aplicarTema(state.preferencias.tema);
   verificarNotificacoesPendentes();
 
   /* === INIT === */
