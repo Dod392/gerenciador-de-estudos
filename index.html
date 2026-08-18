@@ -82,6 +82,7 @@
   .stat-card .stat-label{font-size:var(--text-xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
   .stat-card .stat-value{font-size:var(--text-2xl);font-weight:650;margin-top:4px;}
   .icone{display:inline-block;vertical-align:-3px;flex-shrink:0;}
+  .disciplina-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;flex-shrink:0;}
   .stat-card .stat-icon{position:absolute;top:var(--space-4);right:var(--space-4);opacity:.5;font-size:18px;}
   .stat-icon .icone{width:18px;height:18px;}
   .empty-state-icon .icone{width:24px;height:24px;}
@@ -684,6 +685,13 @@
   function corVar(nome){
     return getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
   }
+  const DISCIPLINA_TOKENS = ['--subject-1','--subject-2','--subject-3','--subject-4','--subject-5','--subject-6'];
+  function corDisciplina(assunto){
+    if(!assunto) return 'var(--muted)';
+    let hash = 0;
+    for(let i=0;i<assunto.length;i++){ hash = (hash*31 + assunto.charCodeAt(i)) >>> 0; }
+    return `var(${DISCIPLINA_TOKENS[hash % DISCIPLINA_TOKENS.length]})`;
+  }
   function confirmarAcao(mensagem){
     if(state?.preferencias?.confirmacoes === false) return true;
     return confirm(mensagem);
@@ -1104,7 +1112,7 @@
     const gridHtml = `
       <div class="mapa-grid">
         ${listaFiltrada.map(c => `
-          <div class="mapa-card">
+          <div class="mapa-card" style="border-left:3px solid ${corDisciplina(c.assunto)};">
             <div class="mapa-card-icon">${iconePorAssunto(c.assunto)}</div>
             <div class="mapa-card-nome">${escapeHtml(c.assunto)}</div>
             <div><button data-status-assunto="${escapeHtml(c.assunto)}" class="badge mapa-status-badge status-${STATUS_CONTEUDO_COR[c.status]} ${c.status==='dominado'?'selo':''}">${STATUS_CONTEUDO_LABEL[c.status]}</button></div>
@@ -1943,7 +1951,7 @@
             ${sessoesFiltradas.map(s => `
               <tr>
                 <td>${formatarData(s.data)}</td>
-                <td>${escapeHtml(s.assunto || 'Estudo livre')}</td>
+                <td><span class="disciplina-dot" style="background:${corDisciplina(s.assunto)};"></span>${escapeHtml(s.assunto || 'Estudo livre')}</td>
                 <td>${escapeHtml(TIPO_LABEL[s.tipo] || s.tipo)}</td>
                 <td>${s.minutos} min</td>
                 <td><div class="config-sessao-acoes">
@@ -2620,7 +2628,7 @@
             const estadoVisual = emAndamento ? 'andamento' : a.estado;
             const rotulo = emAndamento ? 'Em andamento' : (a.estado==='concluida'?'Concluída':a.estado==='atrasada'?'Atrasada':'Pendente');
             return `
-            <div class="activity-item ${a.estado}">
+            <div class="activity-item ${a.estado}" style="border-left:3px solid ${corDisciplina(a.assunto)};padding-left:8px;">
               <div class="item-icon tipo-${a.tipo || 'questoes'}">${iconeTipo(a.tipo || 'questoes')}</div>
               <div class="activity-info">
                 <div class="activity-title">${escapeHtml(a.assunto)}</div>
@@ -2664,7 +2672,7 @@
         ${fila.length ? fila.map(e => {
           const atrasado = e.proximaRevisao <= hojeIso;
           return `
-          <div class="revisao-item" data-erro-id="${e.id}">
+          <div class="revisao-item" data-erro-id="${e.id}" style="border-left:3px solid ${corDisciplina(e.assunto)};padding-left:8px;">
             <div class="item-icon tipo-revisao">${icone('refresh')}</div>
             <div class="revisao-info">
               <div class="revisao-title">${escapeHtml(e.assunto)}</div>
@@ -3124,7 +3132,7 @@
       const categoria = categoriaPorAssunto(e.assunto);
       const atrasado = e.proximaRevisao <= hojeIso;
       return `
-        <div class="erro-card ${expandido?'expandido':''}">
+        <div class="erro-card ${expandido?'expandido':''}" style="border-left:3px solid ${corDisciplina(e.assunto)};">
           <div class="erro-card-header" data-toggle-erro="${e.id}">
             <div class="item-icon tipo-teoria">${iconePorAssunto(e.assunto)}</div>
             <div class="erro-card-titulo">
@@ -3495,7 +3503,7 @@
           ${totalMin ? `<div class="dia-card-total">${totalMin} min planejados</div>` : ''}
           <div class="dia-card-atividades">
             ${atividades.map(a => `
-              <div class="dia-atividade ${a.concluida?'concluida':''}">
+              <div class="dia-atividade ${a.concluida?'concluida':''}" style="border-left:3px solid ${corDisciplina(a.assunto)};">
                 <button class="dia-atividade-check" data-toggle-atividade="${a.id}" data-toggle-data="${dataIso}" title="${a.concluida?'Marcar como pendente':'Marcar como concluída'}">${a.concluida?'✓':''}</button>
                 <div class="dia-atividade-info">
                   <div class="dia-atividade-assunto">${escapeHtml(a.assunto || 'Estudo livre')}</div>
@@ -3837,7 +3845,7 @@
           ${agregadoP.length ? `
             ${[...agregadoP].sort((a,b)=>b.pct-a.pct).slice(0, desempenhoMostrarTodasDisciplinas ? undefined : 6).map(a => `
               <div class="desempenho-disciplina-row">
-                <div class="desempenho-disciplina-nome">${escapeHtml(a.assunto)}</div>
+                <div class="desempenho-disciplina-nome"><span class="disciplina-dot" style="background:${corDisciplina(a.assunto)};"></span>${escapeHtml(a.assunto)}</div>
                 <div class="desempenho-disciplina-bar-track"><div class="desempenho-disciplina-bar-fill" style="width:${a.pct}%"></div></div>
                 <div class="desempenho-disciplina-pct">${a.pct}%</div>
               </div>`).join('')}
