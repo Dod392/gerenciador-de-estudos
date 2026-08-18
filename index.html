@@ -378,6 +378,10 @@
   .hoje-header-actions button{width:auto;margin:0;padding:0 18px;white-space:nowrap;}
   .hoje-progress-label{display:flex;justify-content:space-between;align-items:baseline;margin-top:var(--space-3);font-size:var(--text-sm);}
   .hoje-progress-label b{font-size:var(--text-lg);}
+  .hoje-meta-dia-row{margin-top:var(--space-3);}
+  .hoje-meta-dia-row label{font-size:var(--text-xs);color:var(--muted);margin:0;}
+  .hoje-meta-dia-row .row input{flex:0 0 100px;margin:0;}
+  .hoje-meta-dia-row .row button{width:auto;margin:0;padding:0 14px;white-space:nowrap;}
 
   .card-header-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2);}
   .card-header-row h3{margin:0;}
@@ -2795,6 +2799,13 @@
         </div>
         <div class="hoje-progress-label"><span>${formatarDuracaoMin(minutosHoje)} estudados de ${formatarDuracaoMin(planejadoMin)} planejados</span><b>${formatarDuracaoMin(minutosHoje)} / ${formatarDuracaoMin(planejadoMin)}</b></div>
         <div class="progress"><i style="width:${pctDia}%"></i></div>
+        <div class="hoje-meta-dia-row">
+          <label for="hoje-meta-dia-input">Meta de hoje (min) — ajuste pra sua rotina</label>
+          <div class="row" style="margin-top:4px;">
+            <input type="number" id="hoje-meta-dia-input" value="${plano?.metaMinutosPorDia?.[hojeIso] ?? planejadoMin}" min="0" step="5">
+            <button type="button" id="btn-salvar-meta-dia">Ajustar meta de hoje</button>
+          </div>
+        </div>
       </div>
     `;
 
@@ -3080,6 +3091,12 @@
 
   function attachHojeHandlers(){
     const app = document.getElementById('app');
+    document.getElementById('btn-salvar-meta-dia')?.addEventListener('click', () => {
+      const input = document.getElementById('hoje-meta-dia-input');
+      definirMetaMinutosDia(state, semanaAtualId(), hojeISO(), input.value);
+      saveState(state);
+      render();
+    });
     app.querySelectorAll('button[data-checkin]').forEach(btn => {
       btn.addEventListener('click', () => {
         registrarCheckin(state, hojeISO(), btn.dataset.checkin);
