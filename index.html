@@ -715,6 +715,7 @@
   function seedState(){
     return {
       meta: { provaData: '2026-11-29', cicloInicio: hojeISO() },
+      provasPorConcurso: {},
       checkins: [],
       erros: [],
       conteudo: SEED_CONTEUDO.map(assunto => ({ assunto, status:'nao_iniciado', concurso:'ambos', atualizadoEm: hojeISO() })),
@@ -764,6 +765,18 @@
     const a = new Date(hojeIso + 'T00:00:00');
     const b = new Date(alvoIso + 'T00:00:00');
     return Math.round((b - a) / 86400000);
+  }
+  function provasOrdenadas(state, hojeIso){
+    return Object.entries(state.provasPorConcurso || {})
+      .filter(([, data]) => !!data)
+      .map(([concurso, data]) => ({ concurso, data, dias: diasAte(hojeIso, data) }))
+      .sort((a,b) => a.data.localeCompare(b.data));
+  }
+  function proximaProva(state, hojeIso){
+    const futuras = provasOrdenadas(state, hojeIso).filter(p => p.dias >= 0);
+    if(futuras.length) return futuras[0];
+    if(state.meta.provaData) return { concurso: null, data: state.meta.provaData, dias: diasAte(hojeIso, state.meta.provaData) };
+    return null;
   }
 
   function registrarCheckin(state, data, status){
@@ -856,6 +869,7 @@
     if(typeof s.preferencias.notificacoes !== 'boolean') s.preferencias.notificacoes = true;
     if(typeof s.ultimoBackup !== 'string') s.ultimoBackup = null;
     if(!Array.isArray(s.historicoImportacoes)) s.historicoImportacoes = [];
+    if(!s.provasPorConcurso || typeof s.provasPorConcurso !== 'object') s.provasPorConcurso = {};
     return s;
   }
 
@@ -1427,39 +1441,54 @@
     const horasSemana = horasRealizadasNaSemana(state.checkins, state.sessoes, semanaId);
     const tocadosSemana = assuntosTocadosNaSemana(state, semanaId);
     const atrasadosSemana = plano ? assuntosAtrasadosNaSemana(plano.assuntosAlvo, tocadosSemana) : [];
+    const sessoesSemana = state.sessoes.filter(s => dentroDaSemana(s.data, semanaId));
+    const checkinsSemana = state.checkins.filter(c => dentroDaSemana(c.data, semanaId));
+    const agregadoSemana = agregarPorAssunto(checkinsSemana, sessoesSemana);
+    const questoesSemana = agregadoSemana.reduce((s,a)=>s+a.questoes,0);
+    const acertosSemana = agregadoSemana.reduce((s,a)=>s+a.acertos,0);
+    const pctAcertoSemana = questoesSemana ? Math.round((acertosSemana/questoesSemana)*100) : null;
+    const sequencia = calcularSequencia(state.checkins, state.sessoes, hojeIso);
+    const cicloAtivo = state.ciclos[state.ciclos.length-1];
+    const provas = provasOrdenadas(state, hojeIso);
+    const naoIniciados = state.conteudo.filter(c => c.status === 'nao_iniciado').map(c => c.assunto);
 
     const linhas = [];
-    linhas.push(`# Snapshot — Gerenciador de Estudos — ${hojeIso}`);
+    linhas.push(`# Relatório semanal — Gerenciador de Estudos — ${hojeIso}`);
     linhas.push('');
-    linhas.push(`Dias até a prova (${state.meta.provaData}): ${diasAte(hojeIso, state.meta.provaData)}`);
-    linhas.push(`Dias estudados: ${estudados} de ${ciclo} dias de ciclo`);
+    linhas.push('Cole este relatório numa conversa nova pra montar o próximo ciclo de estudos com base no que realmente aconteceu esta semana.');
     linhas.push('');
-    linhas.push('## Meta da semana atual');
+    linhas.push('## Onde estou');
+    linhas.push(`- Ciclo atual: ${cicloAtivo ? cicloAtivo.nome : 'nenhum'}${state.ciclos.length > 1 ? ` (ciclo ${state.ciclos.length} de ${state.ciclos.length})` : ''}`);
+    linhas.push(`- Dias estudados no ciclo: ${estudados} de ${ciclo}`);
+    linhas.push(`- Sequência atual: ${sequencia} dia${sequencia===1?'':'s'}`);
+    linhas.push(provas.length
+      ? provas.map(p => `- Prova ${p.concurso}: ${p.dias<0?'já passou':`em ${p.dias} dias`} (${p.data})`).join('\n')
+      : `- Prova (data única): ${diasAte(hojeIso, state.meta.provaData)} dias (${state.meta.provaData})`);
+    linhas.push('');
+    linhas.push('## Como foi esta semana (semana de ' + semanaId + ')');
     linhas.push(plano
       ? [
-          `- Dias: ${diasSemana}/${plano.diasAlvo}`,
-          `- Horas: ${horasSemana}/${plano.horasAlvo}`,
+          `- Dias estudados: ${diasSemana}/${plano.diasAlvo}`,
+          `- Horas estudadas: ${horasSemana}/${plano.horasAlvo}`,
+          `- Questões respondidas: ${questoesSemana}${pctAcertoSemana!==null ? ` (${pctAcertoSemana}% de acerto)` : ''}`,
           `- Assuntos-alvo que ficaram pra trás: ${atrasadosSemana.length ? atrasadosSemana.join(', ') : 'nenhum'}`,
         ].join('\n')
-      : '- nenhuma meta definida para esta semana');
+      : '- nenhuma meta foi definida para esta semana');
     linhas.push('');
-    linhas.push('## Fila de revisão atrasada');
-    linhas.push(atrasados.length
-      ? atrasados.map(e => `- ${e.assunto} (${GRAU_LABEL[e.grau]}, venceu ${e.proximaRevisao})`).join('\n')
-      : '- nenhum item atrasado');
+    linhas.push('## O que puxar pro próximo ciclo');
+    linhas.push([
+      `- Revisões atrasadas (prioridade alta): ${atrasados.length ? atrasados.map(e => `${e.assunto} (${GRAU_LABEL[e.grau]}, venceu ${e.proximaRevisao})`).join('; ') : 'nenhuma'}`,
+      `- Piores assuntos por % de acerto: ${piores.length ? piores.map(p => `${p.assunto} (${p.pct}%)`).join(', ') : 'sem dados suficientes ainda'}`,
+      `- Assuntos ainda não iniciados: ${naoIniciados.length ? naoIniciados.join(', ') : 'nenhum'}`,
+    ].join('\n'));
     linhas.push('');
-    linhas.push('## Mapa de conteúdo');
+    linhas.push('## Mapa de conteúdo (status completo)');
     linhas.push(state.conteudo.map(c => `- ${c.assunto}: ${STATUS_CONTEUDO_LABEL[c.status]} (${concursoLabel(state, c.concurso)})`).join('\n'));
     linhas.push('');
-    linhas.push('## Desempenho por assunto');
+    linhas.push('## Desempenho por assunto (desde sempre)');
     linhas.push(agregado.length
       ? agregado.map(a => `- ${a.assunto}: ${a.pct}% (${a.acertos}/${a.questoes})`).join('\n')
       : '- sem questões registradas ainda');
-    linhas.push('');
-    linhas.push('## 5 piores assuntos');
-    linhas.push(piores.length
-      ? piores.map(p => `- ${p.assunto}: ${p.pct}%`).join('\n')
-      : '- sem dados suficientes');
     return linhas.join('\n');
   }
 
@@ -1752,7 +1781,9 @@
   function renderDashboard(){
     const hojeIso = hojeISO();
     const semanaId = semanaAtualId();
-    const dias = diasAte(hojeIso, state.meta.provaData);
+    const proximaProvaInfo = proximaProva(state, hojeIso);
+    const dias = proximaProvaInfo ? proximaProvaInfo.dias : diasAte(hojeIso, state.meta.provaData);
+    const provasLista = provasOrdenadas(state, hojeIso);
     const plano = obterPlano(state, semanaId);
     const diasFeitos = diasRealizadosNaSemana(state.checkins, state.sessoes, semanaId);
     const horasFeitas = horasRealizadasNaSemana(state.checkins, state.sessoes, semanaId);
@@ -1806,7 +1837,8 @@
             <div class="hoje-header-icon">${icone('calendar')}</div>
             <div>
               <h2>${dias} dias até a prova</h2>
-              <small class="muted">${cicloAtivo ? escapeHtml(cicloAtivo.nome) : ''}${state.ciclos.length > 1 ? ` (ciclo ${state.ciclos.length} de ${state.ciclos.length})` : ''}${anoProva ? ` • prova em ${anoProva}` : ''} • ciclo atual em andamento</small>
+              <small class="muted">${cicloAtivo ? escapeHtml(cicloAtivo.nome) : ''}${state.ciclos.length > 1 ? ` (ciclo ${state.ciclos.length} de ${state.ciclos.length})` : ''}${proximaProvaInfo?.concurso ? ` • prova ${escapeHtml(proximaProvaInfo.concurso)} em ${formatarData(proximaProvaInfo.data)}` : anoProva ? ` • prova em ${anoProva}` : ''} • ciclo atual em andamento</small>
+              ${provasLista.length > 1 ? `<div class="dashboard-badge-row" style="margin-top:6px;">${provasLista.map(p => `<span class="dashboard-badge" style="${p.dias<0?'color:var(--bad);border-color:var(--bad)':''}">${escapeHtml(p.concurso)}: ${p.dias<0?'passou':p.dias+'d'}</span>`).join('')}</div>` : ''}
             </div>
           </div>
           <div class="dashboard-hero-divider"></div>
@@ -2152,7 +2184,7 @@
               </button>
               <button type="button" class="config-action-card" id="btn-export-md">
                 <span class="config-action-icon">${icone('file-text')}</span>
-                <span class="config-action-text"><b>Exportar Markdown</b><small>Exporte seus dados em Markdown.</small></span>
+                <span class="config-action-text"><b>Relatório semanal (Markdown)</b><small>Desempenho da semana pra levar pra próxima conversa e montar o ciclo seguinte.</small></span>
               </button>
               <button type="button" class="config-action-card" id="btn-copy-json">
                 <span class="config-action-icon">{ }</span>
@@ -2207,6 +2239,19 @@
               <button type="button" id="btn-forcar-atualizacao" style="margin-top:var(--space-3);">${icone('refresh')} Forçar atualização do app</button>
               <small class="muted">Limpa o cache local do app (não mexe nos seus dados) e recarrega a versão mais recente. Use se a tela parecer desatualizada após uma atualização.</small>
             </details>
+          </div>
+
+          <div class="card">
+            <h3>${icone('flag')} Provas</h3>
+            <small class="muted">Data da prova de cada concurso — usada pra calcular os dias que faltam.</small>
+            <div class="config-pref-list" style="margin-top:var(--space-3);">
+              ${state.concursos.map(nome => `
+                <div class="config-pref-item">
+                  <div class="config-pref-text"><b>${escapeHtml(nome)}</b></div>
+                  <input type="date" data-prova-concurso="${escapeHtml(nome)}" class="config-pref-select" value="${escapeHtml(state.provasPorConcurso[nome] || '')}">
+                </div>`).join('')}
+            </div>
+            <button type="button" id="btn-salvar-provas" class="primary" style="margin-top:var(--space-2);">Salvar datas</button>
           </div>
 
           <div class="card config-danger-card">
@@ -2310,6 +2355,15 @@
     document.getElementById('btn-forcar-atualizacao')?.addEventListener('click', () => {
       if(!confirmarAcao('Isso vai limpar o cache local do app e recarregar a versão mais atual. Seus dados de estudo não são afetados. Continuar?')) return;
       forcarAtualizacaoApp();
+    });
+    document.getElementById('btn-salvar-provas')?.addEventListener('click', () => {
+      document.querySelectorAll('[data-prova-concurso]').forEach(input => {
+        const nome = input.dataset.provaConcurso;
+        if(input.value) state.provasPorConcurso[nome] = input.value;
+        else delete state.provasPorConcurso[nome];
+      });
+      saveState(state);
+      render();
     });
 
     const excluirInput = document.getElementById('config-excluir-input');
