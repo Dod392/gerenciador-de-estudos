@@ -485,6 +485,10 @@
   @media(min-width:900px){.grid-hoje{grid-template-columns:2fr 1fr;align-items:start;}}
 
   .timer-display{font-size:var(--text-2xl);font-weight:650;text-align:center;margin:var(--space-2) 0;font-variant-numeric:tabular-nums;}
+  .timer-display.pausado{color:var(--muted);}
+  .timer-secondary{font-size:var(--text-xs);color:var(--muted);text-align:center;margin-top:-4px;}
+  .timer-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:var(--space-2);}
+  .timer-actions button{width:auto;flex:1 1 auto;min-height:44px;margin:0;padding:0 12px;white-space:nowrap;}
 
   .fechamento-row{display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-top:var(--space-1);}
   .fechamento-actions{display:flex;gap:var(--space-2);flex-wrap:wrap;}
@@ -632,6 +636,8 @@
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     'alarm-clock': '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M5 3 3 5M19 3l2 2M8 2h8"/>',
     play: '<path d="M6 4l14 8-14 8V4z"/>',
+    pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+    coffee: '<path d="M3 8h13v6a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5V8z"/><path d="M16 8h2a3 3 0 0 1 0 6h-1"/><path d="M8 2v2M11 2v2M14 2v2"/>',
     'check-circle': '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9"/>',
     circle: '<circle cx="12" cy="12" r="7"/>',
     'book-open': '<path d="M12 6c-2-1.5-5-2-8-1v13c3-1 6-.5 8 1 2-1.5 5-2 8-1V5c-3-1-6-.5-8 1zM12 6v13"/>',
@@ -851,13 +857,58 @@
     return sessao;
   }
   function iniciarSessaoEmAndamento(state, {assunto, tipo, origem}){
-    state.sessaoEmAndamento = { assunto: assunto || null, tipo: tipo || null, origem: origem || null, inicioEm: new Date().toISOString() };
+    state.sessaoEmAndamento = { assunto: assunto || null, tipo: tipo || null, origem: origem || null, inicioEm: new Date().toISOString(), acumuladoMs: 0, pausado: false, pomodoro: null };
     return state.sessaoEmAndamento;
+  }
+  function elapsedMsSessao(sessao){
+    if(!sessao) return 0;
+    const emAndamento = sessao.pausado ? 0 : (Date.now() - new Date(sessao.inicioEm).getTime());
+    return (sessao.acumuladoMs || 0) + emAndamento;
+  }
+  function pausarSessaoEmAndamento(state){
+    const sessao = state.sessaoEmAndamento;
+    if(!sessao || sessao.pausado) return;
+    sessao.acumuladoMs = (sessao.acumuladoMs || 0) + (Date.now() - new Date(sessao.inicioEm).getTime());
+    sessao.pausado = true;
+  }
+  function retomarSessaoEmAndamento(state){
+    const sessao = state.sessaoEmAndamento;
+    if(!sessao || !sessao.pausado) return;
+    sessao.inicioEm = new Date().toISOString();
+    sessao.pausado = false;
+  }
+  const POMODORO_FOCO_MIN = 25;
+  const POMODORO_PAUSA_MIN = 5;
+  function ativarPomodoro(state){
+    const sessao = state.sessaoEmAndamento;
+    if(!sessao) return;
+    if(sessao.pausado) retomarSessaoEmAndamento(state);
+    sessao.pomodoro = { fase: 'foco', faseIniciadaEm: new Date().toISOString() };
+  }
+  function desativarPomodoro(state){
+    const sessao = state.sessaoEmAndamento;
+    if(!sessao) return;
+    sessao.pomodoro = null;
+  }
+  function tickPomodoro(state){
+    const sessao = state.sessaoEmAndamento;
+    if(!sessao || !sessao.pomodoro) return null;
+    const duracaoMin = sessao.pomodoro.fase === 'foco' ? POMODORO_FOCO_MIN : POMODORO_PAUSA_MIN;
+    const decorridoMs = Date.now() - new Date(sessao.pomodoro.faseIniciadaEm).getTime();
+    if(decorridoMs < duracaoMin * 60000) return null;
+    if(sessao.pomodoro.fase === 'foco'){
+      pausarSessaoEmAndamento(state);
+      sessao.pomodoro = { fase: 'pausa', faseIniciadaEm: new Date().toISOString() };
+      return 'pausa';
+    }
+    retomarSessaoEmAndamento(state);
+    sessao.pomodoro = { fase: 'foco', faseIniciadaEm: new Date().toISOString() };
+    return 'foco';
   }
   function finalizarSessaoEmAndamento(state){
     const sessao = state.sessaoEmAndamento;
     if(!sessao) return null;
-    const minutos = Math.max(1, Math.round((Date.now() - new Date(sessao.inicioEm).getTime()) / 60000));
+    const minutos = Math.max(1, Math.round(elapsedMsSessao(sessao) / 60000));
     state.sessaoEmAndamento = null;
     return { assunto: sessao.assunto, tipo: sessao.tipo, origem: sessao.origem, minutos };
   }
@@ -880,6 +931,11 @@
   function normalizarCamposNovos(s){
     if(!Array.isArray(s.sessoes)) s.sessoes = [];
     if(!s.sessaoEmAndamento || typeof s.sessaoEmAndamento !== 'object') s.sessaoEmAndamento = null;
+    if(s.sessaoEmAndamento){
+      if(typeof s.sessaoEmAndamento.acumuladoMs !== 'number') s.sessaoEmAndamento.acumuladoMs = 0;
+      if(typeof s.sessaoEmAndamento.pausado !== 'boolean') s.sessaoEmAndamento.pausado = false;
+      if(!('pomodoro' in s.sessaoEmAndamento)) s.sessaoEmAndamento.pomodoro = null;
+    }
     if(!Array.isArray(s.concursos) || !s.concursos.length) s.concursos = ['Transpetro', 'INEA'];
     if(!Array.isArray(s.ciclos) || !s.ciclos.length) s.ciclos = [{ id: 'ciclo-1', nome: '1º Ciclo', inicio: s.meta?.cicloInicio || hojeISO() }];
     if(typeof s.contadorRevisoes !== 'number') s.contadorRevisoes = 0;
@@ -1792,6 +1848,39 @@
         icon: './icons/icon-192.png',
       });
     } catch(e){ /* Notification indisponível neste contexto — sem problema, é best-effort. */ }
+  }
+
+  function tocarBeepPomodoro(fase){
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if(!Ctx) return;
+      const ctx = new Ctx();
+      const tons = fase === 'pausa' ? [660, 440] : [440, 660];
+      tons.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.value = 0.08;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        const inicio = ctx.currentTime + i * 0.18;
+        osc.start(inicio);
+        osc.stop(inicio + 0.15);
+      });
+      setTimeout(() => ctx.close(), 800);
+    } catch(e){ /* áudio indisponível — sem problema, é best-effort. */ }
+  }
+  function avisarTrocaDeFase(fase){
+    tocarBeepPomodoro(fase);
+    if(!state.preferencias.notificacoes) return;
+    if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    try {
+      new Notification('Gerenciador de Estudos', {
+        body: fase === 'pausa' ? 'Pomodoro: 25 min de foco concluídos. Pausa de 5 min.' : 'Pomodoro: pausa concluída. De volta ao foco.',
+        icon: './icons/icon-192.png',
+      });
+    } catch(e){ /* best-effort */ }
   }
 
   function importarJSON(texto){
@@ -3012,16 +3101,28 @@
       </div>
     `;
 
-    const timerHtml = state.sessaoEmAndamento ? `
+    const sessaoAtiva = state.sessaoEmAndamento;
+    const pomodoroAtivo = sessaoAtiva && sessaoAtiva.pomodoro;
+    const timerHtml = sessaoAtiva ? `
       <div class="card hero-card" id="timer-card">
         <div class="hero-eyebrow">${icone('clock')} Sessão em andamento</div>
         <div class="hero-top">
-          <div class="item-icon tipo-${state.sessaoEmAndamento.tipo || 'questoes'}">${iconeTipo(state.sessaoEmAndamento.tipo)}</div>
+          <div class="item-icon tipo-${sessaoAtiva.tipo || 'questoes'}">${iconeTipo(sessaoAtiva.tipo)}</div>
           <div class="hero-title-block">
-            <h3>${escapeHtml(state.sessaoEmAndamento.assunto || 'Estudo livre')}</h3>
-            <div class="timer-display" id="timer-elapsed" data-inicio="${escapeHtml(state.sessaoEmAndamento.inicioEm)}">00:00</div>
+            <h3>${escapeHtml(sessaoAtiva.assunto || 'Estudo livre')}</h3>
+            ${pomodoroAtivo ? `<span class="status-pill ${pomodoroAtivo.fase === 'foco' ? 'andamento' : 'concluida'}">${pomodoroAtivo.fase === 'foco' ? icone('zap') + ' Foco' : icone('coffee') + ' Pausa'}</span>` : ''}
+            <div class="timer-display ${sessaoAtiva.pausado ? 'pausado' : ''}" id="timer-elapsed" data-pomodoro="${pomodoroAtivo ? '1' : '0'}">00:00</div>
+            ${pomodoroAtivo ? `<div class="timer-secondary" id="timer-total-foco">Foco total: 0 min</div>` : ''}
           </div>
           <button class="primary hero-cta" id="timer-finalizar">Finalizar</button>
+        </div>
+        <div class="timer-actions">
+          ${pomodoroAtivo
+            ? `<button id="timer-pomodoro-sair">Sair do Pomodoro</button>`
+            : `
+              <button id="timer-pausar">${sessaoAtiva.pausado ? icone('play') + ' Retomar' : icone('pause') + ' Pausar'}</button>
+              <button id="timer-pomodoro-ativar">${icone('zap')} Pomodoro 25/5</button>
+            `}
         </div>
       </div>
     ` : '';
@@ -3435,16 +3536,45 @@
     if(timerIntervalId){ clearInterval(timerIntervalId); timerIntervalId = null; }
     const timerEl = document.getElementById('timer-elapsed');
     if(timerEl){
-      const inicio = new Date(timerEl.dataset.inicio).getTime();
+      const formatarMMSS = (segundos) => `${String(Math.floor(segundos/60)).padStart(2,'0')}:${String(segundos%60).padStart(2,'0')}`;
       const tick = () => {
-        const segundos = Math.floor((Date.now() - inicio) / 1000);
-        const mm = String(Math.floor(segundos/60)).padStart(2,'0');
-        const ss = String(segundos%60).padStart(2,'0');
-        timerEl.textContent = `${mm}:${ss}`;
+        const sessao = state.sessaoEmAndamento;
+        if(!sessao) return;
+        if(sessao.pomodoro){
+          const faseMudou = tickPomodoro(state);
+          if(faseMudou){
+            saveState(state);
+            avisarTrocaDeFase(faseMudou);
+            render();
+            return;
+          }
+          const duracaoMin = sessao.pomodoro.fase === 'foco' ? POMODORO_FOCO_MIN : POMODORO_PAUSA_MIN;
+          const restanteSeg = Math.max(0, duracaoMin*60 - Math.floor((Date.now() - new Date(sessao.pomodoro.faseIniciadaEm).getTime())/1000));
+          timerEl.textContent = formatarMMSS(restanteSeg);
+          const totalEl = document.getElementById('timer-total-foco');
+          if(totalEl) totalEl.textContent = `Foco total: ${Math.round(elapsedMsSessao(sessao)/60000)} min`;
+        } else {
+          timerEl.textContent = formatarMMSS(Math.floor(elapsedMsSessao(sessao)/1000));
+        }
       };
       tick();
       timerIntervalId = setInterval(tick, 1000);
     }
+    document.getElementById('timer-pausar')?.addEventListener('click', () => {
+      if(state.sessaoEmAndamento.pausado) retomarSessaoEmAndamento(state); else pausarSessaoEmAndamento(state);
+      saveState(state);
+      render();
+    });
+    document.getElementById('timer-pomodoro-ativar')?.addEventListener('click', () => {
+      ativarPomodoro(state);
+      saveState(state);
+      render();
+    });
+    document.getElementById('timer-pomodoro-sair')?.addEventListener('click', () => {
+      desativarPomodoro(state);
+      saveState(state);
+      render();
+    });
     document.getElementById('timer-finalizar')?.addEventListener('click', () => {
       const resultado = finalizarSessaoEmAndamento(state);
       saveState(state);
