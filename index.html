@@ -6,6 +6,28 @@
 <title>Gerenciador de Estudos</title>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#f5f6fa">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<!--
+  Content-Security-Policy — camada extra contra XSS e exfiltração de dados,
+  além do escapeHtml() já usado em toda interpolação de texto do usuário.
+  script-src precisa de 'unsafe-inline' porque este app é um único arquivo
+  HTML sem build step (o script inteiro vive inline) — não dá pra usar nonce
+  num site estático do GitHub Pages sem servidor por trás. Mesmo assim, a
+  política ainda restringe de QUAL origem scripts/estilos/conexões podem
+  vir, bloqueando injeção de recursos de domínios não listados aqui.
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com https://apis.google.com;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' data: https://*.googleusercontent.com;
+  connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com;
+  frame-src https://gerenciador-de-estudos-f804c.firebaseapp.com https://accounts.google.com;
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self';
+">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
