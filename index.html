@@ -1526,8 +1526,8 @@
     const dias = diasAte(proximaRevisao, hojeIso);
     return dias === 0 ? 'Vence hoje' : `Atrasada há ${dias} dia${dias===1?'':'s'}`;
   }
-  function iniciarSessaoRevisao(state, hojeIso){
-    const fila = filaFlashcardsRevisao(state, hojeIso).map(f => f.id);
+  function iniciarSessaoRevisaoErros(state, hojeIso){
+    const fila = window.ErrosIA.filaErrosPendentes(state.erros, hojeIso).map(e => e.id);
     if(!fila.length) return null;
     return { fila, indice: 0, revelado: false };
   }
@@ -3195,7 +3195,7 @@
   let erroModalAberto = null; // { modo: 'novo' } | { modo: 'editar', id }
   let erroMenuAberto = null;
   let errosOrdenacao = 'proxima_revisao';
-  let revisaoSessao = null; // { fila: [flashcardId,...], indice, revelado }
+  let revisaoSessao = null; // { fila: [erroId,...], indice, revelado }
   let flashcardModalErroId = null; // erroId aberto pra "+ Adicionar flashcard"
   let desempenhoCicloId = null;
   let desempenhoPeriodo = '90';
@@ -3757,7 +3757,10 @@
           aplicarResultadoRevisao(f, 'bom');
           incrementarContadorRevisoes(state);
           const erroDoCard = obterErroDoFlashcard(state, f);
-          if(erroDoCard) avancarStatusPorAtividade(state, erroDoCard.assunto, hojeISO());
+          if(erroDoCard){
+            avancarStatusPorAtividade(state, erroDoCard.assunto, hojeISO());
+            window.ErrosIA.aplicarRevisaoErro(erroDoCard, true, hojeISO());
+          }
         }
         saveState(state);
         render();
@@ -3769,6 +3772,8 @@
         if(f){
           aplicarResultadoRevisao(f, 'errei');
           incrementarContadorRevisoes(state);
+          const erroDoCard = obterErroDoFlashcard(state, f);
+          if(erroDoCard) window.ErrosIA.aplicarRevisaoErro(erroDoCard, false, hojeISO());
         }
         saveState(state);
         render();
@@ -4251,9 +4256,9 @@
     })() : '';
 
     const sessaoModalHtml = revisaoSessao ? (() => {
-      const fcAtual = state.flashcards.find(f => f.id === revisaoSessao.fila[revisaoSessao.indice]);
-      const terminou = revisaoSessao.indice >= revisaoSessao.fila.length || !fcAtual;
-      const erroAtual = fcAtual ? obterErroDoFlashcard(state, fcAtual) : null;
+      const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
+      const terminou = revisaoSessao.indice >= revisaoSessao.fila.length || !erroAtual;
+      const cardsApoio = erroAtual ? flashcardsDoErro(state, erroAtual.id) : [];
       return `
         <div class="modal-backdrop" id="revisao-sessao-backdrop">
           <div class="modal-panel revisao-sessao-panel">
@@ -4261,33 +4266,33 @@
               <div class="empty-state">
                 <div class="empty-state-icon">${icone('check-circle',28)}</div>
                 <b>Sessão concluída</b>
-                <p class="muted">Você revisou ${revisaoSessao.fila.length} flashcard${revisaoSessao.fila.length===1?'':'s'}.</p>
+                <p class="muted">Você revisou ${revisaoSessao.fila.length} erro${revisaoSessao.fila.length===1?'':'s'}.</p>
                 <button class="primary" id="revisao-sessao-fechar">Fechar</button>
               </div>
             ` : `
               <div class="revisao-sessao-progresso">${revisaoSessao.indice+1} de ${revisaoSessao.fila.length}</div>
               <div class="progress"><i style="width:${Math.round((revisaoSessao.indice)/revisaoSessao.fila.length*100)}%"></i></div>
-              ${fcAtual.precisaCompletar ? `
+              ${erroAtual.precisaCompletar ? `
                 <div class="erro-form-erro" style="margin-top:var(--space-2);">
-                  Card incompleto — completar explicação.
+                  Erro incompleto — completar explicação.
                   <button class="card-link" id="revisao-sessao-completar" style="display:inline;width:auto;min-height:auto;padding:0;">Editar erro de origem →</button>
                 </div>` : ''}
-              <h3>${escapeHtml(erroAtual?.assunto || '')}</h3>
+              <h3>${escapeHtml(erroAtual.assunto)}</h3>
               <div class="revisao-sessao-secao">
-                <p style="font-size:var(--text-lg);">${escapeHtml(fcAtual.frente)}</p>
+                <p style="font-size:var(--text-lg);">${escapeHtml(erroAtual.oQueErrei)}</p>
               </div>
               ${revisaoSessao.revelado ? `
                 <div class="revisao-sessao-secao">
-                  <div class="erro-card-col-titulo erro-col-ok">Resposta</div>
-                  <p>${escapeHtml(fcAtual.verso)}</p>
+                  <div class="erro-card-col-titulo erro-col-ok">Regra correta</div>
+                  <p>${erroAtual.regraCorreta ? escapeHtml(erroAtual.regraCorreta) : '<span class="muted">(sem explicação registrada)</span>'}</p>
                 </div>
+                ${erroAtual.pegadinha ? `<div class="revisao-sessao-secao"><div class="erro-card-col-titulo">Pegadinha</div><p>${escapeHtml(erroAtual.pegadinha)}</p></div>` : ''}
+                ${erroAtual.comoReconhecer ? `<div class="revisao-sessao-secao"><div class="erro-card-col-titulo">Como reconhecer</div><p>${escapeHtml(erroAtual.comoReconhecer)}</p></div>` : ''}
+                ${cardsApoio.length ? `<div class="revisao-sessao-secao"><div class="erro-card-col-titulo">Flashcards de apoio</div>${cardsApoio.map(fc => `<p class="muted">${escapeHtml(fc.frente)} → ${escapeHtml(fc.verso)}</p>`).join('')}</div>` : ''}
                 <div class="revisao-sm2-row">
-                  <button class="bad" data-sm2="errei">Errei</button>
-                  <button data-sm2="dificil">Difícil</button>
-                  <button data-sm2="bom">Bom</button>
-                  <button class="ok" data-sm2="facil">Fácil</button>
+                  <button class="bad" data-revisao-erro-resultado="errou">Não lembrei</button>
+                  <button class="ok" data-revisao-erro-resultado="acertou">Acertei</button>
                 </div>
-                <button class="card-link" id="revisao-sessao-ver-erro">Ver explicação completa →</button>
               ` : `
                 <button class="primary" id="revisao-sessao-revelar">Mostrar resposta</button>
               `}
@@ -4436,21 +4441,22 @@
     });
 
     document.getElementById('erros-revisar-pendentes-btn')?.addEventListener('click', () => {
-      revisaoSessao = iniciarSessaoRevisao(state, hojeISO());
+      revisaoSessao = iniciarSessaoRevisaoErros(state, hojeISO());
       render();
     });
     document.getElementById('revisao-sessao-revelar')?.addEventListener('click', () => {
       revisaoSessao.revelado = true;
       render();
     });
-    document.querySelectorAll('[data-sm2]').forEach(btn => {
+    document.querySelectorAll('[data-revisao-erro-resultado]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const fcAtual = state.flashcards.find(f => f.id === revisaoSessao.fila[revisaoSessao.indice]);
-        if(fcAtual){
-          aplicarResultadoRevisao(fcAtual, btn.dataset.sm2);
+        const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
+        if(erroAtual){
+          const acertou = btn.dataset.revisaoErroResultado === 'acertou';
+          window.ErrosIA.aplicarRevisaoErro(erroAtual, acertou, hojeISO());
+          flashcardsDoErro(state, erroAtual.id).forEach(fc => aplicarResultadoRevisao(fc, acertou ? 'bom' : 'errei'));
           incrementarContadorRevisoes(state);
-          const erroDoCard = obterErroDoFlashcard(state, fcAtual);
-          if(erroDoCard && (btn.dataset.sm2==='bom'||btn.dataset.sm2==='facil')) avancarStatusPorAtividade(state, erroDoCard.assunto, hojeISO());
+          if(acertou) avancarStatusPorAtividade(state, erroAtual.assunto, hojeISO());
         }
         saveState(state);
         revisaoSessao.indice++;
@@ -4459,19 +4465,9 @@
       });
     });
     document.getElementById('revisao-sessao-completar')?.addEventListener('click', () => {
-      const fcAtual = state.flashcards.find(f => f.id === revisaoSessao.fila[revisaoSessao.indice]);
-      const erroDoCard = fcAtual ? obterErroDoFlashcard(state, fcAtual) : null;
-      if(erroDoCard){
-        erroModalAberto = { modo:'editar', id: erroDoCard.id };
-        revisaoSessao = null;
-      }
-      render();
-    });
-    document.getElementById('revisao-sessao-ver-erro')?.addEventListener('click', () => {
-      const fcAtual = state.flashcards.find(f => f.id === revisaoSessao.fila[revisaoSessao.indice]);
-      const erroDoCard = fcAtual ? obterErroDoFlashcard(state, fcAtual) : null;
-      if(erroDoCard){
-        errosExpandidos.add(erroDoCard.id);
+      const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
+      if(erroAtual){
+        erroModalAberto = { modo:'editar', id: erroAtual.id };
         revisaoSessao = null;
       }
       render();
