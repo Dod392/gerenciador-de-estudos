@@ -257,6 +257,7 @@
   .erro-card.expandido .erro-card-preview{display:none;}
   .erro-card-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:0 0 auto;}
   .erro-prioridade-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:var(--text-xs);font-weight:600;white-space:nowrap;}
+  .erro-prioridade-badge.prioridade-critica{background:var(--fg);color:#fff;}
   .erro-prioridade-badge.prioridade-alta{background:var(--status-high-priority);color:#fff;}
   .erro-prioridade-badge.prioridade-media{background:var(--status-pending);color:#1a1206;}
   .erro-prioridade-badge.prioridade-baixa{background:var(--border);color:var(--muted);}
@@ -272,8 +273,6 @@
   .erro-card-pegadinha .erro-card-col-titulo{color:var(--warn);}
   .erro-form-panel{max-width:560px;}
   .erro-form-explicacao{min-height:132px;}
-  .erro-form-contador{font-size:var(--text-xs);color:var(--muted);text-align:right;margin-top:2px;}
-  .erro-form-contador.ok{color:var(--ok);}
   .erro-form-exemplo{margin:var(--space-2) 0;border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);}
   .erro-form-exemplo summary{cursor:pointer;font-size:var(--text-sm);color:var(--muted);}
   .erro-form-exemplo p{font-size:var(--text-sm);margin:6px 0 0;}
@@ -1321,22 +1320,9 @@
 
   /* === ERROS (Tarefa 4) === */
   const ORIGEM_LABEL = { questao_prova:'Questão de prova', simulado:'Simulado', leitura:'Leitura', aula:'Aula' };
-  const TIPO_ERRO_LABEL = { conteudo:'Conteúdo', interpretacao:'Interpretação', distracao:'Distração' };
-  const PRIORIDADE_LABEL = { alta:'Alta prioridade', media:'Média prioridade', baixa:'Baixa prioridade' };
-  const EXPLICACAO_MIN_CHARS = 200;
-  const EXPLICACAO_PREFIXOS_PROIBIDOS = ['revisar','estudar','ver ','consultar','olhar','buscar','pesquisar','rever'];
-
-  function validarExplicacao(texto){
-    const limpo = (texto || '').trim();
-    if(limpo.length < EXPLICACAO_MIN_CHARS){
-      return `Isso é um lembrete, não uma explicação. Escreva o conteúdo em si — o que você precisa saber para acertar da próxima vez. (mínimo ${EXPLICACAO_MIN_CHARS} caracteres, tem ${limpo.length})`;
-    }
-    const normalizado = limpo.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-    if(EXPLICACAO_PREFIXOS_PROIBIDOS.some(p => normalizado.startsWith(p))){
-      return 'Isso é um lembrete, não uma explicação. Escreva o conteúdo em si — o que você precisa saber para acertar da próxima vez.';
-    }
-    return null;
-  }
+  const TIPO_ERRO_LABEL = { chute:'Chute', erro_conceitual:'Erro conceitual', confusao_conceitos:'Confusão entre conceitos', falha_memorizacao:'Falha de memorização', falha_interpretacao:'Falha de interpretação' };
+  const PRIORIDADE_LABEL = { critica:'Crítica', alta:'Alta prioridade', media:'Média prioridade', baixa:'Baixa prioridade' };
+  const CONFIANCA_EXPLICACAO_LABEL = { alta:'Alta', media:'Média', baixa:'Baixa (pode ter mudado)' };
 
   function criarFlashcard(state, erroId, {frente, verso, precisaCompletar}){
     const fc = {
@@ -1368,22 +1354,32 @@
       criadoEm: hoje,
       disciplinaId: dados.disciplinaId || dados.assunto,
       assunto: dados.assunto,
+      subtema: dados.subtema || null,
+      concurso: dados.concurso || null,
       origem: dados.origem || 'leitura',
       fonte: dados.fonte || null,
       enunciadoResumo: dados.enunciadoResumo || '',
       oQueErrei: dados.oQueErrei,
-      explicacao: dados.explicacao || '',
+      regraCorreta: dados.regraCorreta || '',
       pegadinha: dados.pegadinha || null,
+      comoReconhecer: dados.comoReconhecer || null,
+      confiancaExplicacao: dados.confiancaExplicacao || null,
       baseLegal: dados.baseLegal || null,
-      tipoErro: dados.tipoErro || 'conteudo',
+      tipoErro: dados.tipoErro || 'erro_conceitual',
       prioridade: dados.prioridade || 'media',
+      status: 'novo',
+      dataUltimaRevisao: null,
+      proximaRevisao: hoje,
+      intervaloRevisaoDias: 1,
+      revisoes: [],
       flashcardIds: [],
-      precisaCompletar: !!dados.precisaCompletar,
+      precisaCompletar: true,
     };
+    window.ErrosIA.recalcularExplicacaoPendente(erro);
     state.erros.push(erro);
     criarFlashcard(state, erro.id, {
       frente: erro.pegadinha || erro.oQueErrei,
-      verso: erro.explicacao,
+      verso: erro.regraCorreta,
       precisaCompletar: erro.precisaCompletar,
     });
     return erro;
@@ -1394,17 +1390,21 @@
     if(!erro) return null;
     erro.assunto = dados.assunto;
     erro.disciplinaId = dados.disciplinaId || dados.assunto;
+    erro.subtema = dados.subtema ?? erro.subtema;
+    erro.concurso = dados.concurso ?? erro.concurso;
     erro.origem = dados.origem || erro.origem;
     erro.fonte = dados.fonte ?? erro.fonte;
     erro.enunciadoResumo = dados.enunciadoResumo ?? erro.enunciadoResumo;
     erro.oQueErrei = dados.oQueErrei;
-    erro.explicacao = dados.explicacao;
+    erro.regraCorreta = dados.regraCorreta;
     erro.pegadinha = dados.pegadinha ?? erro.pegadinha;
+    erro.comoReconhecer = dados.comoReconhecer ?? erro.comoReconhecer;
+    erro.confiancaExplicacao = dados.confiancaExplicacao ?? erro.confiancaExplicacao;
     erro.baseLegal = dados.baseLegal ?? erro.baseLegal;
     erro.tipoErro = dados.tipoErro || erro.tipoErro;
     erro.prioridade = dados.prioridade || erro.prioridade;
-    if(!validarExplicacao(erro.explicacao) && erro.precisaCompletar){
-      erro.precisaCompletar = false;
+    const aindaPendente = window.ErrosIA.recalcularExplicacaoPendente(erro);
+    if(!aindaPendente){
       (erro.flashcardIds||[]).forEach(fcId => {
         const fc = state.flashcards.find(f => f.id === fcId);
         if(fc) fc.precisaCompletar = false;
@@ -4084,7 +4084,7 @@
       const categoria = categoriaPorAssunto(e.assunto);
       const cards = flashcardsDoErro(state, e.id);
       const proximaRevisaoErro = cards.length ? cards.reduce((min,f) => f.proximaRevisao < min ? f.proximaRevisao : min, cards[0].proximaRevisao) : null;
-      const trechoExplicacao = e.explicacao ? (e.explicacao.length > 110 ? e.explicacao.slice(0,110)+'…' : e.explicacao) : '(sem explicação registrada ainda)';
+      const trechoExplicacao = e.regraCorreta ? (e.regraCorreta.length > 110 ? e.regraCorreta.slice(0,110)+'…' : e.regraCorreta) : '(sem explicação registrada ainda)';
       return `
         <div class="erro-card ${expandido?'expandido':''}" style="border-left:3px solid ${corDisciplina(e.disciplinaId||e.assunto)};">
           <div class="erro-card-header" data-toggle-erro="${e.id}">
@@ -4112,10 +4112,11 @@
                 <p class="muted">${escapeHtml(e.oQueErrei)}</p>
               </div>
               <div class="erro-card-col" style="grid-column:1/-1;">
-                <div class="erro-card-col-titulo erro-col-ok">Explicação</div>
-                ${e.explicacao ? `<p>${escapeHtml(e.explicacao)}</p>` : `<p class="muted">Ainda não tem explicação completa registrada. <button class="card-link" data-editar-erro="${e.id}" style="display:inline;width:auto;min-height:auto;padding:0;">Completar agora →</button></p>`}
+                <div class="erro-card-col-titulo erro-col-ok">Regra correta</div>
+                ${e.regraCorreta ? `<p>${escapeHtml(e.regraCorreta)}</p>` : `<p class="muted">Ainda não tem explicação completa registrada. <button class="card-link" data-editar-erro="${e.id}" style="display:inline;width:auto;min-height:auto;padding:0;">Completar agora →</button></p>`}
               </div>
               ${e.pegadinha ? `<div class="erro-card-col erro-card-pegadinha" style="grid-column:1/-1;"><div class="erro-card-col-titulo">Pegadinha</div><p>${escapeHtml(e.pegadinha)}</p></div>` : ''}
+              ${e.comoReconhecer ? `<div class="erro-card-col" style="grid-column:1/-1;"><div class="erro-card-col-titulo">Como reconhecer</div><p>${escapeHtml(e.comoReconhecer)}</p></div>` : ''}
             </div>
             <div class="erro-card-footer">
               <div class="erro-card-footer-info muted">
@@ -4169,7 +4170,6 @@
       const erro = editando ? state.erros.find(e => e.id === erroModalAberto.id) : null;
       const assuntoInicial = editando ? erro.assunto : (state.conteudo[0]?.assunto || '');
       const contagemInicial = assuntoInicial ? contarErrosPorAssunto(state.erros, assuntoInicial, editando ? erro.id : null) : 0;
-      const explicacaoInicial = editando ? (erro.explicacao || '') : '';
       return `
         <div class="modal-backdrop" id="erro-modal-backdrop">
           <div class="modal-panel erro-form-panel">
@@ -4195,24 +4195,32 @@
             <input type="text" id="erro-form-enunciado" placeholder="O que a questão cobrava, em 1-2 linhas" value="${editando ? escapeHtml(erro.enunciadoResumo||'') : ''}">
             <label>O que errei</label>
             <textarea id="erro-form-oque" placeholder="Qual foi o equívoco especificamente">${editando ? escapeHtml(erro.oQueErrei) : ''}</textarea>
-            <label>Explicação completa</label>
-            <textarea id="erro-form-explicacao" class="erro-form-explicacao" placeholder="Escreva aqui o conteúdo como se fosse ensinar alguém. Ao revisar, você deve conseguir aprender só com este texto.">${escapeHtml(explicacaoInicial)}</textarea>
-            <div class="erro-form-contador" id="erro-form-contador">0 / ${EXPLICACAO_MIN_CHARS}</div>
-            <small class="muted" id="erro-form-erro-explicacao" style="color:var(--bad);display:none;"></small>
-            <details class="erro-form-exemplo">
-              <summary>Ver exemplo — ruim vs. bom</summary>
-              <p class="muted"><b>Ruim:</b> "Revisar base legal: Lei 9.433/1997"</p>
-              <p class="muted"><b>Bom:</b> "O CNRH arbitra conflitos sobre recursos hídricos em última instância administrativa, aprova o Plano Nacional de Recursos Hídricos e estabelece critérios gerais para outorga e cobrança. Pegadinha: o CNRH define critérios gerais — quem executa a outorga é o órgão gestor (ANA, no âmbito federal)."</p>
-            </details>
+            <label>Regra correta</label>
+            <textarea id="erro-form-regra" class="erro-form-explicacao" placeholder="Em uma frase direta: qual é a regra/conceito correto.">${editando ? escapeHtml(erro.regraCorreta||'') : ''}</textarea>
             <label>Pegadinha (opcional)</label>
             <textarea id="erro-form-pegadinha" placeholder="A distinção que a banca explora">${editando ? escapeHtml(erro.pegadinha||'') : ''}</textarea>
+            <label>Como reconhecer (opcional)</label>
+            <textarea id="erro-form-como-reconhecer" placeholder="O sinal no enunciado que indica esse ponto">${editando ? escapeHtml(erro.comoReconhecer||'') : ''}</textarea>
             <label>Referência (opcional)</label>
             <input type="text" id="erro-form-baselegal" placeholder="Só a referência. A explicação vai no campo acima." value="${editando ? escapeHtml(erro.baseLegal||'') : ''}">
             <div class="row">
               <div>
+                <label>Subtema (opcional)</label>
+                <input type="text" id="erro-form-subtema" placeholder="Recorte específico do tema" value="${editando ? escapeHtml(erro.subtema||'') : ''}">
+              </div>
+              <div>
+                <label>Concurso (opcional)</label>
+                <select id="erro-form-concurso">
+                  <option value="" ${!erro?.concurso?'selected':''}>—</option>
+                  ${(state.concursos||[]).map(nome => `<option value="${escapeHtml(nome)}" ${(erro?.concurso||'')===nome?'selected':''}>${escapeHtml(nome)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div class="row">
+              <div>
                 <label>Tipo de erro</label>
                 <select id="erro-form-tipo">
-                  ${Object.entries(TIPO_ERRO_LABEL).map(([v,l]) => `<option value="${v}" ${(erro?.tipoErro||'conteudo')===v?'selected':''}>${l}</option>`).join('')}
+                  ${Object.entries(TIPO_ERRO_LABEL).map(([v,l]) => `<option value="${v}" ${(erro?.tipoErro||'erro_conceitual')===v?'selected':''}>${l}</option>`).join('')}
                 </select>
               </div>
               <div>
@@ -4222,6 +4230,11 @@
                 </select>
               </div>
             </div>
+            <label>Confiança na explicação (opcional)</label>
+            <select id="erro-form-confianca">
+              <option value="" ${!erro?.confiancaExplicacao?'selected':''}>—</option>
+              ${Object.entries(CONFIANCA_EXPLICACAO_LABEL).map(([v,l]) => `<option value="${v}" ${(erro?.confiancaExplicacao||'')===v?'selected':''}>${l}</option>`).join('')}
+            </select>
             <div class="row">
               <button id="erro-form-cancelar">Cancelar</button>
               <button class="primary" id="erro-form-salvar">${editando ? 'Salvar alterações' : 'Adicionar'}</button>
@@ -4391,38 +4404,23 @@
       const aviso = document.getElementById('erro-form-aviso');
       if(aviso) aviso.textContent = count ? `Você já tem ${count} erro${count===1?'':'s'} registrado${count===1?'':'s'} para este assunto.` : '';
     });
-    const explicacaoInput = document.getElementById('erro-form-explicacao');
-    const atualizarContadorExplicacao = () => {
-      const contador = document.getElementById('erro-form-contador');
-      if(!contador || !explicacaoInput) return;
-      const n = explicacaoInput.value.trim().length;
-      contador.textContent = `${n} / ${EXPLICACAO_MIN_CHARS}`;
-      contador.classList.toggle('ok', n >= EXPLICACAO_MIN_CHARS);
-    };
-    if(explicacaoInput){
-      atualizarContadorExplicacao();
-      explicacaoInput.addEventListener('input', atualizarContadorExplicacao);
-    }
     document.getElementById('erro-form-salvar')?.addEventListener('click', () => {
       const assunto = document.getElementById('erro-form-assunto').value;
       const origem = document.getElementById('erro-form-origem').value;
       const fonte = document.getElementById('erro-form-fonte').value.trim();
       const enunciadoResumo = document.getElementById('erro-form-enunciado').value.trim();
       const oQueErrei = document.getElementById('erro-form-oque').value.trim();
-      const explicacao = document.getElementById('erro-form-explicacao').value.trim();
+      const regraCorreta = document.getElementById('erro-form-regra').value.trim();
       const pegadinha = document.getElementById('erro-form-pegadinha').value.trim();
+      const comoReconhecer = document.getElementById('erro-form-como-reconhecer').value.trim();
       const baseLegal = document.getElementById('erro-form-baselegal').value.trim();
+      const subtema = document.getElementById('erro-form-subtema').value.trim();
+      const concurso = document.getElementById('erro-form-concurso').value;
       const tipoErro = document.getElementById('erro-form-tipo').value;
       const prioridade = document.getElementById('erro-form-prioridade').value;
-      const avisoEl = document.getElementById('erro-form-erro-explicacao');
+      const confiancaExplicacao = document.getElementById('erro-form-confianca').value;
       if(!oQueErrei){ alert('Preencha "o que errei".'); return; }
-      const erroValidacao = validarExplicacao(explicacao);
-      if(erroValidacao){
-        if(avisoEl){ avisoEl.textContent = erroValidacao; avisoEl.style.display = 'block'; }
-        return;
-      }
-      if(avisoEl) avisoEl.style.display = 'none';
-      const dados = { assunto, disciplinaId: assunto, origem, fonte: fonte||null, enunciadoResumo, oQueErrei, explicacao, pegadinha: pegadinha||null, baseLegal: baseLegal||null, tipoErro, prioridade };
+      const dados = { assunto, disciplinaId: assunto, subtema: subtema||null, concurso: concurso||null, origem, fonte: fonte||null, enunciadoResumo, oQueErrei, regraCorreta, pegadinha: pegadinha||null, comoReconhecer: comoReconhecer||null, confiancaExplicacao: confiancaExplicacao||null, baseLegal: baseLegal||null, tipoErro, prioridade };
       if(erroModalAberto.modo === 'editar'){
         atualizarErro(state, erroModalAberto.id, dados);
       } else {
@@ -5181,7 +5179,10 @@
     Object.entries(fieldValues).forEach(([id,val]) => { const el = document.getElementById(id); if(el) el.value = val; });
   }
 
-  function render(){ renderSidebar(); renderTabsNav(); renderScreen(); }
+  function render(){
+    if(window.ErrosIA) state.erros.forEach(window.ErrosIA.migrarErroParaSchemaIA);
+    renderSidebar(); renderTabsNav(); renderScreen();
+  }
 
   attachSidebarHandlers();
   attachTabsHandlers();
