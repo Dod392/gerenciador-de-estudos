@@ -1468,19 +1468,12 @@
 
   function filtrarErros(state, erros, { filtro, assunto, busca, concurso, tipoErro, prioridade, hojeIso }){
     return erros.filter(e => {
-      const cards = flashcardsDoErro(state, e.id);
-      const pendente = cards.some(f => f.proximaRevisao <= hojeIso);
-      const revisado = cards.some(f => f.historico && f.historico.length);
+      const pendente = window.ErrosIA.estaPendenteRevisao(e, hojeIso);
+      const revisado = e.revisoes && e.revisoes.length > 0;
       if(filtro === 'pendentes' && !pendente) return false;
       if(filtro === 'revisados' && !revisado) return false;
       if(filtro === 'alta_prioridade' && prioridadeErro(e) !== 'alta') return false;
-      if(filtro === 'ainda_errando'){
-        const ultimoResultado = cards
-          .flatMap(f => f.historico || [])
-          .sort((a,b) => a.data < b.data ? -1 : a.data > b.data ? 1 : 0)
-          .pop();
-        if(!ultimoResultado || ultimoResultado.resultado !== 'errei') return false;
-      }
+      if(filtro === 'ainda_errando' && e.status !== 'recorrente') return false;
       if(assunto && assunto !== 'todos' && e.disciplinaId !== assunto) return false;
       if(tipoErro && tipoErro !== 'todos' && e.tipoErro !== tipoErro) return false;
       if(prioridade && prioridade !== 'todas' && e.prioridade !== prioridade) return false;
@@ -1495,17 +1488,16 @@
 
   function statsErros(state, hojeIso){
     const erros = state.erros;
-    const flashcards = state.flashcards || [];
     const total = erros.length;
-    const pendentes = filaFlashcardsRevisao(state, hojeIso).length;
+    const pendentes = window.ErrosIA.filaErrosPendentes(erros, hojeIso).length;
     const seteDiasAtras = addDays(hojeIso, -7);
     const catorzeDiasAtras = addDays(hojeIso, -14);
     const criadosUltimos7Dias = erros.filter(e => e.criadoEm >= seteDiasAtras).length;
-    const historicoTodos = flashcards.flatMap(f => f.historico || []);
-    const revisadosEstaSemana = historicoTodos.filter(h => h.data >= seteDiasAtras).length;
-    const revisadosSemanaAnterior = historicoTodos.filter(h => h.data >= catorzeDiasAtras && h.data < seteDiasAtras).length;
-    const revisoesHoje = historicoTodos.filter(h => h.data === hojeIso).length;
-    const errosComRevisao = new Set(flashcards.filter(f => f.historico && f.historico.length).map(f => f.erroId)).size;
+    const revisoesTodas = erros.flatMap(e => e.revisoes || []);
+    const revisadosEstaSemana = revisoesTodas.filter(r => r.data >= seteDiasAtras).length;
+    const revisadosSemanaAnterior = revisoesTodas.filter(r => r.data >= catorzeDiasAtras && r.data < seteDiasAtras).length;
+    const revisoesHoje = revisoesTodas.filter(r => r.data === hojeIso).length;
+    const errosComRevisao = erros.filter(e => e.revisoes && e.revisoes.length).length;
     const taxaRevisao = total ? Math.round((errosComRevisao / total) * 100) : 0;
     const porAssunto = {};
     erros.forEach(e => { porAssunto[e.assunto] = (porAssunto[e.assunto]||0) + 1; });
@@ -1517,22 +1509,17 @@
   function ordenarErros(state, erros, criterio){
     const copia = [...erros];
     if(criterio === 'prioridade'){
-      const peso = { alta:0, media:1, baixa:2 };
-      return copia.sort((a,b) => peso[prioridadeErro(a)] - peso[prioridadeErro(b)]);
+      const ordem = window.ErrosIA.PRIORIDADE_ORDEM;
+      return copia.sort((a,b) => ordem.indexOf(prioridadeErro(a)) - ordem.indexOf(prioridadeErro(b)));
     }
     if(criterio === 'assunto') return copia.sort((a,b) => a.assunto.localeCompare(b.assunto));
     if(criterio === 'recente') return copia.sort((a,b) => b.criadoEm.localeCompare(a.criadoEm));
     if(criterio === 'mais_errados'){
-      const errosCount = id => flashcardsDoErro(state, id).flatMap(f => f.historico||[]).filter(h => h.resultado==='errei').length;
-      return copia.sort((a,b) => errosCount(b.id) - errosCount(a.id));
+      const errosCount = e => (e.revisoes||[]).filter(r => !r.acertou).length;
+      return copia.sort((a,b) => errosCount(b) - errosCount(a));
     }
     // 'proxima_revisao' (padrão)
-    const proximaDoErro = id => {
-      const cards = flashcardsDoErro(state, id);
-      if(!cards.length) return '9999-12-31';
-      return cards.reduce((min,f) => f.proximaRevisao < min ? f.proximaRevisao : min, cards[0].proximaRevisao);
-    };
-    return copia.sort((a,b) => proximaDoErro(a.id) < proximaDoErro(b.id) ? -1 : proximaDoErro(a.id) > proximaDoErro(b.id) ? 1 : 0);
+    return copia.sort((a,b) => a.proximaRevisao < b.proximaRevisao ? -1 : a.proximaRevisao > b.proximaRevisao ? 1 : 0);
   }
   function diasAtrasoLabel(proximaRevisao, hojeIso){
     if(proximaRevisao > hojeIso) return `Próxima ${proximaRevisao}`;
@@ -3997,7 +3984,7 @@
     const stats = statsErros(state, hojeIso);
     const listaFiltrada = ordenarErros(state, filtrarErros(state, state.erros, { filtro: errosFiltro, assunto: errosFiltroAssunto, busca: errosBusca, concurso: errosFiltroConcurso, tipoErro: errosFiltroTipo, prioridade: errosFiltroPrioridade, hojeIso }), errosOrdenacao);
     const assuntosComErro = [...new Set(state.erros.map(e => e.disciplinaId || e.assunto))].sort();
-    const pendentesCount = filaFlashcardsRevisao(state, hojeIso).length;
+    const pendentesCount = window.ErrosIA.filaErrosPendentes(state.erros, hojeIso).length;
 
     const headerHtml = `
       <div class="card">
@@ -4083,7 +4070,7 @@
       const prioridade = prioridadeErro(e);
       const categoria = categoriaPorAssunto(e.assunto);
       const cards = flashcardsDoErro(state, e.id);
-      const proximaRevisaoErro = cards.length ? cards.reduce((min,f) => f.proximaRevisao < min ? f.proximaRevisao : min, cards[0].proximaRevisao) : null;
+      const proximaRevisaoErro = e.proximaRevisao;
       const trechoExplicacao = e.regraCorreta ? (e.regraCorreta.length > 110 ? e.regraCorreta.slice(0,110)+'…' : e.regraCorreta) : '(sem explicação registrada ainda)';
       return `
         <div class="erro-card ${expandido?'expandido':''}" style="border-left:3px solid ${corDisciplina(e.disciplinaId||e.assunto)};">
