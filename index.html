@@ -3987,6 +3987,7 @@
   function renderErros(){
     const hojeIso = hojeISO();
     const stats = statsErros(state, hojeIso);
+    const maisCritico = window.ErrosIA.calcularAssuntoMaisCritico(state.erros);
     const listaFiltrada = ordenarErros(state, filtrarErros(state, state.erros, { filtro: errosFiltro, assunto: errosFiltroAssunto, busca: errosBusca, concurso: errosFiltroConcurso, tipoErro: errosFiltroTipo, prioridade: errosFiltroPrioridade, hojeIso }), errosOrdenacao);
     const assuntosComErro = [...new Set(state.erros.map(e => e.disciplinaId || e.assunto))].sort();
     const pendentesCount = window.ErrosIA.filaErrosPendentes(state.erros, hojeIso).length;
@@ -4147,6 +4148,7 @@
           <div class="resumo-meta-item"><div><b>${stats.taxaRevisao}%</b><br><small class="muted">Taxa de revisão</small></div></div>
           <div class="resumo-meta-item"><div><b>${state.contadorRevisoes || 0}</b><br><small class="muted">Total de revisões (desde sempre)</small></div></div>
           ${stats.assuntoMaisFrequente ? `<div class="resumo-meta-item"><div><b>${escapeHtml(stats.assuntoMaisFrequente)}</b><br><small class="muted">Assunto mais frequente — ${stats.assuntoMaisFrequenteCount} erros</small></div></div>` : ''}
+          ${maisCritico ? `<div class="resumo-meta-item"><div><b style="color:var(--bad);">${escapeHtml(maisCritico.assunto)}</b><br><small class="muted">Assunto mais crítico — recorrência × prioridade</small></div></div>` : ''}
         </div>
         <div class="card">
           <h3><span class="section-icon">${icone('graduation-cap')}</span>Como registrar um bom erro</h3>
