@@ -24,6 +24,19 @@ test('migrarErroParaSchemaIA é idempotente', () => {
   assert.equal(erro.status, 'recorrente');
 });
 
+test('migrarErroParaSchemaIA usa a menor proximaRevisao dos flashcards do erro, não criadoEm', () => {
+  const erro = { id:'1', criadoEm:'2026-01-01', assunto:'PNRH', tipoErro:'conteudo', explicacao:'texto antigo', prioridade:'media' };
+  migrarErroParaSchemaIA(erro, [{ proximaRevisao:'2026-09-01' }, { proximaRevisao:'2026-08-25' }]);
+  assert.equal(erro.proximaRevisao, '2026-08-25');
+  assert.equal(erro.intervaloRevisaoDias, 1, 'intervalo não é semeado a partir do flashcard, permanece no default');
+});
+
+test('migrarErroParaSchemaIA sem flashcards (2º argumento omitido) mantém o fallback antigo para criadoEm', () => {
+  const erro = { id:'1', criadoEm:'2026-08-10', assunto:'PNRH', tipoErro:'conteudo', explicacao:'texto antigo', prioridade:'media' };
+  migrarErroParaSchemaIA(erro);
+  assert.equal(erro.proximaRevisao, '2026-08-10');
+});
+
 test('migrarErroParaSchemaIA mapeia os 3 tipos antigos', () => {
   const conteudo = { id:'1', criadoEm:'2026-08-10', tipoErro:'conteudo' };
   const interpretacao = { id:'2', criadoEm:'2026-08-10', tipoErro:'interpretacao' };
@@ -36,11 +49,12 @@ test('migrarErroParaSchemaIA mapeia os 3 tipos antigos', () => {
   assert.equal(distracao.tipoErro, 'chute');
 });
 
-test('recalcularExplicacaoPendente exige regraCorreta + pegadinha + comoReconhecer', () => {
-  const erro = { regraCorreta:'r', pegadinha:null, comoReconhecer:'c' };
-  assert.equal(recalcularExplicacaoPendente(erro), true);
-  erro.pegadinha = 'p';
-  assert.equal(recalcularExplicacaoPendente(erro), false);
+test('recalcularExplicacaoPendente exige apenas regraCorreta (pegadinha/comoReconhecer são opcionais)', () => {
+  const erro = { regraCorreta:'r', pegadinha:null, comoReconhecer:null };
+  assert.equal(recalcularExplicacaoPendente(erro), false, 'com só regraCorreta preenchido, não deve ficar pendente');
+
+  const semRegra = { regraCorreta:'', pegadinha:'p', comoReconhecer:'c' };
+  assert.equal(recalcularExplicacaoPendente(semRegra), true, 'sem regraCorreta, continua pendente mesmo com os opcionais preenchidos');
 });
 
 test('subirPrioridade avança na escala e trava em critica', () => {

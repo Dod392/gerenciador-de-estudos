@@ -37,6 +37,32 @@ test('errar reseta intervalo, marca recorrente e sobe prioridade', () => {
   assert.equal(erro.proximaRevisao, '2026-08-11');
 });
 
+test('aplicarRevisaoErro é idempotente no mesmo dia: 2 chamadas no mesmo hojeIso não empilham revisoes nem reavançam o intervalo', () => {
+  const erro = erroBase();
+  aplicarRevisaoErro(erro, true, '2026-08-10');
+  assert.equal(erro.revisoes.length, 1);
+  assert.equal(erro.intervaloRevisaoDias, 3);
+  aplicarRevisaoErro(erro, true, '2026-08-10');
+  assert.equal(erro.revisoes.length, 1, 'não deve empilhar uma 2ª entrada no mesmo dia');
+  assert.equal(erro.intervaloRevisaoDias, 3, 'não deve reavançar 3→7 numa 2ª revisão do mesmo dia');
+});
+
+test('aplicarRevisaoErro no mesmo dia com acertou diferente apenas corrige o registro do dia, sem reprocessar prioridade/status', () => {
+  const erro = erroBase({ prioridade:'media' });
+  aplicarRevisaoErro(erro, true, '2026-08-10');
+  assert.equal(erro.revisoes.length, 1);
+  assert.equal(erro.revisoes[0].acertou, true);
+  aplicarRevisaoErro(erro, false, '2026-08-10');
+  assert.equal(erro.revisoes.length, 1, 'ainda deve haver só 1 entrada para o dia');
+  assert.equal(erro.revisoes[0].acertou, false, 'a entrada do dia deve refletir o valor mais recente');
+  // Simplificação aceita: uma virada de acertou→errou no mesmo dia não
+  // reexecuta a escalada de prioridade nem o reset de status — isso exigiria
+  // desfazer a mutação já aplicada pela 1ª chamada do dia (intervalo/status/
+  // prioridade), o que não é possível de forma limpa só reescrevendo o
+  // registro de revisoes. Documentado como regressão menor aceitável.
+  assert.equal(erro.prioridade, 'media', 'prioridade não é reescalada retroativamente na virada do mesmo dia');
+});
+
 test('estaPendenteRevisao ignora corrigidos mesmo com data vencida', () => {
   const erro = erroBase({ status:'corrigido', proximaRevisao:'2020-01-01' });
   assert.equal(estaPendenteRevisao(erro, '2026-08-19'), false);

@@ -16,6 +16,12 @@ function proximoIntervalo(atual){
 
 export function aplicarRevisaoErro(erro, acertou, hojeIso){
   if(!Array.isArray(erro.revisoes)) erro.revisoes = [];
+  if(erro.dataUltimaRevisao === hojeIso && erro.revisoes.length){
+    // Já revisado hoje: apenas corrige o registro do dia, sem reavançar
+    // intervalo/status/prioridade uma segunda vez no mesmo dia.
+    erro.revisoes[erro.revisoes.length - 1].acertou = !!acertou;
+    return erro;
+  }
   erro.revisoes.push({ data: hojeIso, acertou: !!acertou });
   erro.dataUltimaRevisao = hojeIso;
   if(acertou){

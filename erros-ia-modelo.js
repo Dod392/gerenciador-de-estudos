@@ -10,7 +10,7 @@ export const PRIORIDADE_ORDEM = ['critica', 'alta', 'media', 'baixa'];
 
 const TIPO_ERRO_MIGRACAO = { conteudo: 'erro_conceitual', interpretacao: 'falha_interpretacao', distracao: 'chute' };
 
-export function migrarErroParaSchemaIA(erro){
+export function migrarErroParaSchemaIA(erro, flashcardsDoErro = []){
   if('status' in erro) return erro; // já migrado
   erro.subtema = erro.subtema ?? null;
   erro.concurso = erro.concurso ?? null;
@@ -21,16 +21,18 @@ export function migrarErroParaSchemaIA(erro){
   erro.confiancaExplicacao = erro.confiancaExplicacao ?? null;
   erro.status = 'novo';
   erro.dataUltimaRevisao = null;
-  erro.proximaRevisao = erro.criadoEm;
+  erro.proximaRevisao = flashcardsDoErro.length
+    ? flashcardsDoErro.reduce((min, f) => f.proximaRevisao < min ? f.proximaRevisao : min, flashcardsDoErro[0].proximaRevisao)
+    : erro.criadoEm;
   erro.intervaloRevisaoDias = 1;
   erro.revisoes = [];
   return erro;
 }
 
 export function recalcularExplicacaoPendente(erro){
-  const completo = !!(erro.regraCorreta && erro.regraCorreta.trim())
-    && !!(erro.pegadinha && erro.pegadinha.trim())
-    && !!(erro.comoReconhecer && erro.comoReconhecer.trim());
+  // pegadinha e comoReconhecer são campos opcionais no formulário — só
+  // regraCorreta é exigido para considerar a explicação completa.
+  const completo = !!(erro.regraCorreta && erro.regraCorreta.trim());
   erro.precisaCompletar = !completo;
   return erro.precisaCompletar;
 }
