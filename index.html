@@ -3655,10 +3655,21 @@
                 <label>Fonte/Banca (opcional, vale pra sessão toda)</label>
                 <input type="text" id="registro-questoes-fonte" placeholder="ex: CESPE 2023" value="${escapeHtml(sessaoQuestoesDraft.fonte || '')}">
                 <small class="muted">${total} quest${total===1?'ão':'ões'} respondida${total===1?'':'s'} — ${acertos} certa${acertos===1?'':'s'}</small>
-                <div class="row">
-                  <button type="button" class="ok" id="registro-questoes-acertei">${icone('check-circle')} Acertei</button>
-                  <button type="button" class="bad" id="registro-questoes-errei">${icone('alert-triangle')} Errei</button>
-                </div>
+                ${!sessaoQuestoesDraft.erroPendente ? `
+                  <div class="row">
+                    <button type="button" class="ok" id="registro-questoes-acertei">${icone('check-circle')} Acertei</button>
+                    <button type="button" class="bad" id="registro-questoes-errei">${icone('alert-triangle')} Errei</button>
+                  </div>
+                ` : `
+                  <div class="erro-form-erro" style="margin-top:var(--space-2);">
+                    <label>O que você errou (opcional)</label>
+                    <textarea id="registro-questoes-oque" placeholder="Ex: confundi outorga com licenciamento">${escapeHtml(sessaoQuestoesDraft.erroPendente.oQueErrei || '')}</textarea>
+                    <div class="row">
+                      <button type="button" id="registro-questoes-pular">Pular</button>
+                      <button type="button" class="primary" id="registro-questoes-registrar-erro">Registrar no caderno de erros</button>
+                    </div>
+                  </div>
+                `}
               `;
             })()}
           </div>
@@ -3863,6 +3874,30 @@
     });
     document.getElementById('registro-questoes-errei')?.addEventListener('click', () => {
       sessaoQuestoesDraft.itens.push({ correta: false });
+      sessaoQuestoesDraft.erroPendente = { oQueErrei: '' };
+      render();
+    });
+    document.getElementById('registro-questoes-oque')?.addEventListener('input', (e) => {
+      sessaoQuestoesDraft.erroPendente.oQueErrei = e.target.value;
+      renderPreservandoFoco();
+    });
+    document.getElementById('registro-questoes-pular')?.addEventListener('click', () => {
+      sessaoQuestoesDraft.erroPendente = null;
+      render();
+    });
+    document.getElementById('registro-questoes-registrar-erro')?.addEventListener('click', () => {
+      const assunto = registroAberto.assunto || resolverAssuntoBusca('registro-assunto-busca', 'registro-assunto');
+      const oQueErrei = (sessaoQuestoesDraft.erroPendente.oQueErrei || '').trim() || 'Errei sem detalhar o motivo — completar depois';
+      criarErro(state, {
+        assunto,
+        disciplinaId: assunto,
+        origem: 'questao_prova',
+        fonte: sessaoQuestoesDraft.fonte || null,
+        oQueErrei,
+      });
+      saveState(state);
+      sessaoQuestoesDraft.erroPendente = null;
+      alert('Erro registrado no Caderno de Erros! Complete a explicação quando puder.');
       render();
     });
     document.querySelectorAll('[data-ir-planejamento]').forEach(btn => {
