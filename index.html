@@ -4029,7 +4029,7 @@
           <div class="erros-header-actions">
             <input type="text" id="erros-busca-input" placeholder="Buscar erro ou assunto..." value="${escapeHtml(errosBusca)}">
             ${pendentesCount ? `<button class="primary" id="erros-revisar-pendentes-btn">${icone('play')} Revisar pendentes (${pendentesCount})</button>` : ''}
-            ${pendentesExportar ? `<span class="badge" style="background:var(--warn-soft);color:var(--warn);">${pendentesExportar} erro${pendentesExportar===1?'':'s'} sem explicação</span>` : ''}
+            ${pendentesExportar ? `<span class="badge" style="background:var(--warn-soft);color:var(--warn);">${pendentesExportar} erro${pendentesExportar===1?'':'s'} para analisar</span>` : ''}
             <button id="erros-analisar-ia-btn">${icone('zap')} Analisar com IA</button>
             <button id="erros-importar-ia-btn">${icone('download')} Importar resposta da IA</button>
             <button class="primary" id="erros-novo-btn">+ Novo erro</button>
@@ -4119,7 +4119,7 @@
               <div class="erro-card-preview muted">${escapeHtml(trechoExplicacao)}</div>
             </div>
             <div class="erro-card-meta">
-              <span class="erro-prioridade-badge prioridade-${prioridade}">${PRIORIDADE_LABEL[prioridade]}</span>
+              <span class="erro-prioridade-badge prioridade-${escapeHtml(prioridade)}">${PRIORIDADE_LABEL[prioridade]}</span>
               ${proximaRevisaoErro ? `<span class="erro-card-data">${icone('calendar')} ${diasAtrasoLabel(proximaRevisaoErro, hojeIso)}</span>` : ''}
             </div>
             <button class="erro-card-chevron" aria-label="Expandir">${expandido?'▲':'▼'}</button>
@@ -4528,7 +4528,7 @@
         const { resumo, itens } = window.ErrosIA.extrairRespostaIA(texto);
         iaImportPreview = window.ErrosIA.gerarPreviewImportacao(itens, state.erros);
         iaImportErro = null;
-        if(resumo) state.errosPadroesDetectados = resumo;
+        if(resumo){ state.errosPadroesDetectados = resumo; saveState(state); }
       } catch(err){
         iaImportErro = err.message;
         iaImportPreview = null;

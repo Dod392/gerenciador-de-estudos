@@ -104,6 +104,68 @@ test('aplicarImportacao aplica atualização selecionada via Object.assign e rec
   assert.equal(resultado.criados, 0);
 });
 
+test('gerarPreviewImportacao descarta prioridade inválida/maliciosa vinda da IA em vez de aplicá-la', () => {
+  const existente = { id:'1', assunto:'PNRH', prioridade:'baixa' };
+  const item = { id:'1', prioridade: 'media" onmouseover="x' };
+  const [preview] = gerarPreviewImportacao([item], [existente]);
+  assert.equal('prioridade' in preview.dados, false);
+});
+
+test('gerarPreviewImportacao descarta tipo_erro inválido vindo da IA em vez de aplicá-lo', () => {
+  const existente = { id:'1', assunto:'PNRH' };
+  const item = { id:'1', tipo_erro: 'not_a_real_type' };
+  const [preview] = gerarPreviewImportacao([item], [existente]);
+  assert.equal('tipoErro' in preview.dados, false);
+});
+
+test('gerarPreviewImportacao coage tema não-string para string em vez de deixar passar ou descartar', () => {
+  const existente = { id:'1', assunto:'PNRH' };
+  const item = { id:'1', tema: 123 };
+  const [preview] = gerarPreviewImportacao([item], [existente]);
+  assert.equal(preview.dados.assunto, '123');
+  assert.equal(typeof preview.dados.assunto, 'string');
+});
+
+test('gerarPreviewImportacao mantém prioridade e tipo_erro válidos intactos', () => {
+  const existente = { id:'1', assunto:'PNRH' };
+  const item = { id:'1', prioridade: 'critica', tipo_erro: 'falha_interpretacao' };
+  const [preview] = gerarPreviewImportacao([item], [existente]);
+  assert.equal(preview.dados.prioridade, 'critica');
+  assert.equal(preview.dados.tipoErro, 'falha_interpretacao');
+});
+
+test('aplicarImportacao (atualização) limpa precisaCompletar dos flashcards do erro quando a explicação deixa de estar pendente', () => {
+  const state = {
+    erros: [{ id:'1', assunto:'PNRH', regraCorreta:'', precisaCompletar:true, flashcardIds:['fc-1'] }],
+    flashcards: [{ id:'fc-1', precisaCompletar:true }],
+  };
+  const preview = [
+    { tipo:'atualizacao', erroId:'1', dados:{ regraCorreta:'nova regra completa' }, diffs:[], flashcardsSugeridos:[], selecionado:true },
+  ];
+  aplicarImportacao(state, preview, {
+    criarErro: () => { throw new Error('não deveria chamar criarErro'); },
+    criarFlashcard: () => {},
+    recalcularExplicacaoPendente: (erro) => { erro.precisaCompletar = false; return false; },
+  });
+  assert.equal(state.flashcards[0].precisaCompletar, false);
+});
+
+test('aplicarImportacao (atualização) não mexe no precisaCompletar dos flashcards quando a explicação continua pendente', () => {
+  const state = {
+    erros: [{ id:'1', assunto:'PNRH', regraCorreta:'', precisaCompletar:true, flashcardIds:['fc-1'] }],
+    flashcards: [{ id:'fc-1', precisaCompletar:true }],
+  };
+  const preview = [
+    { tipo:'atualizacao', erroId:'1', dados:{ regraCorreta:'' }, diffs:[], flashcardsSugeridos:[], selecionado:true },
+  ];
+  aplicarImportacao(state, preview, {
+    criarErro: () => { throw new Error('não deveria chamar criarErro'); },
+    criarFlashcard: () => {},
+    recalcularExplicacaoPendente: (erro) => { erro.precisaCompletar = true; return true; },
+  });
+  assert.equal(state.flashcards[0].precisaCompletar, true);
+});
+
 test('aplicarImportacao cria novo erro selecionado e válido, ignora inválido mesmo se marcado', () => {
   const state = { erros: [], flashcards: [] };
   const preview = [
