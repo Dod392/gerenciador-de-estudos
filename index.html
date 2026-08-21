@@ -1872,17 +1872,27 @@
       throw new Error('formato não reconhecido — esperava um objeto com um array "dias"');
     }
     let adicionadas = 0;
+    // Snapshot das atividades já existentes por dia, tirado uma vez ANTES de
+    // processar os blocos daquele dia — comparar contra plano.atividadesPorDia
+    // ao vivo (recalculado a cada bloco) fazia o 2º bloco de um dia ser
+    // descartado como "duplicata" do 1º que este mesmo import acabou de
+    // adicionar, sempre que os dois batessem em assunto/tipo/minutos.
+    const existentesAntesPorDia = new Map();
     planoExterno.dias.forEach(dia => {
       if(!dia || !dia.data || !Array.isArray(dia.blocos)) return;
       const semanaId = segundaFeiraDaSemana(dia.data);
       const concluidoNoDia = dia.status === 'concluido';
+      if(!existentesAntesPorDia.has(dia.data)){
+        const plano = obterPlano(state, semanaId);
+        existentesAntesPorDia.set(dia.data, [...(plano?.atividadesPorDia?.[dia.data] || [])]);
+      }
+      const existentesAntes = existentesAntesPorDia.get(dia.data);
       dia.blocos.forEach(bloco => {
         if(!bloco) return;
         const tipo = TIPO_PLANO_EXTERNO_MAP[bloco.tipo] || 'teoria';
         const minutos = Number(bloco.min) || 0;
         const assunto = bloco.tema || null;
-        const plano = obterPlano(state, semanaId);
-        const jaExiste = plano?.atividadesPorDia?.[dia.data]?.some(a =>
+        const jaExiste = existentesAntes.some(a =>
           a.assunto === assunto && a.tipo === tipo && a.minutos === minutos);
         if(jaExiste) return;
         const atividade = adicionarAtividadeDia(state, semanaId, dia.data, { assunto, tipo, minutos });
@@ -3398,7 +3408,7 @@
   function planejadoMinutosHoje(plano, hojeIso){
     if(!plano) return 150;
     const metaDireta = plano.metaMinutosPorDia?.[hojeIso];
-    if(metaDireta) return metaDireta;
+    if(metaDireta != null) return metaDireta;
     const atividadesHoje = plano.atividadesPorDia?.[hojeIso];
     if(atividadesHoje && atividadesHoje.length){
       return atividadesHoje.reduce((s,a) => s + (a.minutos||0), 0);
@@ -3423,8 +3433,9 @@
       state.planejamento.push(plano);
     }
     if(!plano.metaMinutosPorDia) plano.metaMinutosPorDia = {};
-    const min = Number(minutos) || 0;
-    if(min > 0) plano.metaMinutosPorDia[dataIso] = min;
+    const bruto = String(minutos ?? '').trim();
+    const min = Number(bruto);
+    if(bruto !== '' && Number.isFinite(min) && min >= 0) plano.metaMinutosPorDia[dataIso] = min;
     else delete plano.metaMinutosPorDia[dataIso];
     return plano.metaMinutosPorDia[dataIso] ?? null;
   }
@@ -3470,7 +3481,7 @@
     const sessoesDeHoje = state.sessoes.filter(s => s.data === hojeIso);
     const minutosHoje = minutosNoDia(ci, sessoesDeHoje);
     const planejadoMin = planejadoMinutosHoje(plano, hojeIso);
-    const pctDia = Math.min(100, Math.round((minutosHoje/planejadoMin)*100));
+    const pctDia = planejadoMin > 0 ? Math.min(100, Math.round((minutosHoje/planejadoMin)*100)) : 100;
     const concluidas = atividades.filter(a=>a.estado==='concluida').length;
     const questoesHoje = (ci?.questoes || 0) + state.sessoes.filter(s => s.data===hojeIso && s.tipo==='questoes').reduce((s,x)=>s+(x.questoes||0),0);
     const diasTexto = dias === null ? 'Nenhuma prova cadastrada' : dias > 0 ? `${dias} dias para a prova` : dias === 0 ? 'A prova é hoje!' : `Prova foi há ${Math.abs(dias)} dias`;
@@ -3852,6 +3863,11 @@
         ci.questoes = Number(document.getElementById('hoje-questoes').value) || null;
         ci.acertos = Number(document.getElementById('hoje-acertos').value) || null;
         ci.obs = document.getElementById('hoje-obs').value;
+        // Detalhar depois de ter marcado "Não estudei" e agora registrar
+        // minutos/questões reais precisa tirar o dia do status "nao", senão
+        // a sequência de dias estudados (que filtra status !== 'nao') fica
+        // quebrada mesmo com estudo de verdade registrado nesse dia.
+        if(ci.status === 'nao' && (ci.minutos || ci.questoes)) ci.status = 'minimo';
         saveState(state);
         render();
       });
@@ -4930,7 +4946,7 @@
     const addAtividadeModalHtml = atividadeDiaAberta ? `
       <div class="modal-backdrop" id="add-atividade-backdrop">
         <div class="modal-panel" id="add-atividade-form">
-          <h3>Adicionar atividade — ${atividadeDiaAberta.slice(8,10)}/${atividadeDiaAberta.slice(5,7)}</h3>
+          <h3>Adicionar atividade — ${formatarData(atividadeDiaAberta)}</h3>
           <label>Assunto</label>
           <div class="combo">
             <input type="text" id="atividade-assunto-busca" placeholder="Buscar assunto..." autocomplete="off">
