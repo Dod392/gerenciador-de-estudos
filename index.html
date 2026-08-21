@@ -1285,6 +1285,32 @@
     state.sessaoEmAndamento = null;
     return { assunto: sessao.assunto, tipo: sessao.tipo, origem: sessao.origem, minutos };
   }
+  function zerarSessaoEmAndamento(state){
+    const sessao = state.sessaoEmAndamento;
+    if(!sessao) return;
+    sessao.acumuladoMs = 0;
+    sessao.inicioEm = new Date().toISOString();
+    sessao.pausado = false;
+    if(sessao.pomodoro){
+      sessao.pomodoro = { fase: 'foco', faseIniciadaEm: new Date().toISOString() };
+    }
+  }
+  // Troca pra uma sessão nova sem descartar o tempo já decorrido da atual —
+  // registra a sessão anterior (com o assunto/tipo que ela já tinha) antes
+  // de iniciar a próxima, pra nenhum tempo de estudo se perder silenciosamente.
+  function trocarSessaoEmAndamento(state, novosDados){
+    let sessaoAnteriorSalva = null;
+    if(state.sessaoEmAndamento){
+      const resultado = finalizarSessaoEmAndamento(state);
+      if(resultado){
+        registrarSessao(state, hojeISO(), { tipo: resultado.tipo || 'questoes', assunto: resultado.assunto, minutos: resultado.minutos, obs: '' });
+        concluirAtividadeDiaPorAssunto(state, semanaAtualId(), hojeISO(), resultado.assunto);
+        sessaoAnteriorSalva = resultado;
+      }
+    }
+    iniciarSessaoEmAndamento(state, novosDados);
+    return sessaoAnteriorSalva;
+  }
   function atualizarSessao(state, id, dados){
     const idx = state.sessoes.findIndex(s => s.id === id);
     if(idx === -1) return null;
@@ -3538,6 +3564,7 @@
               <button id="timer-pausar">${sessaoAtiva.pausado ? icone('play') + ' Retomar' : icone('pause') + ' Pausar'}</button>
               <button id="timer-pomodoro-ativar">${icone('zap')} Pomodoro 25/5</button>
             `}
+          <button id="timer-zerar">${icone('refresh')} Zerar</button>
         </div>
       </div>
     ` : '';
@@ -3985,12 +4012,13 @@
       if(e.target.id === 'iniciar-backdrop'){ iniciarAberto = null; render(); }
     });
     document.getElementById('iniciar-confirmar')?.addEventListener('click', () => {
-      if(state.sessaoEmAndamento && !confirmarAcao('Já existe uma sessão em andamento. Descartar e iniciar outra?')) return;
+      if(state.sessaoEmAndamento && !confirmarAcao('Já existe uma sessão em andamento. Registrar o tempo dela e iniciar outra?')) return;
       const assunto = resolverAssuntoBusca('iniciar-assunto-busca', 'iniciar-assunto');
       const tipo = document.getElementById('iniciar-tipo').value;
-      iniciarSessaoEmAndamento(state, { assunto, tipo, origem: 'header' });
+      const anterior = trocarSessaoEmAndamento(state, { assunto, tipo, origem: 'header' });
       saveState(state);
       iniciarAberto = null;
+      if(anterior) alert(`${anterior.minutos} min${anterior.assunto ? ` de "${anterior.assunto}"` : ''} foram registrados automaticamente antes de iniciar a nova sessão.`);
       render();
     });
     document.querySelectorAll('[data-continuar-timer]').forEach(btn => {
@@ -4127,11 +4155,18 @@
       }
       render();
     });
+    document.getElementById('timer-zerar')?.addEventListener('click', () => {
+      if(!confirmarAcao('Isso zera o tempo já decorrido nesta sessão (ainda não foi salvo em lugar nenhum). Continuar?')) return;
+      zerarSessaoEmAndamento(state);
+      saveState(state);
+      render();
+    });
     app.querySelectorAll('[data-iniciar-timer]').forEach(btn => {
       btn.addEventListener('click', () => {
-        if(state.sessaoEmAndamento && !confirmarAcao('Já existe uma sessão em andamento. Descartar e iniciar outra?')) return;
-        iniciarSessaoEmAndamento(state, { assunto: btn.dataset.iniciarTimer || null, tipo: btn.dataset.tipoSugerido || null, origem: btn.dataset.origem || null });
+        if(state.sessaoEmAndamento && !confirmarAcao('Já existe uma sessão em andamento. Registrar o tempo dela e iniciar outra?')) return;
+        const anterior = trocarSessaoEmAndamento(state, { assunto: btn.dataset.iniciarTimer || null, tipo: btn.dataset.tipoSugerido || null, origem: btn.dataset.origem || null });
         saveState(state);
+        if(anterior) alert(`${anterior.minutos} min${anterior.assunto ? ` de "${anterior.assunto}"` : ''} foram registrados automaticamente antes de iniciar a nova sessão.`);
         render();
       });
     });
