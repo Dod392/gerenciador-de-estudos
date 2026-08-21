@@ -1290,9 +1290,10 @@
     if(!sessao) return;
     sessao.acumuladoMs = 0;
     sessao.inicioEm = new Date().toISOString();
-    sessao.pausado = false;
+    // Não mexe em sessao.pausado — zerar só reseta o contador, não deve
+    // retomar sozinho uma sessão que o usuário pausou de propósito.
     if(sessao.pomodoro){
-      sessao.pomodoro = { fase: 'foco', faseIniciadaEm: new Date().toISOString() };
+      sessao.pomodoro = { fase: 'foco', faseIniciadaEm: new Date().toISOString(), pausada: !!sessao.pomodoro.pausada };
     }
   }
   // Troca pra uma sessão nova sem descartar o tempo já decorrido da atual —
