@@ -3192,6 +3192,7 @@
   let iniciarAberto = null;
   let timerIntervalId = null;
   let sessaoEditando = null;
+  let sessaoQuestoesDraft = null; // { itens: [{correta}], fonte, erroPendente } — modo "questão por questão" do registro de estudo
   let configSessaoBusca = '';
   let configSessaoFiltroTipo = 'todos';
   let configExcluirTexto = '';
@@ -3637,11 +3638,29 @@
           <label>Minutos estudados</label>
           <input type="number" id="registro-minutos" value="${registroAberto.minutosPreenchidos ?? ''}">
           <div data-tipo-fields="questoes">
-            <div class="row">
-              <div><label>Questões</label><input type="number" id="registro-questoes"></div>
-              <div><label>Acertos</label><input type="number" id="registro-acertos"></div>
+            <div class="mapa-filtros-botoes" style="margin-bottom:8px;">
+              <button type="button" class="mapa-filtro-btn ${!sessaoQuestoesDraft?'active':''}" id="registro-questoes-modo-totais">Só totais</button>
+              <button type="button" class="mapa-filtro-btn ${sessaoQuestoesDraft?'active':''}" id="registro-questoes-modo-unidade">Questão por questão</button>
             </div>
-            <small class="muted" id="registro-calculo">Preencha questões pra calcular</small>
+            ${!sessaoQuestoesDraft ? `
+              <div class="row">
+                <div><label>Questões</label><input type="number" id="registro-questoes"></div>
+                <div><label>Acertos</label><input type="number" id="registro-acertos"></div>
+              </div>
+              <small class="muted" id="registro-calculo">Preencha questões pra calcular</small>
+            ` : (() => {
+              const total = sessaoQuestoesDraft.itens.length;
+              const acertos = sessaoQuestoesDraft.itens.filter(i => i.correta).length;
+              return `
+                <label>Fonte/Banca (opcional, vale pra sessão toda)</label>
+                <input type="text" id="registro-questoes-fonte" placeholder="ex: CESPE 2023" value="${escapeHtml(sessaoQuestoesDraft.fonte || '')}">
+                <small class="muted">${total} quest${total===1?'ão':'ões'} respondida${total===1?'':'s'} — ${acertos} certa${acertos===1?'':'s'}</small>
+                <div class="row">
+                  <button type="button" class="ok" id="registro-questoes-acertei">${icone('check-circle')} Acertei</button>
+                  <button type="button" class="bad" id="registro-questoes-errei">${icone('alert-triangle')} Errei</button>
+                </div>
+              `;
+            })()}
           </div>
           <div data-tipo-fields="teoria">
             <label>Páginas lidas (opcional)</label>
@@ -3815,12 +3834,35 @@
     });
     document.getElementById('registro-cancelar')?.addEventListener('click', () => {
       registroAberto = null;
+      sessaoQuestoesDraft = null;
       render();
     });
     document.getElementById('registro-backdrop')?.addEventListener('click', (e) => {
       if(e.target.id !== 'registro-backdrop') return;
       if(registroAberto?.minutosPreenchidos != null && !confirmarAcao('Você tem uma sessão cronometrada aguardando registro. Fechar sem salvar descarta esse tempo. Continuar?')) return;
       registroAberto = null;
+      sessaoQuestoesDraft = null;
+      render();
+    });
+    document.getElementById('registro-questoes-modo-totais')?.addEventListener('click', () => {
+      if(sessaoQuestoesDraft && sessaoQuestoesDraft.itens.length && !confirmarAcao('Isso descarta as questões já registradas nesta sessão. Continuar?')) return;
+      sessaoQuestoesDraft = null;
+      render();
+    });
+    document.getElementById('registro-questoes-modo-unidade')?.addEventListener('click', () => {
+      if(!sessaoQuestoesDraft) sessaoQuestoesDraft = { itens: [], fonte: null, erroPendente: null };
+      render();
+    });
+    document.getElementById('registro-questoes-fonte')?.addEventListener('input', (e) => {
+      sessaoQuestoesDraft.fonte = e.target.value;
+      renderPreservandoFoco();
+    });
+    document.getElementById('registro-questoes-acertei')?.addEventListener('click', () => {
+      sessaoQuestoesDraft.itens.push({ correta: true });
+      render();
+    });
+    document.getElementById('registro-questoes-errei')?.addEventListener('click', () => {
+      sessaoQuestoesDraft.itens.push({ correta: false });
       render();
     });
     document.querySelectorAll('[data-ir-planejamento]').forEach(btn => {
@@ -3871,8 +3913,13 @@
       if(minutos <= 0){ alert('Informe os minutos estudados.'); return; }
       const dados = { tipo, assunto, minutos, obs: document.getElementById('registro-obs').value };
       if(tipo === 'questoes'){
-        dados.questoes = Number(document.getElementById('registro-questoes').value) || 0;
-        dados.acertos = Number(document.getElementById('registro-acertos').value) || 0;
+        if(sessaoQuestoesDraft){
+          dados.questoes = sessaoQuestoesDraft.itens.length;
+          dados.acertos = sessaoQuestoesDraft.itens.filter(i => i.correta).length;
+        } else {
+          dados.questoes = Number(document.getElementById('registro-questoes').value) || 0;
+          dados.acertos = Number(document.getElementById('registro-acertos').value) || 0;
+        }
       } else if(tipo === 'teoria'){
         dados.paginas = Number(document.getElementById('registro-paginas').value) || null;
         dados.concluida = document.getElementById('registro-concluida').checked;
@@ -3885,6 +3932,7 @@
       concluirAtividadeDiaPorAssunto(state, semanaAtualId(), hojeISO(), dados.assunto);
       saveState(state);
       registroAberto = null;
+      sessaoQuestoesDraft = null;
       render();
     });
 
