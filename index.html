@@ -1141,6 +1141,7 @@
   let state = loadState();
   /* === HOJE (Tarefa 3) === */
   function diasAte(hojeIso, alvoIso){
+    if(!alvoIso) return null;
     const a = new Date(hojeIso + 'T00:00:00');
     const b = new Date(alvoIso + 'T00:00:00');
     return Math.round((b - a) / 86400000);
@@ -2112,7 +2113,7 @@
     linhas.push(`- Sequência atual: ${sequencia} dia${sequencia===1?'':'s'}`);
     linhas.push(provas.length
       ? provas.map(p => `- Prova ${p.concurso}: ${p.dias<0?'já passou':`em ${p.dias} dias`} (${p.data})`).join('\n')
-      : `- Prova (data única): ${diasAte(hojeIso, state.meta.provaData)} dias (${state.meta.provaData})`);
+      : (state.meta.provaData ? `- Prova (data única): ${diasAte(hojeIso, state.meta.provaData)} dias (${state.meta.provaData})` : '- Nenhuma prova cadastrada'));
     linhas.push('');
     linhas.push('## Como foi esta semana (semana de ' + semanaId + ')');
     linhas.push(plano
@@ -2553,7 +2554,7 @@
           <div class="planejamento-header">
             <div class="hoje-header-icon">${icone('calendar')}</div>
             <div>
-              <h2>${dias} dias até a prova</h2>
+              <h2>${dias === null ? 'Nenhuma prova cadastrada' : `${dias} dias até a prova`}</h2>
               <small class="muted">${cicloAtivo ? escapeHtml(cicloAtivo.nome) : ''}${state.ciclos.length > 1 ? ` (ciclo ${state.ciclos.length} de ${state.ciclos.length})` : ''}${proximaProvaInfo?.concurso ? ` • prova ${escapeHtml(proximaProvaInfo.concurso)} em ${formatarData(proximaProvaInfo.data)}` : anoProva ? ` • prova em ${anoProva}` : ''} • ciclo atual em andamento</small>
               ${provasLista.length > 1 ? `<div class="dashboard-badge-row" style="margin-top:6px;">${provasLista.map(p => `<span class="dashboard-badge" style="${p.dias<0?'color:var(--bad);border-color:var(--bad)':''}">${escapeHtml(p.concurso)}: ${p.dias<0?'passou':p.dias+'d'}</span>`).join('')}</div>` : ''}
             </div>
@@ -3472,7 +3473,7 @@
     const pctDia = Math.min(100, Math.round((minutosHoje/planejadoMin)*100));
     const concluidas = atividades.filter(a=>a.estado==='concluida').length;
     const questoesHoje = (ci?.questoes || 0) + state.sessoes.filter(s => s.data===hojeIso && s.tipo==='questoes').reduce((s,x)=>s+(x.questoes||0),0);
-    const diasTexto = dias > 0 ? `${dias} dias para a prova` : dias === 0 ? 'A prova é hoje!' : `Prova foi há ${Math.abs(dias)} dias`;
+    const diasTexto = dias === null ? 'Nenhuma prova cadastrada' : dias > 0 ? `${dias} dias para a prova` : dias === 0 ? 'A prova é hoje!' : `Prova foi há ${Math.abs(dias)} dias`;
 
     const headerHtml = `
       <div class="card">
@@ -5465,7 +5466,7 @@
       const evolucao = evolucaoSemanal(
         filtrarPorConcurso(state, state.checkins, desempenhoConcurso),
         filtrarPorConcurso(state, state.sessoes, desempenhoConcurso),
-        hojeIso, dias
+        range.fim, dias
       );
       criarOuAtualizarChart('chart-evolucao', {
         type: 'line',
