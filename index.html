@@ -3929,7 +3929,13 @@
         document.getElementById('timer-card')?.scrollIntoView({behavior:'smooth', block:'center'});
       });
     });
-    attachComboBusca('registro-assunto-busca', 'registro-assunto', 'registro-assunto-resultados');
+    attachComboBusca('registro-assunto-busca', 'registro-assunto', 'registro-assunto-resultados', (valor) => {
+      // Sem isso, qualquer render() disparado ainda com o modal aberto (alternar modo
+      // questão-por-questão, Acertei, Errei) recria o combo do zero e perde a seleção —
+      // já que o campo escondido é só estado de DOM. Espelhando aqui em registroAberto.assunto,
+      // o próximo render já cai no branch de texto fixo (imune a isso).
+      if(registroAberto) registroAberto.assunto = valor;
+    });
     attachComboBusca('iniciar-assunto-busca', 'iniciar-assunto', 'iniciar-assunto-resultados');
 
     const selTipo = document.getElementById('registro-tipo');
@@ -4039,7 +4045,7 @@
 
   }
 
-  function attachComboBusca(buscaId, hiddenId, resultadosId){
+  function attachComboBusca(buscaId, hiddenId, resultadosId, onSelect){
     const busca = document.getElementById(buscaId);
     const hidden = document.getElementById(hiddenId);
     const resultados = document.getElementById(resultadosId);
@@ -4064,6 +4070,9 @@
       busca.value = item.dataset.valor;
       hidden.value = item.dataset.valor;
       resultados.classList.remove('open');
+      // Mirrors the pick into JS state (when provided) so it survives a full re-render —
+      // the hidden input alone gets wiped the moment anything else in the modal re-renders.
+      if(onSelect) onSelect(item.dataset.valor);
     });
   }
   function resolverAssuntoBusca(buscaId, hiddenId){
