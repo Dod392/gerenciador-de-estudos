@@ -798,6 +798,7 @@
       preferencias: { formatoData: 'DD/MM/AAAA', confirmacoes: true, notificacoes: true },
       historicoImportacoes: [],
       ultimoBackup: null,
+      errosPadroesDetectados: '',
     };
   }
 
@@ -1265,6 +1266,7 @@
     if(typeof s.preferencias.notificacoes !== 'boolean') s.preferencias.notificacoes = true;
     if(typeof s.ultimoBackup !== 'string') s.ultimoBackup = null;
     if(!Array.isArray(s.historicoImportacoes)) s.historicoImportacoes = [];
+    if(typeof s.errosPadroesDetectados !== 'string') s.errosPadroesDetectados = '';
     if(!s.provasPorConcurso || typeof s.provasPorConcurso !== 'object') s.provasPorConcurso = {};
     if(!Array.isArray(s.flashcards)) s.flashcards = [];
     migrarErrosParaModeloV2(s);
@@ -3197,6 +3199,11 @@
   let errosOrdenacao = 'proxima_revisao';
   let revisaoSessao = null; // { fila: [erroId,...], indice, revelado }
   let flashcardModalErroId = null; // erroId aberto pra "+ Adicionar flashcard"
+  let iaExportModalAberto = false;
+  let iaImportModalAberto = false;
+  let iaImportTextoColado = '';
+  let iaImportPreview = null; // array vindo de gerarPreviewImportacao, ou null se ainda não analisado
+  let iaImportErro = null; // mensagem de erro de parse, ou null
   let desempenhoCicloId = null;
   let desempenhoPeriodo = '90';
   let desempenhoConcurso = 'todos';
