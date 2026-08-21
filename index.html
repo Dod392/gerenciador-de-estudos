@@ -2236,6 +2236,22 @@
     document.body.removeChild(ta);
   }
 
+  function copiarTextoIAFallback(texto){
+    const ta = document.createElement('textarea');
+    ta.value = texto;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try {
+      document.execCommand('copy');
+      alert('Prompt copiado! Cole numa IA de chat (Claude, ChatGPT etc).');
+    } catch(e){
+      alert('Não foi possível copiar automaticamente. Selecione o texto manualmente.');
+    }
+    document.body.removeChild(ta);
+  }
+
   /* === DASHBOARD (redesign, Tarefa 2) === */
   function calcularSequencia(checkins, sessoes, hojeIso){
     const diasComCheckin = checkins.filter(c => c.status !== 'nao').map(c => c.data);
@@ -3995,6 +4011,7 @@
     const hojeIso = hojeISO();
     const stats = statsErros(state, hojeIso);
     const maisCritico = window.ErrosIA.calcularAssuntoMaisCritico(state.erros);
+    const pendentesExportar = window.ErrosIA.selecionarErrosParaExportar(state.erros).length;
     const listaFiltrada = ordenarErros(state, filtrarErros(state, state.erros, { filtro: errosFiltro, assunto: errosFiltroAssunto, busca: errosBusca, concurso: errosFiltroConcurso, tipoErro: errosFiltroTipo, prioridade: errosFiltroPrioridade, hojeIso }), errosOrdenacao);
     const assuntosComErro = [...new Set(state.erros.map(e => e.disciplinaId || e.assunto))].sort();
     const pendentesCount = window.ErrosIA.filaErrosPendentes(state.erros, hojeIso).length;
@@ -4012,6 +4029,8 @@
           <div class="erros-header-actions">
             <input type="text" id="erros-busca-input" placeholder="Buscar erro ou assunto..." value="${escapeHtml(errosBusca)}">
             ${pendentesCount ? `<button class="primary" id="erros-revisar-pendentes-btn">${icone('play')} Revisar pendentes (${pendentesCount})</button>` : ''}
+            ${pendentesExportar ? `<span class="badge" style="background:var(--warn-soft);color:var(--warn);">${pendentesExportar} erro${pendentesExportar===1?'':'s'} sem explicação</span>` : ''}
+            <button id="erros-analisar-ia-btn">${icone('zap')} Analisar com IA</button>
             <button class="primary" id="erros-novo-btn">+ Novo erro</button>
           </div>
         </div>
@@ -4311,7 +4330,23 @@
         </div>`;
     })() : '';
 
-    return `<div class="erros-screen">${headerHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}${flashcardModalHtml}${sessaoModalHtml}</div>`;
+    const iaExportModalHtml = iaExportModalAberto ? (() => {
+      const prompt = window.ErrosIA.montarPromptIA(state.erros);
+      return `
+        <div class="modal-backdrop" id="ia-export-modal-backdrop">
+          <div class="modal-panel">
+            <h3>Analisar com IA</h3>
+            <small class="muted">Copie o texto abaixo e cole numa IA de chat (Claude, ChatGPT etc). Depois, cole a resposta dela em "Importar resposta da IA".</small>
+            <textarea id="ia-export-texto" readonly style="min-height:240px;">${escapeHtml(prompt)}</textarea>
+            <div class="row">
+              <button id="ia-export-fechar">Fechar</button>
+              <button class="primary" id="ia-export-copiar">Copiar</button>
+            </div>
+          </div>
+        </div>`;
+    })() : '';
+
+    return `<div class="erros-screen">${headerHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}${flashcardModalHtml}${sessaoModalHtml}${iaExportModalHtml}</div>`;
   }
 
   function attachErrosHandlers(){
@@ -4390,6 +4425,28 @@
     document.getElementById('erros-novo-rodape')?.addEventListener('click', () => {
       erroModalAberto = { modo:'novo' };
       render();
+    });
+    document.getElementById('erros-analisar-ia-btn')?.addEventListener('click', () => {
+      iaExportModalAberto = true;
+      render();
+    });
+    document.getElementById('ia-export-fechar')?.addEventListener('click', () => {
+      iaExportModalAberto = false;
+      render();
+    });
+    document.getElementById('ia-export-modal-backdrop')?.addEventListener('click', (e) => {
+      if(e.target.id === 'ia-export-modal-backdrop'){ iaExportModalAberto = false; render(); }
+    });
+    document.getElementById('ia-export-copiar')?.addEventListener('click', () => {
+      const texto = document.getElementById('ia-export-texto').value;
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(texto).then(
+          () => alert('Prompt copiado! Cole numa IA de chat (Claude, ChatGPT etc).'),
+          () => copiarTextoIAFallback(texto)
+        );
+      } else {
+        copiarTextoIAFallback(texto);
+      }
     });
     document.getElementById('erro-form-cancelar')?.addEventListener('click', () => {
       erroModalAberto = null;
