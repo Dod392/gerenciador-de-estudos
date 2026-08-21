@@ -1211,11 +1211,30 @@
     if(!sessao) return;
     sessao.pomodoro = null;
   }
+  function elapsedMsFasePomodoro(sessao){
+    if(!sessao || !sessao.pomodoro) return 0;
+    const emAndamento = sessao.pomodoro.pausada ? 0 : (Date.now() - new Date(sessao.pomodoro.faseIniciadaEm).getTime());
+    return (sessao.pomodoro.faseAcumuladaMs || 0) + emAndamento;
+  }
+  function pausarPomodoro(state){
+    const sessao = state.sessaoEmAndamento;
+    if(!sessao || !sessao.pomodoro || sessao.pomodoro.pausada) return;
+    sessao.pomodoro.faseAcumuladaMs = (sessao.pomodoro.faseAcumuladaMs || 0) + (Date.now() - new Date(sessao.pomodoro.faseIniciadaEm).getTime());
+    sessao.pomodoro.pausada = true;
+    pausarSessaoEmAndamento(state);
+  }
+  function retomarPomodoro(state){
+    const sessao = state.sessaoEmAndamento;
+    if(!sessao || !sessao.pomodoro || !sessao.pomodoro.pausada) return;
+    sessao.pomodoro.faseIniciadaEm = new Date().toISOString();
+    sessao.pomodoro.pausada = false;
+    if(sessao.pomodoro.fase === 'foco') retomarSessaoEmAndamento(state);
+  }
   function tickPomodoro(state){
     const sessao = state.sessaoEmAndamento;
-    if(!sessao || !sessao.pomodoro) return null;
+    if(!sessao || !sessao.pomodoro || sessao.pomodoro.pausada) return null;
     const duracaoMin = sessao.pomodoro.fase === 'foco' ? POMODORO_FOCO_MIN : POMODORO_PAUSA_MIN;
-    const decorridoMs = Date.now() - new Date(sessao.pomodoro.faseIniciadaEm).getTime();
+    const decorridoMs = elapsedMsFasePomodoro(sessao);
     if(decorridoMs < duracaoMin * 60000) return null;
     if(sessao.pomodoro.fase === 'foco'){
       pausarSessaoEmAndamento(state);
@@ -3469,7 +3488,10 @@
         </div>
         <div class="timer-actions">
           ${pomodoroAtivo
-            ? `<button id="timer-pomodoro-sair">Sair do Pomodoro</button>`
+            ? `
+              <button id="timer-pausar">${pomodoroAtivo.pausada ? icone('play') + ' Retomar' : icone('pause') + ' Pausar'}</button>
+              <button id="timer-pomodoro-sair">Sair do Pomodoro</button>
+            `
             : `
               <button id="timer-pausar">${sessaoAtiva.pausado ? icone('play') + ' Retomar' : icone('pause') + ' Pausar'}</button>
               <button id="timer-pomodoro-ativar">${icone('zap')} Pomodoro 25/5</button>
@@ -4019,7 +4041,7 @@
             return;
           }
           const duracaoMin = sessao.pomodoro.fase === 'foco' ? POMODORO_FOCO_MIN : POMODORO_PAUSA_MIN;
-          const restanteSeg = Math.max(0, duracaoMin*60 - Math.floor((Date.now() - new Date(sessao.pomodoro.faseIniciadaEm).getTime())/1000));
+          const restanteSeg = Math.max(0, duracaoMin*60 - Math.floor(elapsedMsFasePomodoro(sessao)/1000));
           timerEl.textContent = formatarMMSS(restanteSeg);
           const totalEl = document.getElementById('timer-total-foco');
           if(totalEl) totalEl.textContent = `Foco total: ${Math.round(elapsedMsSessao(sessao)/60000)} min`;
@@ -4031,7 +4053,12 @@
       timerIntervalId = setInterval(tick, 1000);
     }
     document.getElementById('timer-pausar')?.addEventListener('click', () => {
-      if(state.sessaoEmAndamento.pausado) retomarSessaoEmAndamento(state); else pausarSessaoEmAndamento(state);
+      const sessao = state.sessaoEmAndamento;
+      if(sessao.pomodoro){
+        if(sessao.pomodoro.pausada) retomarPomodoro(state); else pausarPomodoro(state);
+      } else {
+        if(sessao.pausado) retomarSessaoEmAndamento(state); else pausarSessaoEmAndamento(state);
+      }
       saveState(state);
       render();
     });
