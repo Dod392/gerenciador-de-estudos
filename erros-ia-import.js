@@ -48,6 +48,12 @@ const CAMPOS_TEXTO_COAGIVEIS = [
   'oQueErrei', 'regraCorreta', 'pegadinha', 'comoReconhecer', 'fonte',
 ];
 
+// assunto/oQueErrei nunca podem ser apagados por um valor vazio vindo da IA —
+// nem num erro novo (onde "valido" já barra a criação) nem, principalmente,
+// numa atualização (onde Object.assign aplicaria null/'' por cima do valor
+// bom que já existia, sem qualquer validação de completude nesse caminho).
+const CAMPOS_OBRIGATORIOS = ['assunto', 'oQueErrei'];
+
 function sanitizarValoresIA(dados){
   const resultado = { ...dados };
   if('tipoErro' in resultado && !(resultado.tipoErro in TIPO_ERRO_LABEL)){
@@ -59,6 +65,11 @@ function sanitizarValoresIA(dados){
   if('confiancaExplicacao' in resultado && resultado.confiancaExplicacao !== null && !CONFIANCA_VALORES.includes(resultado.confiancaExplicacao)){
     delete resultado.confiancaExplicacao;
   }
+  CAMPOS_OBRIGATORIOS.forEach(campo => {
+    if(campo in resultado && !resultado[campo]){
+      delete resultado[campo];
+    }
+  });
   CAMPOS_TEXTO_COAGIVEIS.forEach(campo => {
     if(campo in resultado && resultado[campo] !== null && typeof resultado[campo] !== 'string'){
       resultado[campo] = String(resultado[campo]);

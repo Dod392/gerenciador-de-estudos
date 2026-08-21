@@ -1925,10 +1925,8 @@
       criarErro(state, {
         assunto: item.assunto,
         oQueErrei: item.oQueErrei,
-        baseLegal: item.regraCorreta,
+        regraCorreta: item.regraCorreta,
         origem: item.origemQuestao ? 'questao_prova' : 'leitura',
-        explicacao: '',
-        precisaCompletar: true,
       });
       adicionados++;
     });

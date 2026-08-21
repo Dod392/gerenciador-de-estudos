@@ -134,6 +134,52 @@ test('gerarPreviewImportacao mantém prioridade e tipo_erro válidos intactos', 
   assert.equal(preview.dados.tipoErro, 'falha_interpretacao');
 });
 
+test('gerarPreviewImportacao (atualização) descarta tema null em vez de apagar o assunto do erro existente', () => {
+  const existente = { id:'1', assunto:'PNRH', oQueErrei:'confundi X com Y' };
+  const item = { id:'1', tema: null, regra_correta: 'nova explicação boa' };
+  const [preview] = gerarPreviewImportacao([item], [existente]);
+  assert.equal('assunto' in preview.dados, false);
+  assert.equal(preview.dados.regraCorreta, 'nova explicação boa');
+});
+
+test('gerarPreviewImportacao (atualização) descarta o_que_errei vazio/null em vez de apagar o campo do erro existente', () => {
+  const existente = { id:'1', assunto:'PNRH', oQueErrei:'confundi X com Y' };
+  const itemNull = { id:'1', o_que_errei: null };
+  const itemVazio = { id:'1', o_que_errei: '' };
+  const [previewNull] = gerarPreviewImportacao([itemNull], [existente]);
+  const [previewVazio] = gerarPreviewImportacao([itemVazio], [existente]);
+  assert.equal('oQueErrei' in previewNull.dados, false);
+  assert.equal('oQueErrei' in previewVazio.dados, false);
+});
+
+test('gerarPreviewImportacao (atualização) mantém tema/o_que_errei quando a IA manda um valor real', () => {
+  const existente = { id:'1', assunto:'PNRH', oQueErrei:'confundi X com Y' };
+  const item = { id:'1', tema: 'SINGREH', o_que_errei: 'novo relato do erro' };
+  const [preview] = gerarPreviewImportacao([item], [existente]);
+  assert.equal(preview.dados.assunto, 'SINGREH');
+  assert.equal(preview.dados.oQueErrei, 'novo relato do erro');
+});
+
+test('aplicarImportacao (atualização) não sobrescreve assunto/oQueErrei do erro existente quando a IA manda null', () => {
+  const state = {
+    erros: [{ id:'1', assunto:'PNRH', oQueErrei:'confundi X com Y', regraCorreta:'' }],
+    flashcards: [],
+  };
+  const [preview] = gerarPreviewImportacao(
+    [{ id:'1', tema: null, o_que_errei: null, regra_correta: 'agora tem explicação' }],
+    state.erros
+  );
+  preview.selecionado = true;
+  aplicarImportacao(state, [preview], {
+    criarErro: () => { throw new Error('não deveria chamar criarErro'); },
+    criarFlashcard: () => {},
+    recalcularExplicacaoPendente: () => false,
+  });
+  assert.equal(state.erros[0].assunto, 'PNRH');
+  assert.equal(state.erros[0].oQueErrei, 'confundi X com Y');
+  assert.equal(state.erros[0].regraCorreta, 'agora tem explicação');
+});
+
 test('aplicarImportacao (atualização) limpa precisaCompletar dos flashcards do erro quando a explicação deixa de estar pendente', () => {
   const state = {
     erros: [{ id:'1', assunto:'PNRH', regraCorreta:'', precisaCompletar:true, flashcardIds:['fc-1'] }],

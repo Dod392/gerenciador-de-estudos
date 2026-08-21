@@ -17,9 +17,21 @@ function proximoIntervalo(atual){
 export function aplicarRevisaoErro(erro, acertou, hojeIso){
   if(!Array.isArray(erro.revisoes)) erro.revisoes = [];
   if(erro.dataUltimaRevisao === hojeIso && erro.revisoes.length){
-    // Já revisado hoje: apenas corrige o registro do dia, sem reavançar
-    // intervalo/status/prioridade uma segunda vez no mesmo dia.
-    erro.revisoes[erro.revisoes.length - 1].acertou = !!acertou;
+    // Já revisado hoje (ex.: dois flashcards do mesmo Erro revisados
+    // separadamente): corrige o registro do dia sem reavançar intervalo/
+    // status/prioridade de novo — EXCETO quando o resultado piora (era
+    // acerto, agora é erro), caso em que reprocessa pro lado seguro
+    // (reseta intervalo, marca recorrente, sobe prioridade) pra não deixar
+    // o agendamento desatualizado como se ainda estivesse tudo certo.
+    const registroDeHoje = erro.revisoes[erro.revisoes.length - 1];
+    const eraAcerto = registroDeHoje.acertou;
+    registroDeHoje.acertou = !!acertou;
+    if(eraAcerto && !acertou){
+      erro.intervaloRevisaoDias = 1;
+      erro.proximaRevisao = addDaysIso(hojeIso, 1);
+      erro.status = 'recorrente';
+      erro.prioridade = subirPrioridade(erro.prioridade);
+    }
     return erro;
   }
   erro.revisoes.push({ data: hojeIso, acertou: !!acertou });

@@ -47,20 +47,39 @@ test('aplicarRevisaoErro é idempotente no mesmo dia: 2 chamadas no mesmo hojeIs
   assert.equal(erro.intervaloRevisaoDias, 3, 'não deve reavançar 3→7 numa 2ª revisão do mesmo dia');
 });
 
-test('aplicarRevisaoErro no mesmo dia com acertou diferente apenas corrige o registro do dia, sem reprocessar prioridade/status', () => {
+test('aplicarRevisaoErro no mesmo dia virando de acertou para errou reprocessa pro lado seguro (reseta intervalo, marca recorrente, sobe prioridade)', () => {
+  // Cenário real: um Erro com 2 flashcards revisados separadamente no widget
+  // "Revisões de hoje" — o primeiro marca acerto, o segundo (do mesmo Erro,
+  // mesmo dia) marca erro. O agendamento não pode continuar refletindo só o
+  // acerto, senão o erro escaparia da fila de pendentes por dias.
   const erro = erroBase({ prioridade:'media' });
   aplicarRevisaoErro(erro, true, '2026-08-10');
-  assert.equal(erro.revisoes.length, 1);
-  assert.equal(erro.revisoes[0].acertou, true);
+  assert.equal(erro.intervaloRevisaoDias, 3);
   aplicarRevisaoErro(erro, false, '2026-08-10');
   assert.equal(erro.revisoes.length, 1, 'ainda deve haver só 1 entrada para o dia');
   assert.equal(erro.revisoes[0].acertou, false, 'a entrada do dia deve refletir o valor mais recente');
-  // Simplificação aceita: uma virada de acertou→errou no mesmo dia não
-  // reexecuta a escalada de prioridade nem o reset de status — isso exigiria
-  // desfazer a mutação já aplicada pela 1ª chamada do dia (intervalo/status/
-  // prioridade), o que não é possível de forma limpa só reescrevendo o
-  // registro de revisoes. Documentado como regressão menor aceitável.
-  assert.equal(erro.prioridade, 'media', 'prioridade não é reescalada retroativamente na virada do mesmo dia');
+  assert.equal(erro.intervaloRevisaoDias, 1, 'intervalo reseta pro valor seguro de "errou"');
+  assert.equal(erro.status, 'recorrente');
+  assert.equal(erro.prioridade, 'alta', 'prioridade é escalada ao saber que na verdade foi erro');
+  assert.equal(erro.proximaRevisao, '2026-08-11');
+});
+
+test('aplicarRevisaoErro no mesmo dia virando de errou para acertou só corrige o registro, sem reabrir o intervalo já resetado', () => {
+  // Direção inversa: já teria reprocessado pro lado seguro na 1ª chamada
+  // (errou). Uma 2ª chamada no mesmo dia dizendo "na verdade acertei" só
+  // corrige o registro — não há necessidade de reprocessar de novo, já que
+  // o intervalo=1/recorrente que já ficou setado não é um estado inseguro.
+  const erro = erroBase({ prioridade:'media', intervaloRevisaoDias:14 });
+  aplicarRevisaoErro(erro, false, '2026-08-10');
+  assert.equal(erro.intervaloRevisaoDias, 1);
+  assert.equal(erro.status, 'recorrente');
+  assert.equal(erro.prioridade, 'alta');
+  aplicarRevisaoErro(erro, true, '2026-08-10');
+  assert.equal(erro.revisoes.length, 1);
+  assert.equal(erro.revisoes[0].acertou, true, 'a entrada do dia reflete o valor mais recente');
+  assert.equal(erro.intervaloRevisaoDias, 1, 'intervalo permanece o já resetado, não é reprocessado de novo');
+  assert.equal(erro.status, 'recorrente');
+  assert.equal(erro.prioridade, 'alta');
 });
 
 test('estaPendenteRevisao ignora corrigidos mesmo com data vencida', () => {
