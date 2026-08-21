@@ -3623,7 +3623,7 @@
           ${registroAberto.assunto ? `<p><b>${escapeHtml(registroAberto.assunto)}</b></p>` : `
             <label>Assunto</label>
             <div class="combo">
-              <input type="text" id="registro-assunto-busca" placeholder="Buscar assunto..." autocomplete="off">
+              <input type="text" id="registro-assunto-busca" placeholder="Buscar assunto..." autocomplete="off" value="${escapeHtml(registroAberto.assuntoBuscaTexto || '')}">
               <input type="hidden" id="registro-assunto">
               <div class="combo-results" id="registro-assunto-resultados"></div>
             </div>
@@ -3692,7 +3692,7 @@
             <input type="number" id="registro-cartoes">
           </div>
           <label>Observação (opcional)</label>
-          <textarea id="registro-obs"></textarea>
+          <textarea id="registro-obs">${escapeHtml(registroAberto.obs || '')}</textarea>
           <div class="row">
             <button id="registro-cancelar">Cancelar</button>
             <button id="registro-salvar" class="primary">Salvar registro</button>
@@ -3941,8 +3941,34 @@
     const selTipo = document.getElementById('registro-tipo');
     if(selTipo){
       atualizarCamposPorTipo(selTipo.value);
-      selTipo.addEventListener('change', () => atualizarCamposPorTipo(selTipo.value));
+      selTipo.addEventListener('change', () => {
+        // Espelha em registroAberto.tipo pelo mesmo motivo do onSelect do combo de assunto:
+        // um render() disparado com o modal ainda aberto (alternar modo questão-por-questão,
+        // Acertei, Errei) reconstrói o <select> a partir de registroAberto.tipo, e sem isso ele
+        // reverteria pro tipo sugerido original perdido silenciosamente a troca manual.
+        if(registroAberto) registroAberto.tipo = selTipo.value;
+        atualizarCamposPorTipo(selTipo.value);
+      });
     }
+    // Minutos/obs/busca de assunto só precisam ficar espelhados em registroAberto pra
+    // sobreviver a um render() disparado por OUTRA ação (trocar tipo, alternar modo,
+    // Acertei, Errei) — não precisam forçar um render próprio a cada tecla. Diferente do
+    // padrão usado em #registro-questoes-fonte/#registro-questoes-oque (que só existem
+    // dentro do modo questão-por-questão, onde não há campo "só totais" pra atropelar),
+    // esses três campos convivem no DOM com registro-questoes/registro-acertos (modo só
+    // totais) o tempo todo; um renderPreservandoFoco() a cada tecla aqui reconstruiria o
+    // modal e apagaria questões/acertos já preenchidos (que não têm espelho em estado JS),
+    // já que registroAberto passa a ser sempre "atual" nesses campos, o próximo render de
+    // outra ação já lê o valor certo sem precisar disparar um render aqui.
+    document.getElementById('registro-minutos')?.addEventListener('input', (e) => {
+      if(registroAberto) registroAberto.minutosPreenchidos = e.target.value === '' ? null : Number(e.target.value);
+    });
+    document.getElementById('registro-obs')?.addEventListener('input', (e) => {
+      if(registroAberto) registroAberto.obs = e.target.value;
+    });
+    document.getElementById('registro-assunto-busca')?.addEventListener('input', (e) => {
+      if(registroAberto) registroAberto.assuntoBuscaTexto = e.target.value;
+    });
     document.getElementById('registro-questoes')?.addEventListener('input', atualizarCalculoQuestoes);
     document.getElementById('registro-acertos')?.addEventListener('input', atualizarCalculoQuestoes);
     if(document.getElementById('registro-calculo')) atualizarCalculoQuestoes();
