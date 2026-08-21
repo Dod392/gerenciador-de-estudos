@@ -805,7 +805,13 @@
   function estadoValido(obj){
     return !!obj && typeof obj.meta === 'object' && obj.meta !== null &&
       Array.isArray(obj.checkins) && Array.isArray(obj.erros) &&
-      Array.isArray(obj.conteudo) && Array.isArray(obj.planejamento);
+      Array.isArray(obj.conteudo) && Array.isArray(obj.planejamento) &&
+      // Item malformado nesses dois arrays (ex.: null, ou sem "assunto")
+      // derruba a tela inteira em vários pontos que leem e.assunto/c.assunto
+      // sem guarda (categoriaPorAssunto, iconePorAssunto, filtrarErros...) —
+      // barra aqui, na entrada, em vez de deixar corromper o app depois.
+      obj.conteudo.every(c => c && typeof c === 'object' && typeof c.assunto === 'string') &&
+      obj.erros.every(e => e && typeof e === 'object' && typeof e.assunto === 'string' && typeof e.oQueErrei === 'string');
   }
 
   function loadState(){
@@ -981,10 +987,21 @@
 
   async function conectarDocumentoNuvem(){
     if(!usuarioSincronizado) return;
+    const ref = firebaseFsMod.doc(firebaseDb, 'estados', usuarioSincronizado.uid);
+    const chaveJaConectado = 'estudos_sync_conectado_' + usuarioSincronizado.uid;
+    if(localStorage.getItem(chaveJaConectado)){
+      // Este aparelho já resolveu local-vs-nuvem com esta conta antes — não
+      // repete o prompt destrutivo de "sobrescrever?" a cada carga de página
+      // (onAuthStateChanged dispara de novo em todo reload com sessão
+      // persistida, não só no primeiro login).
+      syncStatus = 'synced';
+      ativarListenerTempoReal(ref);
+      atualizarIndicadorSyncDOM();
+      return;
+    }
     syncStatus = 'syncing';
     atualizarIndicadorSyncDOM();
     try {
-      const ref = firebaseFsMod.doc(firebaseDb, 'estados', usuarioSincronizado.uid);
       const snap = await firebaseFsMod.getDoc(ref);
       if(!snap.exists()){
         await enviarEstadoParaNuvem();
@@ -994,13 +1011,17 @@
         const manterLocal = localTemDados && !confirmarAcao('Já existem dados sincronizados na nuvem para esta conta. Substituir os dados deste aparelho pelos da nuvem? (Cancelar mantém os dados locais e sobrescreve a nuvem com eles.)');
         if(!manterLocal && remoto.estado && estadoValido(remoto.estado)){
           syncAplicandoRemoto = true;
-          state = normalizarCamposNovos(remoto.estado);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-          syncAplicandoRemoto = false;
+          try {
+            state = normalizarCamposNovos(remoto.estado);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          } finally {
+            syncAplicandoRemoto = false;
+          }
         } else {
           await enviarEstadoParaNuvem();
         }
       }
+      localStorage.setItem(chaveJaConectado, '1');
       syncStatus = 'synced';
       ativarListenerTempoReal(ref);
     } catch(e){
@@ -1017,12 +1038,17 @@
       if(dados.origemDispositivo === obterDeviceId()) return; // veio da própria escrita deste aparelho
       if(!dados.estado || !estadoValido(dados.estado)) return;
       syncAplicandoRemoto = true;
-      state = normalizarCamposNovos(dados.estado);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      syncAplicandoRemoto = false;
-      syncStatus = 'synced';
-      atualizarIndicadorSyncDOM();
-      if(podeRerenderizarComSeguranca()) render();
+      try {
+        state = normalizarCamposNovos(dados.estado);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        syncStatus = 'synced';
+        if(podeRerenderizarComSeguranca()) render();
+      } catch(e){
+        syncStatus = 'error';
+      } finally {
+        syncAplicandoRemoto = false;
+        atualizarIndicadorSyncDOM();
+      }
     }, () => { syncStatus = 'error'; atualizarIndicadorSyncDOM(); });
   }
 
@@ -1030,6 +1056,12 @@
     if(!usuarioSincronizado || syncAplicandoRemoto) return;
     clearTimeout(syncDebounceTimer);
     syncDebounceTimer = setTimeout(() => { enviarEstadoParaNuvem(); }, 2000);
+  }
+  function flushSyncPendente(){
+    if(!syncDebounceTimer) return;
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = null;
+    if(usuarioSincronizado && !syncAplicandoRemoto) enviarEstadoParaNuvem();
   }
   async function enviarEstadoParaNuvem(){
     if(!usuarioSincronizado || !firebaseFsMod) return;
@@ -5486,8 +5518,28 @@
   }
 
   function render(){
-    if(window.ErrosIA) state.erros.forEach(e => window.ErrosIA.migrarErroParaSchemaIA(e, flashcardsDoErro(state, e.id)));
-    renderSidebar(); renderTabsNav(); renderScreen();
+    try {
+      if(window.ErrosIA) state.erros.forEach(e => window.ErrosIA.migrarErroParaSchemaIA(e, flashcardsDoErro(state, e.id)));
+      renderSidebar(); renderTabsNav(); renderScreen();
+    } catch(e){
+      console.error('Erro ao renderizar:', e);
+      const app = document.getElementById('app');
+      if(!app) return;
+      app.innerHTML = `
+        <div class="card" style="text-align:center;padding:var(--space-6);">
+          <h2>Algo deu errado</h2>
+          <p class="muted">A tela não conseguiu carregar por causa de um dado inválido salvo neste aparelho.</p>
+          <p class="muted" style="font-size:var(--text-xs);">${escapeHtml(e && e.message ? e.message : String(e))}</p>
+          <button class="primary" id="render-erro-recarregar">Recarregar</button>
+          <button class="bad" id="render-erro-resetar">Apagar dados locais e recomeçar</button>
+        </div>`;
+      document.getElementById('render-erro-recarregar')?.addEventListener('click', () => location.reload());
+      document.getElementById('render-erro-resetar')?.addEventListener('click', () => {
+        if(!confirm('Isso apaga TODOS os dados salvos neste aparelho (o que estiver na nuvem, se você tiver sincronizado, não é afetado). Tem certeza?')) return;
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      });
+    }
   }
 
   attachSidebarHandlers();
@@ -5502,6 +5554,9 @@
         .catch(err => console.warn('SW falhou:', err));
     });
   }
+
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flushSyncPendente(); });
+  window.addEventListener('pagehide', flushSyncPendente);
 
   atualizarVisibilidadeApp();
   iniciarGateDeAutenticacao();
