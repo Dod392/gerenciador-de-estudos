@@ -3481,7 +3481,7 @@
           <div class="hero-title-block">
             <h3>${escapeHtml(sessaoAtiva.assunto || 'Estudo livre')}</h3>
             ${pomodoroAtivo ? `<span class="status-pill ${pomodoroAtivo.fase === 'foco' ? 'andamento' : 'concluida'}">${pomodoroAtivo.fase === 'foco' ? icone('zap') + ' Foco' : icone('coffee') + ' Pausa'}</span>` : ''}
-            <div class="timer-display ${sessaoAtiva.pausado ? 'pausado' : ''}" id="timer-elapsed" data-pomodoro="${pomodoroAtivo ? '1' : '0'}">00:00</div>
+            <div class="timer-display ${(pomodoroAtivo ? pomodoroAtivo.pausada : sessaoAtiva.pausado) ? 'pausado' : ''}" id="timer-elapsed" data-pomodoro="${pomodoroAtivo ? '1' : '0'}">00:00</div>
             ${pomodoroAtivo ? `<div class="timer-secondary" id="timer-total-foco">Foco total: 0 min</div>` : ''}
           </div>
           <button class="primary hero-cta" id="timer-finalizar">Finalizar</button>
