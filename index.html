@@ -4031,6 +4031,7 @@
             ${pendentesCount ? `<button class="primary" id="erros-revisar-pendentes-btn">${icone('play')} Revisar pendentes (${pendentesCount})</button>` : ''}
             ${pendentesExportar ? `<span class="badge" style="background:var(--warn-soft);color:var(--warn);">${pendentesExportar} erro${pendentesExportar===1?'':'s'} sem explicação</span>` : ''}
             <button id="erros-analisar-ia-btn">${icone('zap')} Analisar com IA</button>
+            <button id="erros-importar-ia-btn">${icone('download')} Importar resposta da IA</button>
             <button class="primary" id="erros-novo-btn">+ Novo erro</button>
           </div>
         </div>
@@ -4346,7 +4347,60 @@
         </div>`;
     })() : '';
 
-    return `<div class="erros-screen">${headerHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}${flashcardModalHtml}${sessaoModalHtml}${iaExportModalHtml}</div>`;
+    const iaImportModalHtml = iaImportModalAberto ? (() => {
+      const previewHtml = iaImportPreview ? iaImportPreview.map((item, idx) => {
+        const titulo = item.tipo === 'atualizacao'
+          ? `Atualização — ${escapeHtml(state.erros.find(e => e.id === item.erroId)?.assunto || item.erroId)}`
+          : `Novo erro sugerido — ${escapeHtml(item.dados.assunto || '(sem assunto)')}`;
+        const diffsHtml = item.tipo === 'atualizacao'
+          ? item.diffs.map(d => `<p class="muted"><b>${escapeHtml(d.campo)}:</b> ${escapeHtml(String(d.antes ?? '—'))} → ${escapeHtml(String(d.depois ?? '—'))}</p>`).join('')
+          : Object.entries(item.dados).map(([campo, valor]) => `<p class="muted"><b>${escapeHtml(campo)}:</b> ${escapeHtml(String(valor ?? '—'))}</p>`).join('');
+        const flashcardsHtml = item.flashcardsSugeridos.length
+          ? `<p class="muted"><b>Flashcards sugeridos:</b> ${item.flashcardsSugeridos.map(fc => escapeHtml(fc.frente)).join(', ')}</p>`
+          : '';
+        const avisoInvalido = item.tipo === 'novo' && !item.valido
+          ? `<p class="muted" style="color:var(--bad);">Faltam campos obrigatórios (tema/o_que_errei) — este item não pode ser aplicado.</p>` : '';
+        return `
+          <div class="erro-card-col" style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:var(--space-2);">
+            <label style="display:flex;align-items:center;gap:8px;min-height:auto;">
+              <input type="checkbox" data-ia-import-item="${idx}" ${item.selecionado?'checked':''} ${item.tipo==='novo' && !item.valido ? 'disabled' : ''} style="width:auto;min-height:auto;flex-shrink:0;">
+              <b>${titulo}</b>
+            </label>
+            ${diffsHtml}
+            ${flashcardsHtml}
+            ${avisoInvalido}
+          </div>`;
+      }).join('') : '';
+      return `
+        <div class="modal-backdrop" id="ia-import-modal-backdrop">
+          <div class="modal-panel erro-form-panel">
+            <h3>Importar resposta da IA</h3>
+            <small class="muted">Cole abaixo a resposta inteira da IA (resumo + bloco de código JSON).</small>
+            <textarea id="ia-import-texto" style="min-height:160px;">${escapeHtml(iaImportTextoColado)}</textarea>
+            ${iaImportErro ? `<small class="muted" style="color:var(--bad);display:block;margin-top:4px;">${escapeHtml(iaImportErro)}</small>` : ''}
+            ${!iaImportPreview ? `
+              <div class="row">
+                <button id="ia-import-cancelar">Cancelar</button>
+                <button class="primary" id="ia-import-analisar">Analisar</button>
+              </div>
+            ` : `
+              <div class="erro-card-body">${previewHtml}</div>
+              <div class="row">
+                <button id="ia-import-cancelar">Cancelar</button>
+                <button class="primary" id="ia-import-aplicar">Aplicar alterações</button>
+              </div>
+            `}
+          </div>
+        </div>`;
+    })() : '';
+
+    const padroesHtml = state.errosPadroesDetectados ? `
+      <div class="card">
+        <h3><span class="section-icon">${icone('lightbulb')}</span>Padrões detectados</h3>
+        <p class="muted">${escapeHtml(state.errosPadroesDetectados)}</p>
+      </div>` : '';
+
+    return `<div class="erros-screen">${headerHtml}${padroesHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}${flashcardModalHtml}${sessaoModalHtml}${iaExportModalHtml}${iaImportModalHtml}</div>`;
   }
 
   function attachErrosHandlers(){
@@ -4447,6 +4501,66 @@
       } else {
         copiarTextoIAFallback(texto);
       }
+    });
+    document.getElementById('erros-importar-ia-btn')?.addEventListener('click', () => {
+      iaImportModalAberto = true;
+      iaImportTextoColado = '';
+      iaImportPreview = null;
+      iaImportErro = null;
+      render();
+    });
+    document.getElementById('ia-import-cancelar')?.addEventListener('click', () => {
+      iaImportModalAberto = false;
+      iaImportPreview = null;
+      iaImportErro = null;
+      render();
+    });
+    document.getElementById('ia-import-modal-backdrop')?.addEventListener('click', (e) => {
+      if(e.target.id === 'ia-import-modal-backdrop'){ iaImportModalAberto = false; iaImportPreview = null; iaImportErro = null; render(); }
+    });
+    document.getElementById('ia-import-texto')?.addEventListener('input', (e) => {
+      iaImportTextoColado = e.target.value;
+    });
+    document.getElementById('ia-import-analisar')?.addEventListener('click', () => {
+      const texto = document.getElementById('ia-import-texto').value;
+      iaImportTextoColado = texto;
+      try {
+        const { resumo, itens } = window.ErrosIA.extrairRespostaIA(texto);
+        iaImportPreview = window.ErrosIA.gerarPreviewImportacao(itens, state.erros);
+        iaImportErro = null;
+        if(resumo) state.errosPadroesDetectados = resumo;
+      } catch(err){
+        iaImportErro = err.message;
+        iaImportPreview = null;
+      }
+      render();
+    });
+    document.querySelectorAll('[data-ia-import-item]').forEach(chk => {
+      chk.addEventListener('change', () => {
+        const idx = Number(chk.dataset.iaImportItem);
+        if(iaImportPreview[idx]) iaImportPreview[idx].selecionado = chk.checked;
+        render();
+      });
+    });
+    document.getElementById('ia-import-aplicar')?.addEventListener('click', () => {
+      const resultado = window.ErrosIA.aplicarImportacao(state, iaImportPreview, {
+        criarErro,
+        criarFlashcard,
+        recalcularExplicacaoPendente: window.ErrosIA.recalcularExplicacaoPendente,
+      });
+      if(!Array.isArray(state.historicoImportacoes)) state.historicoImportacoes = [];
+      state.historicoImportacoes.push({
+        id: String(Date.now()) + Math.random().toString(36).slice(2,7),
+        tipo: 'erros_ia',
+        quando: new Date().toISOString(),
+        errosAtualizados: resultado.atualizados,
+        errosCriados: resultado.criados,
+      });
+      saveState(state);
+      iaImportModalAberto = false;
+      iaImportPreview = null;
+      iaImportErro = null;
+      render();
     });
     document.getElementById('erro-form-cancelar')?.addEventListener('click', () => {
       erroModalAberto = null;
