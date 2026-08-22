@@ -1264,6 +1264,10 @@
     const sessao = state.sessaoEmAndamento;
     if(!sessao) return;
     sessao.pomodoro = null;
+    // Sai do Pomodoro sempre pausado (espelha ativarPomodoro, que retoma ao
+    // entrar) — sem isso, sair durante a fase de foco deixava o cronômetro
+    // normal rodando sem aviso, exigindo pausa manual pra perceber.
+    pausarSessaoEmAndamento(state);
   }
   function elapsedMsFasePomodoro(sessao){
     if(!sessao || !sessao.pomodoro) return 0;
