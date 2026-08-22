@@ -40,3 +40,12 @@ Registro de decisões tomadas durante a execução do plano `docs/superpowers/sp
 - **Schema de questão pra IA usa os mesmos nomes de campo do modelo interno** (assunto, enunciado, alternativas, gabarito...), diferente do schema de erros (que traduz pra tema/o_que_errei) — seguindo literalmente o pedido do plano de usar "o schema da seção 3.1".
 - **Questão importada por IA sempre grava `origem:'ia'`**, mesmo que a resposta da IA tente mandar outro valor no campo — a origem reflete o canal de importação real do app, não é algo que a IA deveria poder declarar.
 - **Import por arquivo reaproveita o mesmo pipeline do "colar"** (lê o arquivo pro mesmo textarea, mesmo botão Analisar) em vez de um caminho de código separado — menos duplicação, mesmo comportamento de validação/preview nos dois casos.
+
+### Fase 5
+
+- **`state.sequencia` é uma sequência própria do Treino, separada da sequência de dias estudados que já existia no app** (`calcularSequencia`, baseada em checkins/sessoes, usada em Dashboard/Desempenho) — essa continua intocada, conforme a restrição global de não mudar comportamento de tela existente. As duas sequências podem divergir (ex.: estudar sem abrir o Treino conta na antiga mas não na nova) — isso é esperado, não é bug.
+- **A checagem de sequência (`checarSequenciaTreino`) é chamada em vários pontos** (cada resposta que pode terminar a sessão, Sair, Terminar) em vez de um único lugar — como a função pura é idempotente por dia, chamar de novo não tem custo, e isso garante que a sequência já apareça atualizada na própria tela de fechamento, e não só depois de clicar Terminar.
+- **Resultado do simulado só é gravado ao clicar "Terminar" (fechamento completo)**, nunca ao "Sair" no meio — abandonar um simulado não consome a vaga da semana, dá pra tentar de novo.
+- **"Assuntos críticos" do simulado reaproveita `calcularAssuntoMaisCritico`** (o mesmo cálculo já usado no Caderno de Erros), em vez de duplicar lógica de detecção de fraqueza dentro de `treino-progresso.js`.
+- **Mapa de domínio por assunto fica num `<details>` fechado por padrão** na entrada do Treino, seguindo o mesmo padrão de "Avançado" já usado em Configurações — não compete visualmente com o fluxo principal de "Começar".
+- **Simulado exige um mínimo de 3 questões no banco pra ficar disponível** (não as 10 ideais do plano) — número arbitrário, escolhido pra não bloquear completamente quem tem um banco pequeno, mas ainda impedir um "simulado" de 1 questão.

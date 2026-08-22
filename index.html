@@ -841,6 +841,8 @@
       sessoes: [],
       sessaoEmAndamento: null,
       treinoSessao: null,
+      sequencia: { atual: 0, melhor: 0, ultimoDiaValido: null, folgasUsadasNaSemana: 0, semanaRef: null },
+      simuladosSemanais: [],
       ciclos: [{ id: 'ciclo-1', nome: '1º Ciclo', inicio: hojeISO() }],
       contadorRevisoes: 0,
       preferencias: { formatoData: 'DD/MM/AAAA', confirmacoes: true, notificacoes: true },
@@ -1416,6 +1418,8 @@
     if(!Array.isArray(s.flashcards)) s.flashcards = [];
     if(!Array.isArray(s.questoes)) s.questoes = [];
     if(s.treinoSessao === undefined) s.treinoSessao = null;
+    if(!s.sequencia || typeof s.sequencia !== 'object') s.sequencia = { atual: 0, melhor: 0, ultimoDiaValido: null, folgasUsadasNaSemana: 0, semanaRef: null };
+    if(!Array.isArray(s.simuladosSemanais)) s.simuladosSemanais = [];
     migrarErrosParaModeloV2(s);
     return s;
   }
@@ -4388,11 +4392,17 @@
     const nadaPendente = errosPendentes.length === 0 && questoesDisp.length === 0;
     const modalHtml = renderTreinoQuestaoModalHtml(hojeIso);
     const iaModalsHtml = renderTreinoIaExportModalHtml() + renderTreinoIaImportModalHtml();
+    const seq = state.sequencia;
+    const dominioHtml = renderTreinoDominioHtml();
+    const simuladoHtml = renderTreinoSimuladoCardHtml(hojeIso);
     return `
       <div class="card treino-entrada">
         <div class="card-header-row">
           <h2>${icone('zap')} Treino</h2>
-          <button type="button" class="card-link" id="treino-gerenciar-questoes-btn">${icone('book-open')} Banco de questões (${state.questoes.length})</button>
+          <div class="row" style="width:auto;">
+            ${seq.atual > 0 ? `<span class="badge">${icone('flame')} ${seq.atual} dia${seq.atual===1?'':'s'}</span>` : ''}
+            <button type="button" class="card-link" id="treino-gerenciar-questoes-btn">${icone('book-open')} Banco de questões (${state.questoes.length})</button>
+          </div>
         </div>
         <p class="muted">${errosPendentes.length} revisão${errosPendentes.length===1?'':'ões'} pendente${errosPendentes.length===1?'':'s'} · ${questoesDisp.length} questão${questoesDisp.length===1?'':'ões'} disponível${questoesDisp.length===1?'':'eis'}${gargalo ? ` · gargalo: ${escapeHtml(gargalo[0])} (${gargalo[1]})` : ''}</p>
         <div class="row">
@@ -4429,8 +4439,60 @@
           </div>
         `}
       </div>
+      ${simuladoHtml}
+      ${dominioHtml}
       ${modalHtml}
       ${iaModalsHtml}
+    `;
+  }
+
+  function renderTreinoDominioHtml(){
+    const mapa = window.Treino ? window.Treino.mapaDominioPorAssunto(state.erros) : [];
+    if(!mapa.length) return '';
+    return `
+      <div class="card">
+        <details>
+          <summary><b>${icone('target')} Domínio por assunto</b></summary>
+          <div style="margin-top:var(--space-3);">
+            ${mapa.slice(0, 8).map(m => `
+              <div style="margin-bottom:var(--space-2);">
+                <div class="row" style="justify-content:space-between;"><span>${escapeHtml(m.assunto)}</span><span class="muted">${m.percentualDominio}%</span></div>
+                <div class="progress"><i style="width:${m.percentualDominio}%"></i></div>
+              </div>
+            `).join('')}
+          </div>
+        </details>
+      </div>
+    `;
+  }
+
+  function renderTreinoSimuladoCardHtml(hojeIso){
+    const semanaId = semanaAtualId();
+    const disponivel = window.Treino ? window.Treino.simuladoDisponivel(state.simuladosSemanais, semanaId) : false;
+    const ultimo = [...(state.simuladosSemanais||[])].reverse().find(s => s.semanaId === semanaId);
+    const questoesDisp = window.Treino ? window.Treino.questoesDisponiveis(state.questoes, hojeIso) : [];
+    if(!disponivel){
+      return `
+        <div class="card">
+          <h3>${icone('flag')} Simulado relâmpago</h3>
+          <p class="muted">Feito esta semana — ${ultimo.acertos}/${ultimo.total} (${ultimo.pct}%). Volta a ficar disponível na próxima semana.</p>
+        </div>
+      `;
+    }
+    if(questoesDisp.length < 3){
+      return `
+        <div class="card">
+          <h3>${icone('flag')} Simulado relâmpago</h3>
+          <p class="muted">Precisa de mais questões no banco pra montar um simulado (mínimo 3 disponíveis, ideal 10).</p>
+        </div>
+      `;
+    }
+    return `
+      <div class="card">
+        <h3>${icone('flag')} Simulado relâmpago</h3>
+        <p class="muted">10 questões dos assuntos mais críticos, uma vez por semana — mede transferência pro formato de prova.</p>
+        <button class="primary" id="treino-simulado-comecar-btn">${icone('play')} Começar simulado</button>
+      </div>
     `;
   }
 
@@ -4692,6 +4754,8 @@
     const total = sessao.respostas.length;
     const acertos = sessao.respostas.filter(r => r.acertou).length;
     const pctAcerto = total ? Math.round((acertos/total)*100) : 0;
+    const seq = state.sequencia;
+    const contouHoje = seq.ultimoDiaValido === hojeIso;
     return `
       <div class="card treino-fechamento">
         <h2>${icone('flag')} Sessão encerrada</h2>
@@ -4700,6 +4764,7 @@
           <div class="stat-label">Erros corrigidos hoje</div>
         </div>
         <p>${total} item${total===1?'':'s'} revisado${total===1?'':'s'} · ${pctAcerto}% de acerto · melhor combo ${sessao.melhorCombo}</p>
+        ${contouHoje ? `<p class="muted">${icone('flame')} Sequência: ${seq.atual} dia${seq.atual===1?'':'s'}${seq.folgasUsadasNaSemana>0?' · folga usada esta semana':''}</p>` : `<p class="muted">Sessão curta — precisa de 5 itens ou 8 minutos pra contar na sequência.</p>`}
         <button class="primary" id="treino-terminar-btn">Terminar</button>
       </div>
     `;
@@ -4823,6 +4888,7 @@
       const questao = state.questoes.find(q => q.id === item.refId);
       const acertou = questao ? sessao.alternativaSelecionada === questao.gabarito : false;
       window.Treino.registrarResposta(sessao, { acertou });
+      if(window.Treino.sessaoTerminada(sessao)) checarSequenciaTreino(sessao);
       saveState(state);
       render();
     });
@@ -4946,6 +5012,7 @@
       const confianca = state.treinoSessao.confiancaAtual;
       if(erro) window.ErrosIA.aplicarRevisaoErro(erro, true, hojeISO(), { confianca });
       window.Treino.registrarResposta(state.treinoSessao, { acertou: true });
+      if(window.Treino.sessaoTerminada(state.treinoSessao)) checarSequenciaTreino(state.treinoSessao);
       saveState(state);
       render();
     });
@@ -4967,6 +5034,7 @@
         if(tipo) erro.tipoErro = tipo;
       }
       window.Treino.registrarResposta(state.treinoSessao, { acertou: false });
+      if(window.Treino.sessaoTerminada(state.treinoSessao)) checarSequenciaTreino(state.treinoSessao);
       saveState(state);
       render();
     });
@@ -4981,26 +5049,53 @@
         }
         state.treinoSessao.aguardandoDesambiguacao = false;
         window.Treino.registrarResposta(state.treinoSessao, { acertou: false });
+        if(window.Treino.sessaoTerminada(state.treinoSessao)) checarSequenciaTreino(state.treinoSessao);
         saveState(state);
         render();
       });
     });
     document.getElementById('treino-pular-btn')?.addEventListener('click', () => {
       window.Treino.pularItem(state.treinoSessao);
+      if(window.Treino.sessaoTerminada(state.treinoSessao)) checarSequenciaTreino(state.treinoSessao);
       saveState(state);
       render();
     });
     document.getElementById('treino-sair-btn')?.addEventListener('click', () => {
       if(!confirmarAcao('Sair do treino agora? O progresso desta sessão fica salvo — você pode continuar depois.')) return;
+      checarSequenciaTreino(state.treinoSessao);
       state.treinoSessao = null;
       saveState(state);
       render();
     });
     document.getElementById('treino-terminar-btn')?.addEventListener('click', () => {
+      const sessao = state.treinoSessao;
+      checarSequenciaTreino(sessao);
+      if(sessao && sessao.modo === 'simulado'){
+        window.Treino.registrarResultadoSimulado(state.simuladosSemanais, semanaAtualId(), sessao.respostas, hojeISO());
+      }
       state.treinoSessao = null;
       saveState(state);
       render();
     });
+    document.getElementById('treino-simulado-comecar-btn')?.addEventListener('click', () => {
+      const hojeIso = hojeISO();
+      const questoesDisp = window.Treino.questoesDisponiveis(state.questoes, hojeIso);
+      const maisCritico = window.ErrosIA ? window.ErrosIA.calcularAssuntoMaisCritico(state.erros) : null;
+      const assuntosCriticos = maisCritico ? [maisCritico.assunto] : [];
+      const questoesSimulado = window.Treino.montarFilaSimulado(questoesDisp, assuntosCriticos, 10);
+      const fila = window.Treino.montarFila(window.Treino.questoesParaItensFila(questoesSimulado));
+      state.treinoSessao = window.Treino.criarSessao({ fila, tempoAlvoMin: null, modo: 'simulado' });
+      saveState(state);
+      render();
+    });
+  }
+  // Idempotente por dia (a lógica pura já garante isso) — chamado ao sair ou
+  // terminar uma sessão de Treino, nunca a cada resposta individual.
+  function checarSequenciaTreino(sessao){
+    if(!sessao || !window.Treino) return;
+    const contou = window.Treino.sessaoContaParaSequencia(sessao, Date.now());
+    if(!contou) return;
+    state.sequencia = window.Treino.atualizarSequencia(state.sequencia, hojeISO(), semanaAtualId(), true);
   }
 
   function renderErros(){
