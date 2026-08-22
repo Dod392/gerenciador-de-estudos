@@ -1,12 +1,13 @@
 // Bump CACHE_VERSION when precached files change, as an extra safety net —
 // navigation requests below are network-first, so this mainly protects
 // icons/manifest/Chart.js from going stale.
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const CACHE = 'estudos-' + CACHE_VERSION;
 const LOCAIS = [
   './', './index.html', './manifest.json',
   './icons/icon-192.png', './icons/icon-512.png',
   './erros-ia.js', './erros-ia-modelo.js', './erros-ia-repeticao.js',
+  './erros-ia-export.js', './erros-ia-import.js',
 ];
 const CDN = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
 
