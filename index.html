@@ -829,6 +829,7 @@
       checkins: [],
       erros: [],
       flashcards: [],
+      questoes: [],
       conteudo: SEED_CONTEUDO.map(assunto => ({ assunto, status:'nao_iniciado', concurso:'ambos', atualizadoEm: hojeISO() })),
       concursos: ['Transpetro', 'INEA'],
       planejamento: [],
@@ -1408,6 +1409,7 @@
     if(typeof s.errosPadroesDetectados !== 'string') s.errosPadroesDetectados = '';
     if(!s.provasPorConcurso || typeof s.provasPorConcurso !== 'object') s.provasPorConcurso = {};
     if(!Array.isArray(s.flashcards)) s.flashcards = [];
+    if(!Array.isArray(s.questoes)) s.questoes = [];
     if(s.treinoSessao === undefined) s.treinoSessao = null;
     migrarErrosParaModeloV2(s);
     return s;
