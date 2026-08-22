@@ -11,6 +11,7 @@ export function criarSessao({ fila, tempoAlvoMin, modo, filtroAssunto = null, fi
     confiancaAtual: null,
     revelado: false,
     aguardandoDesambiguacao: false,
+    alternativaSelecionada: null,
     respostas: [],
     combo: 0,
     melhorCombo: 0,
@@ -45,6 +46,7 @@ export function registrarResposta(sessao, { acertou, emMs = 0 }){
   sessao.revelado = false;
   sessao.confiancaAtual = null;
   sessao.aguardandoDesambiguacao = false;
+  sessao.alternativaSelecionada = null;
   return sessao;
 }
 
@@ -54,6 +56,7 @@ export function pularItem(sessao){
   sessao.revelado = false;
   sessao.confiancaAtual = null;
   sessao.aguardandoDesambiguacao = false;
+  sessao.alternativaSelecionada = null;
   return sessao;
 }
 

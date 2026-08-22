@@ -14,6 +14,7 @@ test('criarSessao monta o objeto com os campos esperados, zerado', () => {
   assert.equal(s.indice, 0);
   assert.equal(s.revelado, false);
   assert.equal(s.aguardandoDesambiguacao, false);
+  assert.equal(s.alternativaSelecionada, null);
   assert.equal(s.combo, 0);
   assert.equal(s.melhorCombo, 0);
   assert.deepEqual(s.respostas, []);
@@ -83,6 +84,18 @@ test('pularItem reseta aguardandoDesambiguacao ao avançar de item', () => {
   s.aguardandoDesambiguacao = true;
   pularItem(s);
   assert.equal(s.aguardandoDesambiguacao, false);
+});
+
+test('registrarResposta e pularItem resetam alternativaSelecionada ao avançar de item', () => {
+  const s1 = criarSessao({ fila: filaExemplo(), tempoAlvoMin: 10, modo: 'misto' });
+  s1.alternativaSelecionada = 'B';
+  registrarResposta(s1, { acertou: true });
+  assert.equal(s1.alternativaSelecionada, null);
+
+  const s2 = criarSessao({ fila: filaExemplo(), tempoAlvoMin: 10, modo: 'misto' });
+  s2.alternativaSelecionada = 'C';
+  pularItem(s2);
+  assert.equal(s2.alternativaSelecionada, null);
 });
 
 test('errosCorrigidosHoje conta só status corrigido com dataUltimaRevisao de hoje', () => {
