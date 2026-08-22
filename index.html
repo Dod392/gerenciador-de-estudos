@@ -544,6 +544,11 @@
   .treino-fechamento-metrica-principal{margin:var(--space-4) 0;}
   .treino-fechamento-metrica-principal .stat-value{font-size:48px;font-weight:700;color:var(--accent);}
   .treino-fechamento-metrica-principal .stat-label{color:var(--muted);}
+  .treino-alternativas{display:flex;flex-direction:column;gap:8px;margin-top:var(--space-3);}
+  .treino-alternativa{width:100%;text-align:left;min-height:48px;margin:0;padding:10px 14px;background:transparent;white-space:normal;}
+  .treino-alternativa.active{border-color:var(--accent);background:var(--accent-soft);}
+  .treino-alternativa.correta{border-color:var(--ok);color:var(--ok);}
+  .treino-alternativa.errada{border-color:var(--bad);color:var(--bad);}
   @media(max-width:430px){
     .treino-acao-grande{min-height:48px;}
   }
@@ -4358,10 +4363,11 @@
     if(!el) return;
     el.textContent = q ? `Erros: ${calcularErros(q,a)} · Aproveitamento: ${calcularAproveitamento(q,a)}%` : 'Preencha questões pra calcular';
   }
-  /* === TREINO (Fase 1) === */
+  /* === TREINO === */
   let treinoConfigTempo = 10;        // minutos; null = fila toda
-  let treinoConfigModo = 'revisao';  // só 'revisao' existe na Fase 1 (sem banco de questões ainda)
+  let treinoConfigModo = 'misto';    // 'misto' | 'revisao' | 'questoes'
   let treinoConfigFocarAssunto = null;
+  let treinoQuestaoModal = null;     // null | {modo:'lista'} | {modo:'form', id: null|questaoId}
 
   function renderTreino(){
     const hojeIso = hojeISO();
@@ -4369,22 +4375,34 @@
       return window.Treino.sessaoTerminada(state.treinoSessao) ? renderTreinoFechamento() : renderTreinoDurante();
     }
     const errosPendentes = window.ErrosIA ? window.ErrosIA.filaErrosPendentes(state.erros, hojeIso) : [];
+    const questoesDisp = window.Treino ? window.Treino.questoesDisponiveis(state.questoes, hojeIso) : [];
     const porAssunto = {};
     errosPendentes.forEach(e => { porAssunto[e.assunto] = (porAssunto[e.assunto]||0) + 1; });
     const gargalo = Object.entries(porAssunto).sort((a,b) => b[1]-a[1])[0] || null;
-    const assuntosDisponiveis = [...new Set(errosPendentes.map(e => e.assunto))].sort();
+    const assuntosDisponiveis = [...new Set([...errosPendentes.map(e => e.assunto), ...questoesDisp.map(q => q.assunto)])].sort();
+    const nadaPendente = errosPendentes.length === 0 && questoesDisp.length === 0;
+    const modalHtml = renderTreinoQuestaoModalHtml(hojeIso);
     return `
       <div class="card treino-entrada">
-        <h2>${icone('zap')} Treino</h2>
-        <p class="muted">${errosPendentes.length} pendente${errosPendentes.length===1?'':'s'}${gargalo ? ` · gargalo: ${escapeHtml(gargalo[0])} (${gargalo[1]})` : ''}</p>
-        ${errosPendentes.length === 0 ? `
+        <div class="card-header-row">
+          <h2>${icone('zap')} Treino</h2>
+          <button type="button" class="card-link" id="treino-gerenciar-questoes-btn">${icone('book-open')} Banco de questões (${state.questoes.length})</button>
+        </div>
+        <p class="muted">${errosPendentes.length} revisão${errosPendentes.length===1?'':'ões'} pendente${errosPendentes.length===1?'':'s'} · ${questoesDisp.length} questão${questoesDisp.length===1?'':'ões'} disponível${questoesDisp.length===1?'':'eis'}${gargalo ? ` · gargalo: ${escapeHtml(gargalo[0])} (${gargalo[1]})` : ''}</p>
+        ${nadaPendente ? `
           <div class="empty-state">
             <div class="empty-state-icon">${icone('check-circle')}</div>
             <b>Nada pendente agora</b>
-            <p class="muted">Volte quando alguma revisão vencer.</p>
+            <p class="muted">Volte quando alguma revisão vencer, ou adicione questões ao banco.</p>
           </div>
         ` : `
           <div class="treino-config">
+            <label>Modo</label>
+            <div class="treino-config-tempo">
+              <button type="button" class="treino-opcao ${treinoConfigModo==='misto'?'active':''}" data-treino-modo="misto">Misto</button>
+              <button type="button" class="treino-opcao ${treinoConfigModo==='revisao'?'active':''}" data-treino-modo="revisao">Só revisão</button>
+              <button type="button" class="treino-opcao ${treinoConfigModo==='questoes'?'active':''}" data-treino-modo="questoes">Só questões</button>
+            </div>
             <label>Tempo</label>
             <div class="treino-config-tempo">
               ${[5,10,15,25].map(min => `<button type="button" class="treino-opcao ${treinoConfigTempo===min?'active':''}" data-treino-tempo="${min}">${min} min</button>`).join('')}
@@ -4401,13 +4419,87 @@
           </div>
         `}
       </div>
+      ${modalHtml}
     `;
+  }
+
+  const LETRAS_ALTERNATIVA = ['A','B','C','D','E'];
+  function renderTreinoQuestaoModalHtml(hojeIso){
+    if(!treinoQuestaoModal) return '';
+    if(treinoQuestaoModal.modo === 'form'){
+      const editando = !!treinoQuestaoModal.id;
+      const questao = editando ? state.questoes.find(q => q.id === treinoQuestaoModal.id) : null;
+      const alts = {};
+      (questao?.alternativas || []).forEach(a => { alts[a.letra] = a.texto; });
+      return `
+        <div class="modal-backdrop" id="questao-modal-backdrop">
+          <div class="modal-panel erro-form-panel">
+            <h3>${editando ? 'Editar questão' : 'Nova questão'}</h3>
+            <label>Assunto</label>
+            <select id="questao-form-assunto">
+              ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}" ${(questao?.assunto||'')===c.assunto?'selected':''}>${escapeHtml(c.assunto)}</option>`).join('')}
+            </select>
+            <label>Enunciado</label>
+            <textarea id="questao-form-enunciado" placeholder="Texto da questão">${escapeHtml(questao?.enunciado||'')}</textarea>
+            <label>Alternativas (preencha ao menos 2)</label>
+            ${LETRAS_ALTERNATIVA.map(l => `<input type="text" id="questao-form-alt-${l}" placeholder="${l})" value="${escapeHtml(alts[l]||'')}" style="margin-top:4px;">`).join('')}
+            <label>Gabarito</label>
+            <select id="questao-form-gabarito">
+              ${LETRAS_ALTERNATIVA.map(l => `<option value="${l}" ${(questao?.gabarito||'')===l?'selected':''}>${l}</option>`).join('')}
+            </select>
+            <label>Comentário (por que a certa está certa e as outras erradas)</label>
+            <textarea id="questao-form-comentario" placeholder="Explicação">${escapeHtml(questao?.comentario||'')}</textarea>
+            <label>Pegadinha (opcional)</label>
+            <input type="text" id="questao-form-pegadinha" value="${escapeHtml(questao?.pegadinha||'')}">
+            <label>Base legal (opcional)</label>
+            <input type="text" id="questao-form-baselegal" value="${escapeHtml(questao?.baseLegal||'')}">
+            <div class="row">
+              <div>
+                <label>Fonte (opcional)</label>
+                <input type="text" id="questao-form-fonte" placeholder="banca/ano/prova" value="${escapeHtml(questao?.fonte||'')}">
+              </div>
+              <div>
+                <label>Concurso (opcional)</label>
+                <select id="questao-form-concurso">
+                  <option value="" ${!questao?.concurso?'selected':''}>—</option>
+                  ${(state.concursos||[]).map(nome => `<option value="${escapeHtml(nome)}" ${(questao?.concurso||'')===nome?'selected':''}>${escapeHtml(nome)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div class="row">
+              <button id="questao-form-cancelar">Cancelar</button>
+              <button class="primary" id="questao-form-salvar" data-id="${questao?.id||''}">${editando ? 'Salvar alterações' : 'Adicionar'}</button>
+            </div>
+          </div>
+        </div>`;
+    }
+    // modo 'lista'
+    const lista = state.questoes;
+    return `
+      <div class="modal-backdrop" id="questao-modal-backdrop">
+        <div class="modal-panel erro-form-panel">
+          <h3>Banco de questões</h3>
+          <button class="primary" id="questao-nova-btn">${icone('edit')} Nova questão</button>
+          ${lista.length ? lista.map(q => `
+            <div class="erro-card-footer" style="flex-direction:column;align-items:stretch;">
+              <div class="erro-card-footer-info"><b>${escapeHtml(q.assunto)}</b><span class="muted">${escapeHtml(q.enunciado.slice(0,80))}${q.enunciado.length>80?'…':''}</span></div>
+              <div class="erro-card-footer-info muted">${q.estatistica.respondida} respondida${q.estatistica.respondida===1?'':'s'} · ${q.estatistica.respondida ? Math.round(q.estatistica.acertos/q.estatistica.respondida*100) : 0}% de acerto${window.Treino.estaEmCooldown(q, hojeIso) ? ` · em cooldown até ${q.cooldownAte}` : ''}</div>
+              <div class="erro-card-footer-actions">
+                <button type="button" data-questao-editar="${q.id}">Editar</button>
+                <button type="button" class="bad" data-questao-excluir="${q.id}">Excluir</button>
+              </div>
+            </div>
+          `).join('') : '<p class="muted">Nenhuma questão cadastrada ainda.</p>'}
+          <button id="questao-modal-fechar" style="margin-top:var(--space-3);">Fechar</button>
+        </div>
+      </div>`;
   }
 
   function renderTreinoDurante(){
     const sessao = state.treinoSessao;
     const item = window.Treino.itemAtual(sessao);
     if(!item) return renderTreinoFechamento();
+    if(item.tipo === 'questao') return renderTreinoDuranteQuestao(sessao, item);
     const erro = state.erros.find(e => e.id === item.refId);
     if(!erro){
       // Erro foi apagado/mudou de estado no meio da sessão — pula sem travar a tela.
@@ -4469,6 +4561,62 @@
     `;
   }
 
+  function renderTreinoDuranteQuestao(sessao, item){
+    const questao = state.questoes.find(q => q.id === item.refId);
+    if(!questao){
+      window.Treino.pularItem(sessao);
+      saveState(state);
+      return renderTreinoDurante();
+    }
+    const pct = Math.round((sessao.indice / sessao.fila.length) * 100);
+    const acertou = sessao.revelado ? sessao.alternativaSelecionada === questao.gabarito : null;
+    const acoesHtml = sessao.revelado ? `
+      <div class="treino-revelado">
+        <p><b>${acertou ? 'Você acertou!' : `Resposta certa: ${questao.gabarito}`}</b></p>
+        ${questao.comentario ? `<p>${escapeHtml(questao.comentario)}</p>` : ''}
+        ${questao.pegadinha ? `<p><b>Pegadinha:</b> ${escapeHtml(questao.pegadinha)}</p>` : ''}
+        ${questao.baseLegal ? `<p><b>Base legal:</b> ${escapeHtml(questao.baseLegal)}</p>` : ''}
+      </div>
+      <div class="treino-acoes">
+        ${!acertou ? `<button type="button" class="bad treino-acao-grande" id="treino-registrar-erro-btn">${icone('notebook')} Registrar no caderno de erros</button>` : ''}
+        <button class="primary treino-acao-grande" id="treino-questao-continuar-btn">Continuar</button>
+      </div>
+    ` : !sessao.confiancaAtual && sessao.alternativaSelecionada ? `
+      <p class="muted">Como você se sentiu?</p>
+      <div class="treino-acoes">
+        <button type="button" class="treino-acao-grande" data-treino-confianca="chutei">Chutei</button>
+        <button type="button" class="treino-acao-grande" data-treino-confianca="achei_que_sabia">Achei que sabia</button>
+        <button type="button" class="treino-acao-grande" data-treino-confianca="sabia">Sabia</button>
+      </div>
+    ` : sessao.alternativaSelecionada ? `
+      <div class="treino-acoes">
+        <button class="primary treino-acao-grande" id="treino-confirmar-questao-btn">Confirmar</button>
+      </div>
+    ` : `<p class="muted">Toque numa alternativa pra marcar.</p>`;
+    return `
+      <div class="treino-full-screen">
+        <div class="progress"><i style="width:${pct}%"></i></div>
+        <div class="treino-progresso-texto muted">${sessao.indice+1} de ${sessao.fila.length}${sessao.combo>1 ? ` · combo ${sessao.combo}` : ''}</div>
+        <div class="treino-card" style="text-align:left;">
+          <div class="badge">${escapeHtml(questao.assunto)}</div>
+          <p class="treino-gatilho" style="font-size:var(--text-lg);text-align:left;">${escapeHtml(questao.enunciado)}</p>
+          <div class="treino-alternativas">
+            ${questao.alternativas.map(a => `
+              <button type="button" class="treino-alternativa ${sessao.alternativaSelecionada===a.letra?'active':''} ${sessao.revelado && a.letra===questao.gabarito ? 'correta' : ''} ${sessao.revelado && sessao.alternativaSelecionada===a.letra && a.letra!==questao.gabarito ? 'errada' : ''}" data-treino-alternativa="${a.letra}" ${sessao.revelado?'disabled':''}>
+                <b>${a.letra})</b> ${escapeHtml(a.texto)}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+        ${acoesHtml}
+        <div class="treino-acoes-secundarias">
+          <button type="button" id="treino-pular-btn">Pular</button>
+          <button type="button" id="treino-sair-btn">Sair</button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderTreinoFechamento(){
     const sessao = state.treinoSessao;
     const hojeIso = hojeISO();
@@ -4496,17 +4644,137 @@
         render();
       });
     });
+    document.querySelectorAll('[data-treino-modo]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        treinoConfigModo = btn.dataset.treinoModo;
+        render();
+      });
+    });
     document.getElementById('treino-focar-assunto')?.addEventListener('change', (e) => {
       treinoConfigFocarAssunto = e.target.value || null;
       render();
     });
     document.getElementById('treino-comecar-btn')?.addEventListener('click', () => {
       const hojeIso = hojeISO();
-      const errosPendentes = window.ErrosIA.filaErrosPendentes(state.erros, hojeIso);
-      const itens = window.Treino.errosParaItensFila(errosPendentes);
+      let itens = [];
+      if(treinoConfigModo !== 'questoes'){
+        const errosPendentes = window.ErrosIA.filaErrosPendentes(state.erros, hojeIso);
+        itens = itens.concat(window.Treino.errosParaItensFila(errosPendentes));
+      }
+      if(treinoConfigModo !== 'revisao'){
+        const questoesDisp = window.Treino.questoesDisponiveis(state.questoes, hojeIso, { assunto: treinoConfigFocarAssunto || undefined });
+        itens = itens.concat(window.Treino.questoesParaItensFila(window.Treino.selecionarPorFraqueza(questoesDisp)));
+      }
       const fila = window.Treino.montarFila(itens, { focarAssunto: treinoConfigFocarAssunto });
       state.treinoSessao = window.Treino.criarSessao({ fila, tempoAlvoMin: treinoConfigTempo, modo: treinoConfigModo, filtroAssunto: treinoConfigFocarAssunto });
       saveState(state);
+      render();
+    });
+    document.getElementById('treino-gerenciar-questoes-btn')?.addEventListener('click', () => {
+      treinoQuestaoModal = { modo: 'lista' };
+      render();
+    });
+    document.getElementById('questao-nova-btn')?.addEventListener('click', () => {
+      treinoQuestaoModal = { modo: 'form', id: null };
+      render();
+    });
+    document.querySelectorAll('[data-questao-editar]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        treinoQuestaoModal = { modo: 'form', id: btn.dataset.questaoEditar };
+        render();
+      });
+    });
+    document.querySelectorAll('[data-questao-excluir]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if(!confirmarAcao('Excluir esta questão do banco? Essa ação não pode ser desfeita.')) return;
+        window.Treino.excluirQuestao(state.questoes, btn.dataset.questaoExcluir);
+        saveState(state);
+        render();
+      });
+    });
+    document.getElementById('questao-form-cancelar')?.addEventListener('click', () => {
+      treinoQuestaoModal = { modo: 'lista' };
+      render();
+    });
+    document.getElementById('questao-modal-fechar')?.addEventListener('click', () => {
+      treinoQuestaoModal = null;
+      render();
+    });
+    document.getElementById('questao-modal-backdrop')?.addEventListener('click', (e) => {
+      if(e.target.id === 'questao-modal-backdrop'){ treinoQuestaoModal = null; render(); }
+    });
+    document.getElementById('questao-form-salvar')?.addEventListener('click', () => {
+      const assunto = document.getElementById('questao-form-assunto').value;
+      const enunciado = document.getElementById('questao-form-enunciado').value.trim();
+      const alternativas = LETRAS_ALTERNATIVA
+        .map(l => ({ letra: l, texto: document.getElementById(`questao-form-alt-${l}`).value.trim() }))
+        .filter(a => a.texto);
+      const gabarito = document.getElementById('questao-form-gabarito').value;
+      const comentario = document.getElementById('questao-form-comentario').value.trim();
+      if(!enunciado || alternativas.length < 2){ alert('Preencha o enunciado e pelo menos 2 alternativas.'); return; }
+      if(!alternativas.some(a => a.letra === gabarito)){ alert('O gabarito precisa ser uma das alternativas preenchidas.'); return; }
+      const dados = {
+        assunto, enunciado, alternativas, gabarito, comentario,
+        pegadinha: document.getElementById('questao-form-pegadinha').value.trim() || null,
+        baseLegal: document.getElementById('questao-form-baselegal').value.trim() || null,
+        fonte: document.getElementById('questao-form-fonte').value.trim() || null,
+        concurso: document.getElementById('questao-form-concurso').value || null,
+      };
+      const id = document.getElementById('questao-form-salvar').dataset.id;
+      if(id){
+        window.Treino.atualizarQuestao(state.questoes, id, dados);
+      } else {
+        state.questoes.push(window.Treino.criarQuestao(dados));
+      }
+      saveState(state);
+      treinoQuestaoModal = { modo: 'lista' };
+      render();
+    });
+    document.querySelectorAll('[data-treino-alternativa]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.treinoSessao.alternativaSelecionada = btn.dataset.treinoAlternativa;
+        saveState(state);
+        render();
+      });
+    });
+    document.getElementById('treino-confirmar-questao-btn')?.addEventListener('click', () => {
+      const sessao = state.treinoSessao;
+      const item = window.Treino.itemAtual(sessao);
+      const questao = state.questoes.find(q => q.id === item.refId);
+      if(questao){
+        const acertou = sessao.alternativaSelecionada === questao.gabarito;
+        window.Treino.registrarRespostaQuestao(questao, acertou, hojeISO());
+      }
+      sessao.revelado = true;
+      saveState(state);
+      render();
+    });
+    document.getElementById('treino-questao-continuar-btn')?.addEventListener('click', () => {
+      const sessao = state.treinoSessao;
+      const item = window.Treino.itemAtual(sessao);
+      const questao = state.questoes.find(q => q.id === item.refId);
+      const acertou = questao ? sessao.alternativaSelecionada === questao.gabarito : false;
+      window.Treino.registrarResposta(sessao, { acertou });
+      saveState(state);
+      render();
+    });
+    document.getElementById('treino-registrar-erro-btn')?.addEventListener('click', () => {
+      const sessao = state.treinoSessao;
+      const item = window.Treino.itemAtual(sessao);
+      const questao = state.questoes.find(q => q.id === item.refId);
+      if(questao){
+        erroModalAberto = { modo: 'novo', dadosIniciais: {
+          assunto: questao.assunto,
+          fonte: questao.fonte,
+          concurso: questao.concurso,
+          origem: 'questao_prova',
+          enunciadoResumo: questao.enunciado.slice(0, 120),
+          regraCorreta: questao.comentario,
+          pegadinha: questao.pegadinha,
+          baseLegal: questao.baseLegal,
+        }};
+        currentTab = 'erros';
+      }
       render();
     });
     document.querySelectorAll('[data-treino-confianca]').forEach(btn => {

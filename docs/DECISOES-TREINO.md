@@ -24,3 +24,11 @@ Registro de decisões tomadas durante a execução do plano `docs/superpowers/sp
 - **`sabia + errou` sem desambiguação informada** (chamada defensiva, ex.: estado corrompido) cai em `confusao_conceitos` por padrão — o plano não definiu um fallback explícito; escolhido por ser o valor citado primeiro no texto do plano.
 - **`tipoErro` só é reclassificado em erros, nunca em acertos** — mesmo um acerto no chute (`confianca:'chutei'`) não mexe em `erro.tipoErro`, já que classificar "tipo de erro" num acerto não faz sentido semântico.
 - **Botões de confiança e de desambiguação usam estilo neutro** (sem cor ok/bad) — o plano não especificou tratamento visual pra esse tap, e são escolhas neutras (nenhuma "certa"), diferente de Acertei/Errei que são binários com carga positiva/negativa.
+
+### Fase 3
+
+- **CRUD manual do banco de questões vive dentro da própria tela Treino** (modal aberto pelo botão "Banco de questões (N)" na entrada), não em Configurações nem em aba própria — o plano descreve Treino como "onde estudar por questões acontece dentro do app", então gerenciar o banco fica junto.
+- **"Registrar no caderno de erros" a partir de uma questão errada reaproveita o modal de erro já existente** (`erroModalAberto`), navegando pra aba Erros com `dadosIniciais` pré-preenchidos, em vez de duplicar o formulário dentro do Treino — é literalmente "o padrão que já existe hoje", como o plano pediu. Isso exigiu estender o modal de erro pra aceitar `dadosIniciais` opcional (mudança aditiva, não quebra o fluxo normal de "Novo erro").
+- **`selecionarPorFraqueza` é uma heurística simples** (nunca respondida → menor % de acerto → resposta mais antiga), baseada só nas estatísticas da própria questão — não é o cálculo de domínio por assunto que a Fase 5 (`treino-progresso.js`) vai construir. Pode ser substituída/reforçada quando esse módulo existir.
+- **Questão tem 2 passos pra avançar (Confirmar → Continuar), diferente do Erro (1 toque, Acertei/Errei já avança).** Necessário pra dar tempo do usuário clicar "Registrar no caderno de erros" ainda vendo o feedback, antes de sair do item.
+- **Formulário de alternativa fixo em 5 campos (A-E), vazios são ignorados** — cobre o "2 a 5; formato Cesgranrio = 5" do modelo de dados sem precisar de UI dinâmica de adicionar/remover campo.
