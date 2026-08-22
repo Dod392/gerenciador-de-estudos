@@ -820,6 +820,7 @@
       planejamento: [],
       sessoes: [],
       sessaoEmAndamento: null,
+      treinoSessao: null,
       ciclos: [{ id: 'ciclo-1', nome: '1º Ciclo', inicio: hojeISO() }],
       contadorRevisoes: 0,
       preferencias: { formatoData: 'DD/MM/AAAA', confirmacoes: true, notificacoes: true },
@@ -1393,6 +1394,7 @@
     if(typeof s.errosPadroesDetectados !== 'string') s.errosPadroesDetectados = '';
     if(!s.provasPorConcurso || typeof s.provasPorConcurso !== 'object') s.provasPorConcurso = {};
     if(!Array.isArray(s.flashcards)) s.flashcards = [];
+    if(s.treinoSessao === undefined) s.treinoSessao = null;
     migrarErrosParaModeloV2(s);
     return s;
   }
@@ -3390,13 +3392,14 @@
   const NAV_ITEMS = [
     {id:'dashboard', label:'Dashboard', icon:icone('bar-chart')},
     {id:'hoje', label:'Hoje', icon:icone('check-circle')},
+    {id:'treino', label:'Treino', icon:icone('zap')},
     {id:'planejamento', label:'Planejamento', icon:icone('calendar')},
     {id:'mapa', label:'Mapa de Conteúdo', icon:icone('map')},
     {id:'erros', label:'Caderno de Erros', icon:icone('notebook')},
     {id:'desempenho', label:'Desempenho', icon:icone('trending-up')},
     {id:'config', label:'Configurações', icon:icone('settings')},
   ];
-  const MOBILE_PRIMARY = ['hoje', 'planejamento', 'desempenho'];
+  const MOBILE_PRIMARY = ['hoje', 'treino', 'planejamento', 'desempenho'];
   let currentTab = (window.matchMedia && window.matchMedia('(min-width:900px)').matches) ? 'dashboard' : 'hoje';
   let sidebarCollapsed = false;
   let registroAberto = null;
@@ -3818,28 +3821,13 @@
     const revisoesHtml = `
       <div class="card">
         <div class="card-header-row">
-          <h3><span class="section-icon">${icone('refresh')}</span>Revisões de hoje</h3>
-          ${fila.length ? `<button class="card-link" data-ir-erros>Ver todas →</button>` : ''}
+          <h3><span class="section-icon">${icone('refresh')}</span>Revisões</h3>
         </div>
-        ${fila.length ? fila.map(f => {
-          const erroDoCard = obterErroDoFlashcard(state, f);
-          if(!erroDoCard) return '';
-          // Vencido/próx. reflete a data do Erro (a fonte que colocou este
-          // item na fila), não a do flashcard — podem divergir.
-          const atrasado = erroDoCard.proximaRevisao <= hojeIso;
-          return `
-          <div class="revisao-item" data-flashcard-id="${f.id}" style="border-left:3px solid ${corDisciplina(erroDoCard.assunto)};padding-left:8px;">
-            <div class="item-icon tipo-revisao">${icone('refresh')}</div>
-            <div class="revisao-info">
-              <div class="revisao-title">${escapeHtml(erroDoCard.assunto)}</div>
-              <div class="revisao-meta">${f.precisaCompletar ? 'Card incompleto' : 'Flashcard'} ${atrasado ? '· <span class="status-pill atrasada">Atrasada</span>' : `· próx. ${erroDoCard.proximaRevisao}`}</div>
-            </div>
-            <div class="revisao-actions">
-              <button class="ok" data-acertei="${f.id}" title="Acertei">✓</button>
-              <button class="bad" data-errei="${f.id}" title="Errei">✗</button>
-            </div>
-          </div>`;
-        }).join('') : `
+        ${state.treinoSessao && !window.Treino.sessaoTerminada(state.treinoSessao) ? `
+          <button class="primary treino-cta" data-ir-treino>${icone('play')} Continuar treino (${state.treinoSessao.indice} de ${state.treinoSessao.fila.length})</button>
+        ` : fila.length ? `
+          <button class="primary treino-cta" data-ir-treino>${icone('zap')} Treinar agora (${fila.length} pendente${fila.length===1?'':'s'})</button>
+        ` : `
         <div class="empty-state">
           <div class="empty-state-icon">${icone('check-circle')}</div>
           <p><b>Revisões em dia!</b></p>
@@ -4051,34 +4039,8 @@
         render();
       });
     }
-    app.querySelectorAll('button[data-acertei]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const f = state.flashcards.find(x => x.id === btn.dataset.acertei);
-        if(f){
-          aplicarResultadoRevisao(f, 'bom');
-          incrementarContadorRevisoes(state);
-          const erroDoCard = obterErroDoFlashcard(state, f);
-          if(erroDoCard){
-            avancarStatusPorAtividade(state, erroDoCard.assunto, hojeISO());
-            window.ErrosIA.aplicarRevisaoErro(erroDoCard, true, hojeISO());
-          }
-        }
-        saveState(state);
-        render();
-      });
-    });
-    app.querySelectorAll('button[data-errei]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const f = state.flashcards.find(x => x.id === btn.dataset.errei);
-        if(f){
-          aplicarResultadoRevisao(f, 'errei');
-          incrementarContadorRevisoes(state);
-          const erroDoCard = obterErroDoFlashcard(state, f);
-          if(erroDoCard) window.ErrosIA.aplicarRevisaoErro(erroDoCard, false, hojeISO());
-        }
-        saveState(state);
-        render();
-      });
+    app.querySelectorAll('[data-ir-treino]').forEach(btn => {
+      btn.addEventListener('click', () => { currentTab = 'treino'; render(); });
     });
 
     app.querySelectorAll('[data-abrir-registro]').forEach(btn => {
@@ -4386,6 +4348,177 @@
     if(!el) return;
     el.textContent = q ? `Erros: ${calcularErros(q,a)} · Aproveitamento: ${calcularAproveitamento(q,a)}%` : 'Preencha questões pra calcular';
   }
+  /* === TREINO (Fase 1) === */
+  let treinoConfigTempo = 10;        // minutos; null = fila toda
+  let treinoConfigModo = 'revisao';  // só 'revisao' existe na Fase 1 (sem banco de questões ainda)
+  let treinoConfigFocarAssunto = null;
+
+  function renderTreino(){
+    const hojeIso = hojeISO();
+    if(state.treinoSessao){
+      return window.Treino.sessaoTerminada(state.treinoSessao) ? renderTreinoFechamento() : renderTreinoDurante();
+    }
+    const errosPendentes = window.ErrosIA ? window.ErrosIA.filaErrosPendentes(state.erros, hojeIso) : [];
+    const porAssunto = {};
+    errosPendentes.forEach(e => { porAssunto[e.assunto] = (porAssunto[e.assunto]||0) + 1; });
+    const gargalo = Object.entries(porAssunto).sort((a,b) => b[1]-a[1])[0] || null;
+    const assuntosDisponiveis = [...new Set(errosPendentes.map(e => e.assunto))].sort();
+    return `
+      <div class="card treino-entrada">
+        <h2>${icone('zap')} Treino</h2>
+        <p class="muted">${errosPendentes.length} pendente${errosPendentes.length===1?'':'s'}${gargalo ? ` · gargalo: ${escapeHtml(gargalo[0])} (${gargalo[1]})` : ''}</p>
+        ${errosPendentes.length === 0 ? `
+          <div class="empty-state">
+            <div class="empty-state-icon">${icone('check-circle')}</div>
+            <b>Nada pendente agora</b>
+            <p class="muted">Volte quando alguma revisão vencer.</p>
+          </div>
+        ` : `
+          <div class="treino-config">
+            <label>Tempo</label>
+            <div class="treino-config-tempo">
+              ${[5,10,15,25].map(min => `<button type="button" class="treino-opcao ${treinoConfigTempo===min?'active':''}" data-treino-tempo="${min}">${min} min</button>`).join('')}
+              <button type="button" class="treino-opcao ${treinoConfigTempo===null?'active':''}" data-treino-tempo="fila">Fila toda</button>
+            </div>
+            ${assuntosDisponiveis.length > 1 ? `
+              <label>Focar em um assunto (opcional)</label>
+              <select id="treino-focar-assunto">
+                <option value="">Intercalado (padrão)</option>
+                ${assuntosDisponiveis.map(a => `<option value="${escapeHtml(a)}" ${treinoConfigFocarAssunto===a?'selected':''}>${escapeHtml(a)}</option>`).join('')}
+              </select>
+            ` : ''}
+            <button class="primary treino-comecar" id="treino-comecar-btn">${icone('play')} Começar</button>
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  function renderTreinoDurante(){
+    const sessao = state.treinoSessao;
+    const item = window.Treino.itemAtual(sessao);
+    if(!item) return renderTreinoFechamento();
+    const erro = state.erros.find(e => e.id === item.refId);
+    if(!erro){
+      // Erro foi apagado/mudou de estado no meio da sessão — pula sem travar a tela.
+      window.Treino.pularItem(sessao);
+      saveState(state);
+      return renderTreinoDurante();
+    }
+    const pct = Math.round((sessao.indice / sessao.fila.length) * 100);
+    return `
+      <div class="treino-full-screen">
+        <div class="progress"><i style="width:${pct}%"></i></div>
+        <div class="treino-progresso-texto muted">${sessao.indice+1} de ${sessao.fila.length}${sessao.combo>1 ? ` · combo ${sessao.combo}` : ''}</div>
+        <div class="treino-card">
+          <div class="badge">${escapeHtml(erro.assunto)}</div>
+          ${erro.subtema ? `<div class="muted">${escapeHtml(erro.subtema)}</div>` : ''}
+          <p class="treino-gatilho">${escapeHtml(erro.enunciadoResumo || erro.oQueErrei)}</p>
+          <p class="muted">Qual é a regra aqui?</p>
+          ${sessao.revelado ? `
+            <div class="treino-revelado">
+              <p><b>Regra:</b> ${escapeHtml(erro.regraCorreta || '(sem explicação registrada ainda)')}</p>
+              ${erro.pegadinha ? `<p><b>Pegadinha:</b> ${escapeHtml(erro.pegadinha)}</p>` : ''}
+              ${erro.comoReconhecer ? `<p><b>Como reconhecer:</b> ${escapeHtml(erro.comoReconhecer)}</p>` : ''}
+              ${erro.baseLegal ? `<p><b>Base legal:</b> ${escapeHtml(erro.baseLegal)}</p>` : ''}
+            </div>
+          ` : ''}
+        </div>
+        <div class="treino-acoes">
+          ${!sessao.revelado ? `
+            <button class="primary treino-acao-grande" id="treino-revelar-btn">${icone('lightbulb')} Revelar resposta</button>
+          ` : `
+            <button class="ok treino-acao-grande" id="treino-acertei-btn">✓ Acertei</button>
+            <button class="bad treino-acao-grande" id="treino-errei-btn">✗ Errei</button>
+          `}
+        </div>
+        <div class="treino-acoes-secundarias">
+          <button type="button" id="treino-pular-btn">Pular</button>
+          <button type="button" id="treino-sair-btn">Sair</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTreinoFechamento(){
+    const sessao = state.treinoSessao;
+    const hojeIso = hojeISO();
+    const corrigidosHoje = window.Treino.errosCorrigidosHoje(state.erros, hojeIso);
+    const total = sessao.respostas.length;
+    const acertos = sessao.respostas.filter(r => r.acertou).length;
+    const pctAcerto = total ? Math.round((acertos/total)*100) : 0;
+    return `
+      <div class="card treino-fechamento">
+        <h2>${icone('flag')} Sessão encerrada</h2>
+        <div class="treino-fechamento-metrica-principal">
+          <div class="stat-value">${corrigidosHoje}</div>
+          <div class="stat-label">Erros corrigidos hoje</div>
+        </div>
+        <p>${total} item${total===1?'':'s'} revisado${total===1?'':'s'} · ${pctAcerto}% de acerto · melhor combo ${sessao.melhorCombo}</p>
+        <button class="primary" id="treino-terminar-btn">Terminar</button>
+      </div>
+    `;
+  }
+
+  function attachTreinoHandlers(){
+    document.querySelectorAll('[data-treino-tempo]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        treinoConfigTempo = btn.dataset.treinoTempo === 'fila' ? null : Number(btn.dataset.treinoTempo);
+        render();
+      });
+    });
+    document.getElementById('treino-focar-assunto')?.addEventListener('change', (e) => {
+      treinoConfigFocarAssunto = e.target.value || null;
+      render();
+    });
+    document.getElementById('treino-comecar-btn')?.addEventListener('click', () => {
+      const hojeIso = hojeISO();
+      const errosPendentes = window.ErrosIA.filaErrosPendentes(state.erros, hojeIso);
+      const itens = window.Treino.errosParaItensFila(errosPendentes);
+      const fila = window.Treino.montarFila(itens, { focarAssunto: treinoConfigFocarAssunto });
+      state.treinoSessao = window.Treino.criarSessao({ fila, tempoAlvoMin: treinoConfigTempo, modo: treinoConfigModo, filtroAssunto: treinoConfigFocarAssunto });
+      saveState(state);
+      render();
+    });
+    document.getElementById('treino-revelar-btn')?.addEventListener('click', () => {
+      window.Treino.revelarResposta(state.treinoSessao);
+      saveState(state);
+      render();
+    });
+    document.getElementById('treino-acertei-btn')?.addEventListener('click', () => {
+      const item = window.Treino.itemAtual(state.treinoSessao);
+      const erro = state.erros.find(e => e.id === item.refId);
+      if(erro) window.ErrosIA.aplicarRevisaoErro(erro, true, hojeISO());
+      window.Treino.registrarResposta(state.treinoSessao, { acertou: true });
+      saveState(state);
+      render();
+    });
+    document.getElementById('treino-errei-btn')?.addEventListener('click', () => {
+      const item = window.Treino.itemAtual(state.treinoSessao);
+      const erro = state.erros.find(e => e.id === item.refId);
+      if(erro) window.ErrosIA.aplicarRevisaoErro(erro, false, hojeISO());
+      window.Treino.registrarResposta(state.treinoSessao, { acertou: false });
+      saveState(state);
+      render();
+    });
+    document.getElementById('treino-pular-btn')?.addEventListener('click', () => {
+      window.Treino.pularItem(state.treinoSessao);
+      saveState(state);
+      render();
+    });
+    document.getElementById('treino-sair-btn')?.addEventListener('click', () => {
+      if(!confirmarAcao('Sair do treino agora? O progresso desta sessão fica salvo — você pode continuar depois.')) return;
+      state.treinoSessao = null;
+      saveState(state);
+      render();
+    });
+    document.getElementById('treino-terminar-btn')?.addEventListener('click', () => {
+      state.treinoSessao = null;
+      saveState(state);
+      render();
+    });
+  }
+
   function renderErros(){
     const hojeIso = hojeISO();
     const stats = statsErros(state, hojeIso);
@@ -5701,7 +5834,7 @@
     const fieldValues = {};
     app.querySelectorAll('details input, details select, details textarea').forEach(el => { if(el.id) fieldValues[el.id] = el.value; });
 
-    const map = {hoje:renderHoje, erros:renderErros, mapa:renderMapa, desempenho:renderDesempenho, dashboard:renderDashboard, config:renderConfig, planejamento:renderPlanejamento};
+    const map = {hoje:renderHoje, treino:renderTreino, erros:renderErros, mapa:renderMapa, desempenho:renderDesempenho, dashboard:renderDashboard, config:renderConfig, planejamento:renderPlanejamento};
     // Sair da aba Hoje sem isso deixava o setInterval do timer órfão: ele só
     // era limpo dentro de attachHojeHandlers, que só roda quando a aba Hoje
     // está ativa — então continuava batendo em segundo plano (inclusive
@@ -5710,6 +5843,7 @@
     if(currentTab !== 'hoje' && timerIntervalId){ clearInterval(timerIntervalId); timerIntervalId = null; }
     app.innerHTML = map[currentTab]();
     if(currentTab==='hoje') attachHojeHandlers();
+    if(currentTab==='treino') attachTreinoHandlers();
     if(currentTab==='erros') attachErrosHandlers();
     if(currentTab==='mapa') attachMapaHandlers();
     if(currentTab==='dashboard') attachDashboardHandlers();
