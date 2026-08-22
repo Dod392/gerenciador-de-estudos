@@ -1588,8 +1588,19 @@
     return [...flashcards].sort((a,b) => a.proximaRevisao < b.proximaRevisao ? -1 : a.proximaRevisao > b.proximaRevisao ? 1 : 0);
   }
 
-  function filaFlashcardsRevisao(state, hojeIso){
-    return ordenarFlashcardsPorRevisao((state.flashcards||[]).filter(f => f.proximaRevisao <= hojeIso));
+  function filaRevisoesPendentes(state, hojeIso){
+    // Fonte de verdade é a curva de revisão do Erro (aplicarRevisaoErro), não
+    // a do Flashcard associado — os dois crescem em ritmos diferentes
+    // (Flashcard multiplica por "facilidade" a cada acerto, Erro segue a
+    // sequência fixa 1→3→7→14→30) e descolam depois de alguns acertos
+    // seguidos. Sem isso, um Erro já vencido no Caderno de Erros podia ficar
+    // invisível em Hoje/Dashboard/notificações porque o flashcard associado
+    // ainda não tinha chegado na sua própria data.
+    if(!window.ErrosIA) return [];
+    const errosPendentes = window.ErrosIA.filaErrosPendentes(state.erros, hojeIso);
+    return errosPendentes
+      .map(erro => ordenarFlashcardsPorRevisao(flashcardsDoErro(state, erro.id))[0])
+      .filter(Boolean);
   }
 
   function filtrarErros(state, erros, { filtro, assunto, busca, concurso, tipoErro, prioridade, hojeIso }){
@@ -2176,7 +2187,7 @@
     const estudados = diasEstudados(state.checkins, state.sessoes);
     const ciclo = diasDeCiclo(state.meta.cicloInicio, hojeIso);
     const piores = piores5(agregado);
-    const atrasados = filaFlashcardsRevisao(state, hojeIso);
+    const atrasados = window.ErrosIA ? window.ErrosIA.filaErrosPendentes(state.erros, hojeIso) : [];
     const semanaId = semanaAtualId();
     const plano = obterPlano(state, semanaId);
     const diasSemana = diasRealizadosNaSemana(state.checkins, state.sessoes, semanaId);
@@ -2221,7 +2232,7 @@
     linhas.push('');
     linhas.push('## O que puxar pro próximo ciclo');
     linhas.push([
-      `- Revisões atrasadas (prioridade alta): ${atrasados.length ? atrasados.map(f => { const erro = obterErroDoFlashcard(state, f); return `${erro ? erro.assunto : '?'} (venceu ${f.proximaRevisao})`; }).join('; ') : 'nenhuma'}`,
+      `- Revisões atrasadas (prioridade alta): ${atrasados.length ? atrasados.map(e => `${e.assunto} (venceu ${e.proximaRevisao})`).join('; ') : 'nenhuma'}`,
       `- Piores assuntos por % de acerto: ${piores.length ? piores.map(p => `${p.assunto} (${p.pct}%)`).join(', ') : 'sem dados suficientes ainda'}`,
       `- Assuntos ainda não iniciados: ${naoIniciados.length ? naoIniciados.join(', ') : 'nenhum'}`,
     ].join('\n'));
@@ -2283,7 +2294,7 @@
     const hojeIso = hojeISO();
     const avisos = [];
 
-    const fila = filaFlashcardsRevisao(state, hojeIso);
+    const fila = filaRevisoesPendentes(state, hojeIso);
     if(fila.length) avisos.push(`${fila.length} revis${fila.length===1?'ão':'ões'} pendente${fila.length===1?'':'s'} no Caderno de Erros`);
 
     const semanaId = semanaAtualId();
@@ -2639,7 +2650,7 @@
     const acertos7 = agregado7.reduce((s,a)=>s+a.acertos,0);
     const pctAcerto7 = questoes7 ? Math.round((acertos7/questoes7)*100) : 0;
 
-    const fila = filaFlashcardsRevisao(state, hojeIso);
+    const fila = filaRevisoesPendentes(state, hojeIso);
     const revisoesHojeCount = state.flashcards.filter(f => f.proximaRevisao === hojeIso).length;
 
     const agregadoGeral = agregarPorAssunto(state.checkins, state.sessoes);
@@ -3627,7 +3638,7 @@
     const semanaId = semanaAtualId();
     const plano = obterPlano(state, semanaId);
     const atividades = atividadesDoDiaCombinadas(plano, state.conteudo, state.checkins, state.sessoes, hojeIso);
-    const fila = filaFlashcardsRevisao(state, hojeIso);
+    const fila = filaRevisoesPendentes(state, hojeIso);
     const retaFinal = dias !== null && dias >= 0 && dias <= RETA_FINAL_DIAS;
     const proxima = proximaAtividadeDoDia(atividades, fila, state, retaFinal);
     const sugestaoCritica = !proxima && window.ErrosIA ? window.ErrosIA.calcularAssuntoMaisCritico(state.erros) : null;
@@ -3813,13 +3824,15 @@
         ${fila.length ? fila.map(f => {
           const erroDoCard = obterErroDoFlashcard(state, f);
           if(!erroDoCard) return '';
-          const atrasado = f.proximaRevisao <= hojeIso;
+          // Vencido/próx. reflete a data do Erro (a fonte que colocou este
+          // item na fila), não a do flashcard — podem divergir.
+          const atrasado = erroDoCard.proximaRevisao <= hojeIso;
           return `
           <div class="revisao-item" data-flashcard-id="${f.id}" style="border-left:3px solid ${corDisciplina(erroDoCard.assunto)};padding-left:8px;">
             <div class="item-icon tipo-revisao">${icone('refresh')}</div>
             <div class="revisao-info">
               <div class="revisao-title">${escapeHtml(erroDoCard.assunto)}</div>
-              <div class="revisao-meta">${f.precisaCompletar ? 'Card incompleto' : 'Flashcard'} ${atrasado ? '· <span class="status-pill atrasada">Atrasada</span>' : `· próx. ${f.proximaRevisao}`}</div>
+              <div class="revisao-meta">${f.precisaCompletar ? 'Card incompleto' : 'Flashcard'} ${atrasado ? '· <span class="status-pill atrasada">Atrasada</span>' : `· próx. ${erroDoCard.proximaRevisao}`}</div>
             </div>
             <div class="revisao-actions">
               <button class="ok" data-acertei="${f.id}" title="Acertei">✓</button>
