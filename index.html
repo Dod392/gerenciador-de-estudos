@@ -770,6 +770,21 @@
     if(state?.preferencias?.confirmacoes === false) return true;
     return confirm(mensagem);
   }
+  const HISTORICO_IMPORTACOES_LIMITE = 200;
+  function registrarImportacao(state, entrada){
+    if(!Array.isArray(state.historicoImportacoes)) state.historicoImportacoes = [];
+    state.historicoImportacoes.push({
+      id: String(Date.now()) + Math.random().toString(36).slice(2,7),
+      quando: new Date().toISOString(),
+      ...entrada,
+    });
+    // Sem limite, cada plano/erro importado ao longo dos meses de estudo
+    // infla indefinidamente o documento salvo (localStorage + Firestore) —
+    // mantém só as importações mais recentes, que são as únicas relevantes.
+    if(state.historicoImportacoes.length > HISTORICO_IMPORTACOES_LIMITE){
+      state.historicoImportacoes = state.historicoImportacoes.slice(-HISTORICO_IMPORTACOES_LIMITE);
+    }
+  }
   /* === STATE (Tarefa 2) === */
   const STORAGE_KEY = 'estudos_v1';
   const APP_VERSION = 'v1.0 beta';
@@ -805,13 +820,15 @@
   function estadoValido(obj){
     return !!obj && typeof obj.meta === 'object' && obj.meta !== null &&
       Array.isArray(obj.checkins) && Array.isArray(obj.erros) &&
-      Array.isArray(obj.conteudo) && Array.isArray(obj.planejamento) &&
-      // Item malformado nesses dois arrays (ex.: null, ou sem "assunto")
-      // derruba a tela inteira em vários pontos que leem e.assunto/c.assunto
-      // sem guarda (categoriaPorAssunto, iconePorAssunto, filtrarErros...) —
-      // barra aqui, na entrada, em vez de deixar corromper o app depois.
+      Array.isArray(obj.conteudo) && Array.isArray(obj.planejamento) && Array.isArray(obj.sessoes) &&
+      // Item malformado nesses arrays (ex.: null, ou sem "assunto"/"id")
+      // derruba a tela inteira em vários pontos que leem e.assunto/c.assunto/
+      // s.id sem guarda (categoriaPorAssunto, iconePorAssunto, filtrarErros,
+      // distribuicaoTempoPorTipo...) — barra aqui, na entrada, em vez de
+      // deixar corromper o app depois.
       obj.conteudo.every(c => c && typeof c === 'object' && typeof c.assunto === 'string') &&
-      obj.erros.every(e => e && typeof e === 'object' && typeof e.assunto === 'string' && typeof e.oQueErrei === 'string');
+      obj.erros.every(e => e && typeof e === 'object' && typeof e.assunto === 'string' && typeof e.oQueErrei === 'string') &&
+      obj.sessoes.every(s => s && typeof s === 'object' && typeof s.id === 'string' && typeof s.minutos === 'number');
   }
 
   function loadState(){
@@ -1008,7 +1025,11 @@
       } else {
         const remoto = snap.data();
         const localTemDados = temDadosReais(state);
-        const manterLocal = localTemDados && !confirmarAcao('Já existem dados sincronizados na nuvem para esta conta. Substituir os dados deste aparelho pelos da nuvem? (Cancelar mantém os dados locais e sobrescreve a nuvem com eles.)');
+        // Overwrite entre nuvem/aparelho é irreversível (perde dados de um
+        // dos dois lados) — usa confirm() direto, não confirmarAcao(), pra
+        // nunca ser pulado silenciosamente por causa da preferência
+        // "confirmações" (pensada só pra prompts rotineiros).
+        const manterLocal = localTemDados && !confirm('Já existem dados sincronizados na nuvem para esta conta. Substituir os dados deste aparelho pelos da nuvem? (Cancelar mantém os dados locais e sobrescreve a nuvem com eles.)');
         if(!manterLocal && remoto.estado && estadoValido(remoto.estado)){
           syncAplicandoRemoto = true;
           try {
@@ -1290,11 +1311,19 @@
     if(!sessao) return;
     sessao.acumuladoMs = 0;
     sessao.inicioEm = new Date().toISOString();
-    // Não mexe em sessao.pausado — zerar só reseta o contador, não deve
-    // retomar sozinho uma sessão que o usuário pausou de propósito.
     if(sessao.pomodoro){
-      sessao.pomodoro = { fase: 'foco', faseIniciadaEm: new Date().toISOString(), pausada: !!sessao.pomodoro.pausada };
+      // Zerar sempre volta a fase do Pomodoro pra foco. sessao.pausado
+      // precisa acompanhar essa volta: só continua pausado se o usuário
+      // tinha pausado manualmente (pomodoro.pausada) — se o "pausado" vinha
+      // só do intervalo automático (fase 'pausa', sem pausa manual), esse
+      // motivo deixou de existir com o reset de fase, senão o "Foco total"
+      // ficava congelado até o ciclo inteiro terminar.
+      const pausadaManualmente = !!sessao.pomodoro.pausada;
+      sessao.pomodoro = { fase: 'foco', faseIniciadaEm: new Date().toISOString(), pausada: pausadaManualmente };
+      sessao.pausado = pausadaManualmente;
     }
+    // Sem Pomodoro ativo, sessao.pausado não é mexido — zerar só reseta o
+    // contador, não deve retomar sozinho uma sessão que o usuário pausou.
   }
   // Troca pra uma sessão nova sem descartar o tempo já decorrido da atual —
   // registra a sessão anterior (com o assunto/tipo que ela já tinha) antes
@@ -1939,11 +1968,8 @@
       if(foraDoCiclo.length) cicloAlvo.foraDoCiclo = foraDoCiclo;
     }
     const datas = planoExterno.dias.filter(d => d?.data).map(d => d.data).sort();
-    if(!Array.isArray(state.historicoImportacoes)) state.historicoImportacoes = [];
-    state.historicoImportacoes.push({
-      id: String(Date.now()) + Math.random().toString(36).slice(2,7),
+    registrarImportacao(state, {
       tipo: 'plano',
-      quando: new Date().toISOString(),
       cicloNome: planoExterno.ciclo?.nome || null,
       atividadesAdicionadas: adicionadas,
       diasCobertos: datas.length,
@@ -2000,13 +2026,7 @@
       });
       adicionados++;
     });
-    if(!Array.isArray(state.historicoImportacoes)) state.historicoImportacoes = [];
-    state.historicoImportacoes.push({
-      id: String(Date.now()) + Math.random().toString(36).slice(2,7),
-      tipo: 'erros',
-      quando: new Date().toISOString(),
-      errosAdicionados: adicionados,
-    });
+    registrarImportacao(state, { tipo: 'erros', errosAdicionados: adicionados });
     return adicionados;
   }
 
@@ -2291,7 +2311,10 @@
   }
 
   function tentarImportar(texto){
-    if(!confirmarAcao('Importar vai substituir todos os dados atuais. Continuar?')) return false;
+    // Substitui TODOS os dados — irreversível, então usa confirm() direto
+    // (nunca pulável pela preferência "confirmações", como em outras ações
+    // destrutivas equivalentes).
+    if(!confirm('Importar vai substituir todos os dados atuais. Continuar?')) return false;
     try { importarJSON(texto); render(); return true; }
     catch(err){ alert('Falha ao importar: ' + err.message); return false; }
   }
@@ -2780,6 +2803,11 @@
   /* === CONFIG (redesign, Tarefa 6) === */
   function renderConfig(){
     const prefs = state.preferencias;
+    // A preferência salva pode dizer "notificacoes: true" mesmo depois do
+    // usuário negar a permissão no navegador (ou revogá-la fora do app) —
+    // sem isso o toggle ficava marcado como ligado enquanto nenhuma
+    // notificação jamais dispararia, sem nenhum indício visual do motivo.
+    const notificacoesBloqueadasNoNavegador = typeof Notification !== 'undefined' && Notification.permission === 'denied';
     const sessoesOrdenadas = [...state.sessoes].sort((a,b) => (b.data+b.criadoEm).localeCompare(a.data+a.criadoEm));
     const buscaLower = configSessaoBusca.trim().toLowerCase();
     const sessoesFiltradas = sessoesOrdenadas.filter(s => {
@@ -3019,8 +3047,8 @@
                 <label class="switch"><input type="checkbox" id="pref-confirmacoes-toggle" ${prefs.confirmacoes?'checked':''}><span class="switch-slider"></span></label>
               </div>
               <div class="config-pref-item">
-                <div class="config-pref-text"><b>${icone('bell')} Notificações</b><small>Receber lembretes e alertas do app.</small></div>
-                <label class="switch"><input type="checkbox" id="pref-notificacoes-toggle" ${prefs.notificacoes?'checked':''}><span class="switch-slider"></span></label>
+                <div class="config-pref-text"><b>${icone('bell')} Notificações</b><small>${notificacoesBloqueadasNoNavegador ? 'Bloqueadas nas permissões do navegador — ative lá pra receber alertas.' : 'Receber lembretes e alertas do app.'}</small></div>
+                <label class="switch"><input type="checkbox" id="pref-notificacoes-toggle" ${prefs.notificacoes && !notificacoesBloqueadasNoNavegador?'checked':''}><span class="switch-slider"></span></label>
               </div>
             </div>
             <details class="config-avancado">
@@ -3159,8 +3187,17 @@
       saveState(state);
       if(e.target.checked && typeof Notification !== 'undefined' && Notification.permission === 'default'){
         Notification.requestPermission().then((permissao) => {
-          if(permissao === 'granted') verificarNotificacoesPendentes();
-          else if(permissao === 'denied') alert('Permissão de notificação negada pelo navegador. Pra ativar, permita notificações pra este site nas configurações do navegador.');
+          if(permissao === 'granted'){
+            verificarNotificacoesPendentes();
+          } else if(permissao === 'denied'){
+            // Sem isso, o toggle continuava marcado "ligado" pra sempre
+            // depois de uma negação — nenhuma notificação dispararia, mas
+            // nada na tela avisaria o motivo.
+            state.preferencias.notificacoes = false;
+            saveState(state);
+            alert('Permissão de notificação negada pelo navegador. Pra ativar, permita notificações pra este site nas configurações do navegador.');
+            render();
+          }
         });
       }
       render();
@@ -3215,7 +3252,9 @@
     });
     document.querySelectorAll('[data-excluir-sessao]').forEach(btn => {
       btn.addEventListener('click', () => {
-        if(!confirmarAcao('Excluir esta sessão registrada? Essa ação não pode ser desfeita.')) return;
+        // Exclusão irreversível — confirm() direto, não confirmarAcao(), pra
+        // não ser pulada silenciosamente com "confirmações" desligado.
+        if(!confirm('Excluir esta sessão registrada? Essa ação não pode ser desfeita.')) return;
         excluirSessao(state, btn.dataset.excluirSessao);
         saveState(state);
         render();
@@ -4692,7 +4731,8 @@
     });
     document.querySelectorAll('[data-excluir-erro]').forEach(btn => {
       btn.addEventListener('click', () => {
-        if(!confirmarAcao('Excluir este erro registrado e seus flashcards? Essa ação não pode ser desfeita.')) return;
+        // Exclusão irreversível — confirm() direto, mesmo motivo do acima.
+        if(!confirm('Excluir este erro registrado e seus flashcards? Essa ação não pode ser desfeita.')) return;
         excluirErro(state, btn.dataset.excluirErro);
         erroMenuAberto = null;
         saveState(state);
@@ -4776,14 +4816,7 @@
         criarFlashcard,
         recalcularExplicacaoPendente: window.ErrosIA.recalcularExplicacaoPendente,
       });
-      if(!Array.isArray(state.historicoImportacoes)) state.historicoImportacoes = [];
-      state.historicoImportacoes.push({
-        id: String(Date.now()) + Math.random().toString(36).slice(2,7),
-        tipo: 'erros_ia',
-        quando: new Date().toISOString(),
-        errosAtualizados: resultado.atualizados,
-        errosCriados: resultado.criados,
-      });
+      registrarImportacao(state, { tipo: 'erros_ia', errosAtualizados: resultado.atualizados, errosCriados: resultado.criados });
       saveState(state);
       iaImportModalAberto = false;
       iaImportPreview = null;
@@ -5557,6 +5590,12 @@
     app.querySelectorAll('details input, details select, details textarea').forEach(el => { if(el.id) fieldValues[el.id] = el.value; });
 
     const map = {hoje:renderHoje, erros:renderErros, mapa:renderMapa, desempenho:renderDesempenho, dashboard:renderDashboard, config:renderConfig, planejamento:renderPlanejamento};
+    // Sair da aba Hoje sem isso deixava o setInterval do timer órfão: ele só
+    // era limpo dentro de attachHojeHandlers, que só roda quando a aba Hoje
+    // está ativa — então continuava batendo em segundo plano (inclusive
+    // chamando render() global em trocas de fase do Pomodoro) até o usuário
+    // voltar pra Hoje.
+    if(currentTab !== 'hoje' && timerIntervalId){ clearInterval(timerIntervalId); timerIntervalId = null; }
     app.innerHTML = map[currentTab]();
     if(currentTab==='hoje') attachHojeHandlers();
     if(currentTab==='erros') attachErrosHandlers();
