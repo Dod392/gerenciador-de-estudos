@@ -4368,6 +4368,11 @@
   let treinoConfigModo = 'misto';    // 'misto' | 'revisao' | 'questoes'
   let treinoConfigFocarAssunto = null;
   let treinoQuestaoModal = null;     // null | {modo:'lista'} | {modo:'form', id: null|questaoId}
+  let treinoIaExportModalAberto = false;
+  let treinoIaImportModalAberto = false;
+  let treinoIaImportTextoColado = '';
+  let treinoIaImportPreview = null;
+  let treinoIaImportErro = null;
 
   function renderTreino(){
     const hojeIso = hojeISO();
@@ -4382,6 +4387,7 @@
     const assuntosDisponiveis = [...new Set([...errosPendentes.map(e => e.assunto), ...questoesDisp.map(q => q.assunto)])].sort();
     const nadaPendente = errosPendentes.length === 0 && questoesDisp.length === 0;
     const modalHtml = renderTreinoQuestaoModalHtml(hojeIso);
+    const iaModalsHtml = renderTreinoIaExportModalHtml() + renderTreinoIaImportModalHtml();
     return `
       <div class="card treino-entrada">
         <div class="card-header-row">
@@ -4389,6 +4395,10 @@
           <button type="button" class="card-link" id="treino-gerenciar-questoes-btn">${icone('book-open')} Banco de questões (${state.questoes.length})</button>
         </div>
         <p class="muted">${errosPendentes.length} revisão${errosPendentes.length===1?'':'ões'} pendente${errosPendentes.length===1?'':'s'} · ${questoesDisp.length} questão${questoesDisp.length===1?'':'ões'} disponível${questoesDisp.length===1?'':'eis'}${gargalo ? ` · gargalo: ${escapeHtml(gargalo[0])} (${gargalo[1]})` : ''}</p>
+        <div class="row">
+          <button type="button" id="treino-gerar-ia-btn">${icone('zap')} Gerar questões com IA</button>
+          <button type="button" id="treino-importar-ia-btn">${icone('download')} Importar questões</button>
+        </div>
         ${nadaPendente ? `
           <div class="empty-state">
             <div class="empty-state-icon">${icone('check-circle')}</div>
@@ -4420,6 +4430,7 @@
         `}
       </div>
       ${modalHtml}
+      ${iaModalsHtml}
     `;
   }
 
@@ -4491,6 +4502,63 @@
             </div>
           `).join('') : '<p class="muted">Nenhuma questão cadastrada ainda.</p>'}
           <button id="questao-modal-fechar" style="margin-top:var(--space-3);">Fechar</button>
+        </div>
+      </div>`;
+  }
+
+  function renderTreinoIaExportModalHtml(){
+    if(!treinoIaExportModalAberto) return '';
+    const hojeIso = hojeISO();
+    const errosPendentes = window.ErrosIA ? window.ErrosIA.filaErrosPendentes(state.erros, hojeIso) : [];
+    const porAssunto = {};
+    errosPendentes.forEach(e => { porAssunto[e.assunto] = (porAssunto[e.assunto]||0) + 1; });
+    const assuntosFracos = Object.entries(porAssunto).sort((a,b) => b[1]-a[1]).slice(0,5).map(([a]) => a);
+    const prompt = window.Treino.montarPromptQuestoesIA({ assuntosFracos, questoesExistentes: state.questoes });
+    return `
+      <div class="modal-backdrop" id="treino-ia-export-modal-backdrop">
+        <div class="modal-panel">
+          <h3>Gerar questões com IA</h3>
+          <small class="muted">Copie o texto abaixo e cole numa IA de chat — pode anexar um PDF (edital, lei, prova anterior) junto. Depois, cole a resposta em "Importar questões".</small>
+          <textarea id="treino-ia-export-texto" readonly style="min-height:240px;">${escapeHtml(prompt)}</textarea>
+          <div class="row">
+            <button id="treino-ia-export-fechar">Fechar</button>
+            <button class="primary" id="treino-ia-export-copiar">Copiar</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderTreinoIaImportModalHtml(){
+    if(!treinoIaImportModalAberto) return '';
+    const previewHtml = treinoIaImportPreview ? treinoIaImportPreview.map((item, idx) => `
+      <div class="erro-card-col" style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:var(--space-2);">
+        <label style="display:flex;align-items:center;gap:8px;min-height:auto;">
+          <input type="checkbox" data-treino-ia-import-item="${idx}" ${item.selecionado?'checked':''} ${!item.valido ? 'disabled' : ''} style="width:auto;min-height:auto;flex-shrink:0;">
+          <b>${item.valido ? escapeHtml(item.dados.assunto) + ' — ' + escapeHtml(item.dados.enunciado.slice(0,60)) + (item.dados.enunciado.length>60?'…':'') : 'Item inválido (ignorado)'}</b>
+        </label>
+      </div>
+    `).join('') : '';
+    return `
+      <div class="modal-backdrop" id="treino-ia-import-modal-backdrop">
+        <div class="modal-panel erro-form-panel">
+          <h3>Importar questões</h3>
+          <small class="muted">Cole a resposta da IA (com o bloco \`\`\`json) ou importe um arquivo .json/.txt.</small>
+          <input type="file" id="treino-ia-import-arquivo" accept=".json,.txt" style="display:none">
+          <button type="button" id="treino-ia-import-arquivo-btn">${icone('download')} Escolher arquivo</button>
+          <textarea id="treino-ia-import-texto" style="min-height:160px;margin-top:var(--space-2);">${escapeHtml(treinoIaImportTextoColado)}</textarea>
+          ${treinoIaImportErro ? `<small class="muted" style="color:var(--bad);display:block;margin-top:4px;">${escapeHtml(treinoIaImportErro)}</small>` : ''}
+          ${!treinoIaImportPreview ? `
+            <div class="row">
+              <button id="treino-ia-import-cancelar">Cancelar</button>
+              <button class="primary" id="treino-ia-import-analisar">Analisar</button>
+            </div>
+          ` : `
+            <div class="erro-card-body">${previewHtml}</div>
+            <div class="row">
+              <button id="treino-ia-import-cancelar">Cancelar</button>
+              <button class="primary" id="treino-ia-import-aplicar">Aplicar</button>
+            </div>
+          `}
         </div>
       </div>`;
   }
@@ -4776,6 +4844,89 @@
         currentTab = 'erros';
       }
       render();
+    });
+    document.getElementById('treino-gerar-ia-btn')?.addEventListener('click', () => {
+      treinoIaExportModalAberto = true;
+      render();
+    });
+    document.getElementById('treino-ia-export-fechar')?.addEventListener('click', () => {
+      treinoIaExportModalAberto = false;
+      render();
+    });
+    document.getElementById('treino-ia-export-modal-backdrop')?.addEventListener('click', (e) => {
+      if(e.target.id === 'treino-ia-export-modal-backdrop'){ treinoIaExportModalAberto = false; render(); }
+    });
+    document.getElementById('treino-ia-export-copiar')?.addEventListener('click', () => {
+      const texto = document.getElementById('treino-ia-export-texto').value;
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(texto).then(
+          () => alert('Prompt copiado! Cole numa IA de chat (Claude, ChatGPT etc).'),
+          () => copiarTextoIAFallback(texto)
+        );
+      } else {
+        copiarTextoIAFallback(texto);
+      }
+    });
+    document.getElementById('treino-importar-ia-btn')?.addEventListener('click', () => {
+      treinoIaImportModalAberto = true;
+      treinoIaImportTextoColado = '';
+      treinoIaImportPreview = null;
+      treinoIaImportErro = null;
+      render();
+    });
+    document.getElementById('treino-ia-import-cancelar')?.addEventListener('click', () => {
+      treinoIaImportModalAberto = false;
+      treinoIaImportPreview = null;
+      treinoIaImportErro = null;
+      render();
+    });
+    document.getElementById('treino-ia-import-modal-backdrop')?.addEventListener('click', (e) => {
+      if(e.target.id === 'treino-ia-import-modal-backdrop'){ treinoIaImportModalAberto = false; treinoIaImportPreview = null; treinoIaImportErro = null; render(); }
+    });
+    document.getElementById('treino-ia-import-texto')?.addEventListener('input', (e) => {
+      treinoIaImportTextoColado = e.target.value;
+    });
+    document.getElementById('treino-ia-import-arquivo-btn')?.addEventListener('click', () => {
+      document.getElementById('treino-ia-import-arquivo')?.click();
+    });
+    document.getElementById('treino-ia-import-arquivo')?.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        treinoIaImportTextoColado = reader.result;
+        render();
+      };
+      reader.readAsText(file);
+    });
+    document.getElementById('treino-ia-import-analisar')?.addEventListener('click', () => {
+      const texto = document.getElementById('treino-ia-import-texto').value;
+      treinoIaImportTextoColado = texto;
+      try {
+        const itens = window.Treino.extrairRespostaQuestoesIA(texto);
+        treinoIaImportPreview = window.Treino.gerarPreviewImportacaoQuestoes(itens);
+        treinoIaImportErro = null;
+      } catch(err){
+        treinoIaImportErro = err.message;
+        treinoIaImportPreview = null;
+      }
+      render();
+    });
+    document.querySelectorAll('[data-treino-ia-import-item]').forEach(chk => {
+      chk.addEventListener('change', () => {
+        const idx = Number(chk.dataset.treinoIaImportItem);
+        if(treinoIaImportPreview[idx]) treinoIaImportPreview[idx].selecionado = chk.checked;
+      });
+    });
+    document.getElementById('treino-ia-import-aplicar')?.addEventListener('click', () => {
+      const resultado = window.Treino.aplicarImportacaoQuestoes(state, treinoIaImportPreview, { criarQuestao: window.Treino.criarQuestao });
+      registrarImportacao(state, { tipo: 'questoes_ia', questoesCriadas: resultado.criadas });
+      saveState(state);
+      treinoIaImportModalAberto = false;
+      treinoIaImportPreview = null;
+      treinoIaImportTextoColado = '';
+      render();
+      alert(`${resultado.criadas} questão${resultado.criadas===1?'':'ões'} adicionada${resultado.criadas===1?'':'s'} ao banco.`);
     });
     document.querySelectorAll('[data-treino-confianca]').forEach(btn => {
       btn.addEventListener('click', () => {

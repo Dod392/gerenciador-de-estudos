@@ -32,3 +32,11 @@ Registro de decisões tomadas durante a execução do plano `docs/superpowers/sp
 - **`selecionarPorFraqueza` é uma heurística simples** (nunca respondida → menor % de acerto → resposta mais antiga), baseada só nas estatísticas da própria questão — não é o cálculo de domínio por assunto que a Fase 5 (`treino-progresso.js`) vai construir. Pode ser substituída/reforçada quando esse módulo existir.
 - **Questão tem 2 passos pra avançar (Confirmar → Continuar), diferente do Erro (1 toque, Acertei/Errei já avança).** Necessário pra dar tempo do usuário clicar "Registrar no caderno de erros" ainda vendo o feedback, antes de sair do item.
 - **Formulário de alternativa fixo em 5 campos (A-E), vazios são ignorados** — cobre o "2 a 5; formato Cesgranrio = 5" do modelo de dados sem precisar de UI dinâmica de adicionar/remover campo.
+
+### Fase 4
+
+- **"Assuntos mais fracos" no prompt usa uma heurística simples** (assuntos com mais erros pendentes, top 5), já que `treino-progresso.js` (Fase 5, domínio por assunto de verdade) ainda não existe. Reavaliar quando esse módulo existir.
+- **Linha de "concurso alvo" no prompt fica vazia por padrão** — o app não tem um conceito de "concurso principal único" (só uma lista `state.concursos`), então não há um valor natural pra preencher automaticamente sem adivinhar.
+- **Schema de questão pra IA usa os mesmos nomes de campo do modelo interno** (assunto, enunciado, alternativas, gabarito...), diferente do schema de erros (que traduz pra tema/o_que_errei) — seguindo literalmente o pedido do plano de usar "o schema da seção 3.1".
+- **Questão importada por IA sempre grava `origem:'ia'`**, mesmo que a resposta da IA tente mandar outro valor no campo — a origem reflete o canal de importação real do app, não é algo que a IA deveria poder declarar.
+- **Import por arquivo reaproveita o mesmo pipeline do "colar"** (lê o arquivo pro mesmo textarea, mesmo botão Analisar) em vez de um caminho de código separado — menos duplicação, mesmo comportamento de validação/preview nos dois casos.
