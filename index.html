@@ -99,6 +99,11 @@
   #mais-sheet button{display:flex;align-items:center;gap:var(--space-3);justify-content:flex-start;text-align:left;}
 
   .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--space-4);}
+  /* Card sozinho na última linha (total de cards ímpar) esticado pra largura
+     inteira em vez de ocupar só metade e deixar um vão vazio ao lado — comum
+     em telas de celular com 3 cards de estatística. */
+  .kpi-grid > .card:last-child:nth-child(odd),
+  .resumo-grid > .card:last-child:nth-child(odd){grid-column:1 / -1;}
   .grid-2{display:grid;grid-template-columns:1fr;gap:var(--space-4);}
   .grid-2 > *{min-width:0;}
   .stat-card{position:relative;}
@@ -382,7 +387,7 @@
   .desempenho-pizza-legend-item span{flex:1;}
 
   .desempenho-constancia-table{width:100%;border-collapse:collapse;font-size:var(--text-xs);}
-  .desempenho-constancia-table th,.desempenho-constancia-table td{padding:6px 4px;text-align:center;border-bottom:1px solid var(--border);}
+  .desempenho-constancia-table th,.desempenho-constancia-table td{padding:6px 4px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap;}
   .desempenho-constancia-table th:first-child,.desempenho-constancia-table td:first-child{text-align:left;color:var(--muted);}
   .desempenho-constancia-aderencia{font-weight:600;}
 
