@@ -289,8 +289,6 @@
   .erro-form-exemplo summary{cursor:pointer;font-size:var(--text-sm);color:var(--muted);}
   .erro-form-exemplo p{font-size:var(--text-sm);margin:6px 0 0;}
   .erro-form-erro{background:var(--bad-soft);color:var(--bad);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3);font-size:var(--text-sm);margin:var(--space-2) 0;}
-  .revisao-sm2-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
-  .revisao-sm2-row button{margin:0;font-size:var(--text-sm);padding:0 8px;}
   .erro-card-footer{display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);flex-wrap:wrap;
     padding:var(--space-2) var(--space-3);border-top:1px solid var(--border);}
   .erro-card-footer-info{font-size:var(--text-xs);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
@@ -306,11 +304,6 @@
   .erros-dica:last-child{border-bottom:none;}
   .erros-dica b{font-size:var(--text-sm);}
   .erros-dica p{margin:2px 0 0;font-size:var(--text-xs);}
-
-  .revisao-sessao-panel{max-width:480px;}
-  .revisao-sessao-progresso{font-size:var(--text-sm);color:var(--muted);margin-bottom:4px;}
-  .revisao-sessao-secao{margin-top:var(--space-3);}
-  .revisao-sessao-secao p{margin-top:4px;}
 
   /* === DASHBOARD (redesign) === */
   .dashboard-hero-row{display:flex;align-items:stretch;gap:var(--space-4);flex-wrap:wrap;}
@@ -485,14 +478,6 @@
     .activity-item .activity-footer{flex-basis:100%;margin-left:0;}
   }
 
-  .revisao-item{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) 0;border-bottom:1px solid var(--border);}
-  .revisao-item:last-child{border-bottom:none;}
-  .revisao-item .revisao-info{flex:1;min-width:0;}
-  .revisao-item .revisao-title{font-weight:600;font-size:var(--text-sm);}
-  .revisao-item .revisao-meta{font-size:var(--text-xs);color:var(--muted);margin-top:2px;}
-  .revisao-item .revisao-actions{display:flex;gap:4px;flex-shrink:0;}
-  .revisao-item .revisao-actions button{width:auto;min-height:36px;min-width:36px;padding:0 10px;margin:0;font-size:var(--text-sm);}
-
   .sessao-list{display:flex;flex-direction:column;}
   .sessao-item{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
   .sessao-item:last-child{border-bottom:none;}
@@ -533,6 +518,35 @@
   .fechamento-actions button.opt-warn.active{background:var(--warn);color:var(--accent-fg);}
   .fechamento-actions button.opt-bad.active{background:var(--bad);color:var(--accent-fg);}
   @media(max-width:560px){.fechamento-actions{width:100%;} .fechamento-actions button{flex:1 1 auto;}}
+
+  /* === TREINO === */
+  .treino-entrada h2{display:flex;align-items:center;gap:8px;margin-top:0;}
+  .treino-config{margin-top:var(--space-3);}
+  .treino-config label{margin-top:var(--space-3);}
+  .treino-config-tempo{display:flex;gap:8px;flex-wrap:wrap;}
+  .treino-opcao{width:auto;flex:1 1 auto;min-height:44px;margin:0;padding:0 12px;background:transparent;}
+  .treino-opcao.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);}
+  .treino-comecar{width:100%;min-height:52px;margin-top:var(--space-4);font-size:var(--text-lg);}
+  .treino-cta{width:100%;min-height:48px;}
+
+  .treino-full-screen{display:flex;flex-direction:column;min-height:calc(100vh - 160px);}
+  .treino-progresso-texto{text-align:center;margin:4px 0 var(--space-3);}
+  .treino-card{flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center;padding:var(--space-4) var(--space-2);}
+  .treino-gatilho{font-size:var(--text-xl);font-weight:600;margin:var(--space-3) 0;}
+  .treino-revelado{text-align:left;margin-top:var(--space-4);padding-top:var(--space-4);border-top:1px solid var(--border);}
+  .treino-revelado p{margin-top:8px;}
+  .treino-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:var(--space-4);}
+  .treino-acao-grande{flex:1 1 auto;min-height:56px;margin:0;font-size:var(--text-lg);font-weight:650;}
+  .treino-acoes-secundarias{display:flex;justify-content:space-between;gap:8px;margin-top:var(--space-2);}
+  .treino-acoes-secundarias button{width:auto;min-height:44px;background:transparent;}
+
+  .treino-fechamento{text-align:center;}
+  .treino-fechamento-metrica-principal{margin:var(--space-4) 0;}
+  .treino-fechamento-metrica-principal .stat-value{font-size:48px;font-weight:700;color:var(--accent);}
+  .treino-fechamento-metrica-principal .stat-label{color:var(--muted);}
+  @media(max-width:430px){
+    .treino-acao-grande{min-height:48px;}
+  }
 
   .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:30;display:flex;align-items:center;justify-content:center;padding:var(--space-4);}
   .modal-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
@@ -1664,11 +1678,6 @@
     if(proximaRevisao > hojeIso) return `Próxima ${proximaRevisao}`;
     const dias = diasAte(proximaRevisao, hojeIso);
     return dias === 0 ? 'Vence hoje' : `Atrasada há ${dias} dia${dias===1?'':'s'}`;
-  }
-  function iniciarSessaoRevisaoErros(state, hojeIso){
-    const fila = window.ErrosIA.filaErrosPendentes(state.erros, hojeIso).map(e => e.id);
-    if(!fila.length) return null;
-    return { fila, indice: 0, revelado: false };
   }
   function contarErrosPorAssunto(erros, assunto, excluirId){
     return erros.filter(e => e.assunto === assunto && e.id !== excluirId).length;
@@ -3428,7 +3437,6 @@
   let erroModalAberto = null; // { modo: 'novo' } | { modo: 'editar', id }
   let erroMenuAberto = null;
   let errosOrdenacao = 'proxima_revisao';
-  let revisaoSessao = null; // { fila: [erroId,...], indice, revelado }
   let flashcardModalErroId = null; // erroId aberto pra "+ Adicionar flashcard"
   let iaExportModalAberto = false;
   let iaImportModalAberto = false;
@@ -4540,7 +4548,7 @@
           </div>
           <div class="erros-header-actions">
             <input type="text" id="erros-busca-input" placeholder="Buscar erro ou assunto..." value="${escapeHtml(errosBusca)}">
-            ${pendentesCount ? `<button class="primary" id="erros-revisar-pendentes-btn">${icone('play')} Revisar pendentes (${pendentesCount})</button>` : ''}
+            ${pendentesCount ? `<button class="primary" id="erros-revisar-pendentes-btn">${icone('zap')} Treinar pendentes (${pendentesCount})</button>` : ''}
             ${pendentesExportar ? `<span class="badge" style="background:var(--warn-soft);color:var(--warn);">${pendentesExportar} erro${pendentesExportar===1?'':'s'} para analisar</span>` : ''}
             <button id="erros-analisar-ia-btn">${icone('zap')} Analisar com IA</button>
             <button id="erros-importar-ia-btn">${icone('download')} Importar resposta da IA</button>
@@ -4796,53 +4804,6 @@
         </div>`;
     })() : '';
 
-    const sessaoModalHtml = revisaoSessao ? (() => {
-      const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
-      const terminou = revisaoSessao.indice >= revisaoSessao.fila.length || !erroAtual;
-      const cardsApoio = erroAtual ? flashcardsDoErro(state, erroAtual.id) : [];
-      return `
-        <div class="modal-backdrop" id="revisao-sessao-backdrop">
-          <div class="modal-panel revisao-sessao-panel">
-            ${terminou ? `
-              <div class="empty-state">
-                <div class="empty-state-icon">${icone('check-circle',28)}</div>
-                <b>Sessão concluída</b>
-                <p class="muted">Você revisou ${revisaoSessao.fila.length} erro${revisaoSessao.fila.length===1?'':'s'}.</p>
-                <button class="primary" id="revisao-sessao-fechar">Fechar</button>
-              </div>
-            ` : `
-              <div class="revisao-sessao-progresso">${revisaoSessao.indice+1} de ${revisaoSessao.fila.length}</div>
-              <div class="progress"><i style="width:${Math.round((revisaoSessao.indice)/revisaoSessao.fila.length*100)}%"></i></div>
-              ${erroAtual.precisaCompletar ? `
-                <div class="erro-form-erro" style="margin-top:var(--space-2);">
-                  Erro incompleto — completar explicação.
-                  <button class="card-link" id="revisao-sessao-completar" style="display:inline;width:auto;min-height:auto;padding:0;">Editar erro de origem →</button>
-                </div>` : ''}
-              <h3>${escapeHtml(erroAtual.assunto)}</h3>
-              <div class="revisao-sessao-secao">
-                <p style="font-size:var(--text-lg);">${escapeHtml(erroAtual.oQueErrei)}</p>
-              </div>
-              ${revisaoSessao.revelado ? `
-                <div class="revisao-sessao-secao">
-                  <div class="erro-card-col-titulo erro-col-ok">Regra correta</div>
-                  <p>${erroAtual.regraCorreta ? escapeHtml(erroAtual.regraCorreta) : '<span class="muted">(sem explicação registrada)</span>'}</p>
-                </div>
-                ${erroAtual.pegadinha ? `<div class="revisao-sessao-secao"><div class="erro-card-col-titulo">Pegadinha</div><p>${escapeHtml(erroAtual.pegadinha)}</p></div>` : ''}
-                ${erroAtual.comoReconhecer ? `<div class="revisao-sessao-secao"><div class="erro-card-col-titulo">Como reconhecer</div><p>${escapeHtml(erroAtual.comoReconhecer)}</p></div>` : ''}
-                ${cardsApoio.length ? `<div class="revisao-sessao-secao"><div class="erro-card-col-titulo">Flashcards de apoio</div>${cardsApoio.map(fc => `<p class="muted">${escapeHtml(fc.frente)} → ${escapeHtml(fc.verso)}</p>`).join('')}</div>` : ''}
-                <div class="revisao-sm2-row">
-                  <button class="bad" data-revisao-erro-resultado="errou">Não lembrei</button>
-                  <button class="ok" data-revisao-erro-resultado="acertou">Acertei</button>
-                </div>
-              ` : `
-                <button class="primary" id="revisao-sessao-revelar">Mostrar resposta</button>
-              `}
-              <button class="card-link" id="revisao-sessao-cancelar">Encerrar sessão</button>
-            `}
-          </div>
-        </div>`;
-    })() : '';
-
     const iaExportModalHtml = iaExportModalAberto ? (() => {
       const prompt = window.ErrosIA.montarPromptIA(state.erros);
       return `
@@ -4912,7 +4873,7 @@
         <p class="muted">${escapeHtml(state.errosPadroesDetectados)}</p>
       </div>` : '';
 
-    return `<div class="erros-screen">${headerHtml}${padroesHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}${flashcardModalHtml}${sessaoModalHtml}${iaExportModalHtml}${iaImportModalHtml}</div>`;
+    return `<div class="erros-screen">${headerHtml}${padroesHtml}<div class="grid-hoje">${listaHtml}${sidebarHtml}</div>${erroModalHtml}${flashcardModalHtml}${iaExportModalHtml}${iaImportModalHtml}</div>`;
   }
 
   function attachErrosHandlers(){
@@ -4958,7 +4919,6 @@
     document.querySelectorAll('[data-editar-erro]').forEach(btn => {
       btn.addEventListener('click', () => {
         erroModalAberto = { modo:'editar', id: btn.dataset.editarErro };
-        revisaoSessao = null;
         render();
       });
     });
@@ -5127,47 +5087,8 @@
     });
 
     document.getElementById('erros-revisar-pendentes-btn')?.addEventListener('click', () => {
-      revisaoSessao = iniciarSessaoRevisaoErros(state, hojeISO());
+      currentTab = 'treino';
       render();
-    });
-    document.getElementById('revisao-sessao-revelar')?.addEventListener('click', () => {
-      revisaoSessao.revelado = true;
-      render();
-    });
-    document.querySelectorAll('[data-revisao-erro-resultado]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
-        if(erroAtual){
-          const acertou = btn.dataset.revisaoErroResultado === 'acertou';
-          window.ErrosIA.aplicarRevisaoErro(erroAtual, acertou, hojeISO());
-          flashcardsDoErro(state, erroAtual.id).forEach(fc => aplicarResultadoRevisao(fc, acertou ? 'bom' : 'errei'));
-          incrementarContadorRevisoes(state);
-          if(acertou) avancarStatusPorAtividade(state, erroAtual.assunto, hojeISO());
-        }
-        saveState(state);
-        revisaoSessao.indice++;
-        revisaoSessao.revelado = false;
-        render();
-      });
-    });
-    document.getElementById('revisao-sessao-completar')?.addEventListener('click', () => {
-      const erroAtual = state.erros.find(e => e.id === revisaoSessao.fila[revisaoSessao.indice]);
-      if(erroAtual){
-        erroModalAberto = { modo:'editar', id: erroAtual.id };
-        revisaoSessao = null;
-      }
-      render();
-    });
-    document.getElementById('revisao-sessao-fechar')?.addEventListener('click', () => {
-      revisaoSessao = null;
-      render();
-    });
-    document.getElementById('revisao-sessao-cancelar')?.addEventListener('click', () => {
-      revisaoSessao = null;
-      render();
-    });
-    document.getElementById('revisao-sessao-backdrop')?.addEventListener('click', (e) => {
-      if(e.target.id === 'revisao-sessao-backdrop'){ revisaoSessao = null; render(); }
     });
   }
   const DIAS_SEMANA_LABEL = ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'];
