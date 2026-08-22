@@ -4764,7 +4764,11 @@
     const erroModalHtml = erroModalAberto ? (() => {
       const editando = erroModalAberto.modo === 'editar';
       const erro = editando ? state.erros.find(e => e.id === erroModalAberto.id) : null;
-      const assuntoInicial = editando ? erro.assunto : (state.conteudo[0]?.assunto || '');
+      // Sem edição, "valores" pode vir de dadosIniciais (ex.: "Registrar no
+      // caderno de erros" a partir de uma questão errada no Treino) — sem
+      // isso, cada campo teria que checar dadosIniciais individualmente.
+      const valores = erro || erroModalAberto.dadosIniciais || {};
+      const assuntoInicial = editando ? erro.assunto : (valores.assunto || state.conteudo[0]?.assunto || '');
       const contagemInicial = assuntoInicial ? contarErrosPorAssunto(state.erros, assuntoInicial, editando ? erro.id : null) : 0;
       return `
         <div class="modal-backdrop" id="erro-modal-backdrop">
@@ -4772,43 +4776,43 @@
             <h3>${editando ? 'Editar erro' : 'Novo erro'}</h3>
             <label>Assunto</label>
             <select id="erro-form-assunto">
-              ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}" ${(erro?.assunto||'')===c.assunto?'selected':''}>${escapeHtml(c.assunto)}</option>`).join('')}
+              ${state.conteudo.map(c => `<option value="${escapeHtml(c.assunto)}" ${(assuntoInicial||'')===c.assunto?'selected':''}>${escapeHtml(c.assunto)}</option>`).join('')}
             </select>
             <small class="muted" id="erro-form-aviso">${contagemInicial ? `Você já tem ${contagemInicial} erro${contagemInicial===1?'':'s'} registrado${contagemInicial===1?'':'s'} para este assunto.` : ''}</small>
             <div class="row">
               <div>
                 <label>Origem</label>
                 <select id="erro-form-origem">
-                  ${Object.entries(ORIGEM_LABEL).map(([v,l]) => `<option value="${v}" ${(erro?.origem||'questao_prova')===v?'selected':''}>${l}</option>`).join('')}
+                  ${Object.entries(ORIGEM_LABEL).map(([v,l]) => `<option value="${v}" ${(valores.origem||'questao_prova')===v?'selected':''}>${l}</option>`).join('')}
                 </select>
               </div>
               <div>
                 <label>Fonte (opcional)</label>
-                <input type="text" id="erro-form-fonte" placeholder="banca/ano/prova" value="${editando ? escapeHtml(erro.fonte||'') : ''}">
+                <input type="text" id="erro-form-fonte" placeholder="banca/ano/prova" value="${escapeHtml(valores.fonte||'')}">
               </div>
             </div>
             <label>Enunciado resumido (opcional)</label>
-            <input type="text" id="erro-form-enunciado" placeholder="O que a questão cobrava, em 1-2 linhas" value="${editando ? escapeHtml(erro.enunciadoResumo||'') : ''}">
+            <input type="text" id="erro-form-enunciado" placeholder="O que a questão cobrava, em 1-2 linhas" value="${escapeHtml(valores.enunciadoResumo||'')}">
             <label>O que errei</label>
-            <textarea id="erro-form-oque" placeholder="Qual foi o equívoco especificamente">${editando ? escapeHtml(erro.oQueErrei) : ''}</textarea>
+            <textarea id="erro-form-oque" placeholder="Qual foi o equívoco especificamente">${escapeHtml(valores.oQueErrei||'')}</textarea>
             <label>Regra correta</label>
-            <textarea id="erro-form-regra" class="erro-form-explicacao" placeholder="Em uma frase direta: qual é a regra/conceito correto.">${editando ? escapeHtml(erro.regraCorreta||'') : ''}</textarea>
+            <textarea id="erro-form-regra" class="erro-form-explicacao" placeholder="Em uma frase direta: qual é a regra/conceito correto.">${escapeHtml(valores.regraCorreta||'')}</textarea>
             <label>Pegadinha (opcional)</label>
-            <textarea id="erro-form-pegadinha" placeholder="A distinção que a banca explora">${editando ? escapeHtml(erro.pegadinha||'') : ''}</textarea>
+            <textarea id="erro-form-pegadinha" placeholder="A distinção que a banca explora">${escapeHtml(valores.pegadinha||'')}</textarea>
             <label>Como reconhecer (opcional)</label>
-            <textarea id="erro-form-como-reconhecer" placeholder="O sinal no enunciado que indica esse ponto">${editando ? escapeHtml(erro.comoReconhecer||'') : ''}</textarea>
+            <textarea id="erro-form-como-reconhecer" placeholder="O sinal no enunciado que indica esse ponto">${escapeHtml(valores.comoReconhecer||'')}</textarea>
             <label>Referência (opcional)</label>
-            <input type="text" id="erro-form-baselegal" placeholder="Só a referência. A explicação vai no campo acima." value="${editando ? escapeHtml(erro.baseLegal||'') : ''}">
+            <input type="text" id="erro-form-baselegal" placeholder="Só a referência. A explicação vai no campo acima." value="${escapeHtml(valores.baseLegal||'')}">
             <div class="row">
               <div>
                 <label>Subtema (opcional)</label>
-                <input type="text" id="erro-form-subtema" placeholder="Recorte específico do tema" value="${editando ? escapeHtml(erro.subtema||'') : ''}">
+                <input type="text" id="erro-form-subtema" placeholder="Recorte específico do tema" value="${escapeHtml(valores.subtema||'')}">
               </div>
               <div>
                 <label>Concurso (opcional)</label>
                 <select id="erro-form-concurso">
-                  <option value="" ${!erro?.concurso?'selected':''}>—</option>
-                  ${(state.concursos||[]).map(nome => `<option value="${escapeHtml(nome)}" ${(erro?.concurso||'')===nome?'selected':''}>${escapeHtml(nome)}</option>`).join('')}
+                  <option value="" ${!valores.concurso?'selected':''}>—</option>
+                  ${(state.concursos||[]).map(nome => `<option value="${escapeHtml(nome)}" ${(valores.concurso||'')===nome?'selected':''}>${escapeHtml(nome)}</option>`).join('')}
                 </select>
               </div>
             </div>
@@ -4816,20 +4820,20 @@
               <div>
                 <label>Tipo de erro</label>
                 <select id="erro-form-tipo">
-                  ${Object.entries(TIPO_ERRO_LABEL).map(([v,l]) => `<option value="${v}" ${(erro?.tipoErro||'erro_conceitual')===v?'selected':''}>${l}</option>`).join('')}
+                  ${Object.entries(TIPO_ERRO_LABEL).map(([v,l]) => `<option value="${v}" ${(valores.tipoErro||'erro_conceitual')===v?'selected':''}>${l}</option>`).join('')}
                 </select>
               </div>
               <div>
                 <label>Prioridade</label>
                 <select id="erro-form-prioridade">
-                  ${Object.entries(PRIORIDADE_LABEL).map(([v,l]) => `<option value="${v}" ${(erro?.prioridade||'media')===v?'selected':''}>${l}</option>`).join('')}
+                  ${Object.entries(PRIORIDADE_LABEL).map(([v,l]) => `<option value="${v}" ${(valores.prioridade||'media')===v?'selected':''}>${l}</option>`).join('')}
                 </select>
               </div>
             </div>
             <label>Confiança na explicação (opcional)</label>
             <select id="erro-form-confianca">
-              <option value="" ${!erro?.confiancaExplicacao?'selected':''}>—</option>
-              ${Object.entries(CONFIANCA_EXPLICACAO_LABEL).map(([v,l]) => `<option value="${v}" ${(erro?.confiancaExplicacao||'')===v?'selected':''}>${l}</option>`).join('')}
+              <option value="" ${!valores.confiancaExplicacao?'selected':''}>—</option>
+              ${Object.entries(CONFIANCA_EXPLICACAO_LABEL).map(([v,l]) => `<option value="${v}" ${(valores.confiancaExplicacao||'')===v?'selected':''}>${l}</option>`).join('')}
             </select>
             <div class="row">
               <button id="erro-form-cancelar">Cancelar</button>
