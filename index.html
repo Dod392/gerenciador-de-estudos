@@ -4414,6 +4414,32 @@
       return renderTreinoDurante();
     }
     const pct = Math.round((sessao.indice / sessao.fila.length) * 100);
+    // A ordem importa: revelar só habilita depois do tap de confiança (regra
+    // #1 do método — nunca ver a resposta antes de tentar), e "sabia + errou"
+    // pede um toque extra de desambiguação antes de avançar pro próximo item.
+    const acoesHtml = sessao.aguardandoDesambiguacao ? `
+      <p class="muted">Por que errou, sabendo a regra?</p>
+      <div class="treino-acoes">
+        <button type="button" class="treino-acao-grande" data-treino-desambiguar="confundi">Confundi com outro conceito</button>
+        <button type="button" class="treino-acao-grande" data-treino-desambiguar="li_errado">Li errado o enunciado</button>
+      </div>
+    ` : !sessao.confiancaAtual ? `
+      <p class="muted">Como você se sentiu?</p>
+      <div class="treino-acoes">
+        <button type="button" class="treino-acao-grande" data-treino-confianca="chutei">Chutei</button>
+        <button type="button" class="treino-acao-grande" data-treino-confianca="achei_que_sabia">Achei que sabia</button>
+        <button type="button" class="treino-acao-grande" data-treino-confianca="sabia">Sabia</button>
+      </div>
+    ` : !sessao.revelado ? `
+      <div class="treino-acoes">
+        <button class="primary treino-acao-grande" id="treino-revelar-btn">${icone('lightbulb')} Revelar resposta</button>
+      </div>
+    ` : `
+      <div class="treino-acoes">
+        <button class="ok treino-acao-grande" id="treino-acertei-btn">✓ Acertei</button>
+        <button class="bad treino-acao-grande" id="treino-errei-btn">✗ Errei</button>
+      </div>
+    `;
     return `
       <div class="treino-full-screen">
         <div class="progress"><i style="width:${pct}%"></i></div>
@@ -4432,14 +4458,7 @@
             </div>
           ` : ''}
         </div>
-        <div class="treino-acoes">
-          ${!sessao.revelado ? `
-            <button class="primary treino-acao-grande" id="treino-revelar-btn">${icone('lightbulb')} Revelar resposta</button>
-          ` : `
-            <button class="ok treino-acao-grande" id="treino-acertei-btn">✓ Acertei</button>
-            <button class="bad treino-acao-grande" id="treino-errei-btn">✗ Errei</button>
-          `}
-        </div>
+        ${acoesHtml}
         <div class="treino-acoes-secundarias">
           <button type="button" id="treino-pular-btn">Pular</button>
           <button type="button" id="treino-sair-btn">Sair</button>
@@ -4488,6 +4507,13 @@
       saveState(state);
       render();
     });
+    document.querySelectorAll('[data-treino-confianca]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.treinoSessao.confiancaAtual = btn.dataset.treinoConfianca;
+        saveState(state);
+        render();
+      });
+    });
     document.getElementById('treino-revelar-btn')?.addEventListener('click', () => {
       window.Treino.revelarResposta(state.treinoSessao);
       saveState(state);
@@ -4496,18 +4522,47 @@
     document.getElementById('treino-acertei-btn')?.addEventListener('click', () => {
       const item = window.Treino.itemAtual(state.treinoSessao);
       const erro = state.erros.find(e => e.id === item.refId);
-      if(erro) window.ErrosIA.aplicarRevisaoErro(erro, true, hojeISO());
+      const confianca = state.treinoSessao.confiancaAtual;
+      if(erro) window.ErrosIA.aplicarRevisaoErro(erro, true, hojeISO(), { confianca });
       window.Treino.registrarResposta(state.treinoSessao, { acertou: true });
       saveState(state);
       render();
     });
     document.getElementById('treino-errei-btn')?.addEventListener('click', () => {
+      const confianca = state.treinoSessao.confiancaAtual;
+      if(confianca === 'sabia'){
+        // "Sabia" + errou é ambíguo por natureza — pede um toque extra pra
+        // desambiguar antes de registrar a revisão e avançar.
+        state.treinoSessao.aguardandoDesambiguacao = true;
+        saveState(state);
+        render();
+        return;
+      }
       const item = window.Treino.itemAtual(state.treinoSessao);
       const erro = state.erros.find(e => e.id === item.refId);
-      if(erro) window.ErrosIA.aplicarRevisaoErro(erro, false, hojeISO());
+      if(erro){
+        window.ErrosIA.aplicarRevisaoErro(erro, false, hojeISO(), { confianca });
+        const tipo = window.ErrosIA.deduzirTipoErro(confianca, false);
+        if(tipo) erro.tipoErro = tipo;
+      }
       window.Treino.registrarResposta(state.treinoSessao, { acertou: false });
       saveState(state);
       render();
+    });
+    document.querySelectorAll('[data-treino-desambiguar]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = window.Treino.itemAtual(state.treinoSessao);
+        const erro = state.erros.find(e => e.id === item.refId);
+        const desambiguacao = btn.dataset.treinoDesambiguar;
+        if(erro){
+          window.ErrosIA.aplicarRevisaoErro(erro, false, hojeISO(), { confianca: 'sabia' });
+          erro.tipoErro = window.ErrosIA.deduzirTipoErro('sabia', false, desambiguacao);
+        }
+        state.treinoSessao.aguardandoDesambiguacao = false;
+        window.Treino.registrarResposta(state.treinoSessao, { acertou: false });
+        saveState(state);
+        render();
+      });
     });
     document.getElementById('treino-pular-btn')?.addEventListener('click', () => {
       window.Treino.pularItem(state.treinoSessao);

@@ -17,3 +17,10 @@ Registro de decisões tomadas durante a execução do plano `docs/superpowers/sp
 - **Ícones:** o plano não especificou nomes exatos de ícone. `eye` e `x-circle` não existem no set `ICONES` do app — usei `lightbulb` pra "Revelar resposta" e os caracteres literais ✓/✗ pra "Acertei"/"Errei" (mesmo padrão já usado no código antigo que foi removido).
 - **"Pular" não mexe no combo** (nem zera, nem mantém incrementando) — o plano dizia só "não conta como erro nem acerto", sem detalhar o combo; tratei como neutro (não é claramente um "erro" que devesse zerar).
 - **Card "Revisões" em Hoje perdeu o "de hoje" do título** — like agora é só um botão (Treinar agora / Continuar treino / Revisões em dia), o nome mais genérico "Revisões" cobre os 3 estados sem soar estranho.
+
+### Fase 2
+
+- **`chutei + errou` e `achei_que_sabia + errou` mapeiam determinística para `falha_memorizacao`/`erro_conceitual`** — só `sabia + errou` pede o toque extra de desambiguação, seguindo a leitura literal do plano (que só menciona desambiguação nesse caso).
+- **`sabia + errou` sem desambiguação informada** (chamada defensiva, ex.: estado corrompido) cai em `confusao_conceitos` por padrão — o plano não definiu um fallback explícito; escolhido por ser o valor citado primeiro no texto do plano.
+- **`tipoErro` só é reclassificado em erros, nunca em acertos** — mesmo um acerto no chute (`confianca:'chutei'`) não mexe em `erro.tipoErro`, já que classificar "tipo de erro" num acerto não faz sentido semântico.
+- **Botões de confiança e de desambiguação usam estilo neutro** (sem cor ok/bad) — o plano não especificou tratamento visual pra esse tap, e são escolhas neutras (nenhuma "certa"), diferente de Acertei/Errei que são binários com carga positiva/negativa.
