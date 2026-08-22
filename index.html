@@ -248,6 +248,13 @@
   .erros-header-actions input{margin:0;flex:1 1 220px;}
   .erros-header-actions button{width:auto;min-height:44px;margin:0;padding:0 16px;flex:0 0 auto;white-space:nowrap;}
   .erros-assunto-select{width:auto;min-height:32px;margin:0;padding:0 10px;font-size:var(--text-xs);flex:0 0 auto;margin-left:auto;}
+  /* No celular, cada select tem largura natural bem diferente (varia com o
+     texto da opção mais longa) — sem isso, alguns ficam sozinhos numa linha
+     e outros pareiam por acaso, um layout inconsistente. Empilha todos em
+     largura cheia, uma coluna só, de forma previsível. */
+  @media(max-width:560px){
+    .erros-assunto-select{flex:1 1 100%;width:100%;margin-left:0;}
+  }
   .erros-stat-delta{font-size:10px;color:var(--muted);margin-top:2px;}
   .erros-stat-delta.positivo{color:var(--ok);}
   .erros-stat-delta.negativo{color:var(--bad);}
