@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aplicarRevisaoErro, estaPendenteRevisao, filaErrosPendentes } from './erros-ia-repeticao.js';
+import { aplicarRevisaoErro, estaPendenteRevisao, filaErrosPendentes, deduzirTipoErro } from './erros-ia-repeticao.js';
 
 function erroBase(overrides){
   return { status:'novo', prioridade:'media', intervaloRevisaoDias:1, proximaRevisao:'2026-08-10', dataUltimaRevisao:null, revisoes:[], ...overrides };
@@ -80,6 +80,75 @@ test('aplicarRevisaoErro no mesmo dia virando de errou para acertou só corrige 
   assert.equal(erro.intervaloRevisaoDias, 1, 'intervalo permanece o já resetado, não é reprocessado de novo');
   assert.equal(erro.status, 'recorrente');
   assert.equal(erro.prioridade, 'alta');
+});
+
+test('acerto no chute (confianca "chutei") nao avanca o intervalo nem conta pra virar corrigido', () => {
+  const erro = erroBase({ intervaloRevisaoDias: 7 });
+  aplicarRevisaoErro(erro, true, '2026-08-10', { confianca: 'chutei' });
+  assert.equal(erro.intervaloRevisaoDias, 1, 'nao avanca 7→14, fica travado em 1 dia');
+  assert.equal(erro.proximaRevisao, '2026-08-11');
+  assert.equal(erro.status, 'novo', 'nao vira corrigido so por sorte');
+  assert.equal(erro.revisoes[0].acertou, true, 'o historico ainda registra que acertou de verdade');
+  assert.equal(erro.revisoes[0].confianca, 'chutei');
+});
+
+test('2 acertos-no-chute seguidos NAO marcam status corrigido (diferente de 2 acertos normais)', () => {
+  const erro = erroBase();
+  aplicarRevisaoErro(erro, true, '2026-08-10', { confianca: 'chutei' });
+  aplicarRevisaoErro(erro, true, '2026-08-11', { confianca: 'chutei' });
+  assert.equal(erro.status, 'novo');
+  assert.equal(erro.intervaloRevisaoDias, 1);
+});
+
+test('acerto com confianca "sabia" ou "achei_que_sabia" avanca o intervalo normalmente', () => {
+  const erroSabia = erroBase();
+  aplicarRevisaoErro(erroSabia, true, '2026-08-10', { confianca: 'sabia' });
+  assert.equal(erroSabia.intervaloRevisaoDias, 3);
+
+  const erroAcheiQueSabia = erroBase();
+  aplicarRevisaoErro(erroAcheiQueSabia, true, '2026-08-10', { confianca: 'achei_que_sabia' });
+  assert.equal(erroAcheiQueSabia.intervaloRevisaoDias, 3);
+});
+
+test('aplicarRevisaoErro sem confianca (chamada antiga) continua se comportando exatamente como antes', () => {
+  const erro = erroBase();
+  aplicarRevisaoErro(erro, true, '2026-08-10');
+  assert.equal(erro.intervaloRevisaoDias, 3);
+  assert.equal(erro.revisoes[0].confianca, null);
+});
+
+test('errar com qualquer confianca continua resetando intervalo e marcando recorrente (regra do chute so vale pra acerto)', () => {
+  const erro = erroBase({ intervaloRevisaoDias: 14 });
+  aplicarRevisaoErro(erro, false, '2026-08-10', { confianca: 'chutei' });
+  assert.equal(erro.intervaloRevisaoDias, 1);
+  assert.equal(erro.status, 'recorrente');
+});
+
+test('deduzirTipoErro: acerto nunca reclassifica (retorna null independente da confianca)', () => {
+  assert.equal(deduzirTipoErro('chutei', true), null);
+  assert.equal(deduzirTipoErro('sabia', true), null);
+  assert.equal(deduzirTipoErro('achei_que_sabia', true), null);
+});
+
+test('deduzirTipoErro: chutei + errou vira falha_memorizacao', () => {
+  assert.equal(deduzirTipoErro('chutei', false), 'falha_memorizacao');
+});
+
+test('deduzirTipoErro: achei_que_sabia + errou vira erro_conceitual', () => {
+  assert.equal(deduzirTipoErro('achei_que_sabia', false), 'erro_conceitual');
+});
+
+test('deduzirTipoErro: sabia + errou precisa de desambiguacao — confundi vira confusao_conceitos, li_errado vira falha_interpretacao', () => {
+  assert.equal(deduzirTipoErro('sabia', false, 'confundi'), 'confusao_conceitos');
+  assert.equal(deduzirTipoErro('sabia', false, 'li_errado'), 'falha_interpretacao');
+});
+
+test('deduzirTipoErro: sabia + errou sem desambiguacao informada cai no valor mais comum (confusao_conceitos)', () => {
+  assert.equal(deduzirTipoErro('sabia', false), 'confusao_conceitos');
+});
+
+test('deduzirTipoErro: sem confianca informada (chamada antiga) nao deduz nada', () => {
+  assert.equal(deduzirTipoErro(undefined, false), null);
 });
 
 test('estaPendenteRevisao ignora corrigidos mesmo com data vencida', () => {
