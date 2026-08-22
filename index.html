@@ -4456,10 +4456,10 @@
             ${stats.deltaRevisados ? `<div class="erros-stat-delta ${stats.deltaRevisados>0?'positivo':'negativo'}">${stats.deltaRevisados>0?'+':''}${stats.deltaRevisados} desde a semana passada</div>` : ''}
           </div>
           <div class="card stat-card">
-            <div class="stat-label">Assunto mais frequente</div>
-            <div class="stat-value" style="font-size:var(--text-lg);">${stats.assuntoMaisFrequente ? escapeHtml(stats.assuntoMaisFrequente) : '—'}</div>
-            <div class="stat-icon">${icone('alert-triangle')}</div>
-            ${stats.assuntoMaisFrequente ? `<div class="erros-stat-delta">${stats.assuntoMaisFrequenteCount} erro${stats.assuntoMaisFrequenteCount===1?'':'s'} registrado${stats.assuntoMaisFrequenteCount===1?'':'s'}</div>` : ''}
+            <div class="stat-label">Assunto mais crítico</div>
+            <div class="stat-value" style="font-size:var(--text-lg);">${maisCritico ? escapeHtml(maisCritico.assunto) : '—'}</div>
+            <div class="stat-icon" style="color:var(--bad)">${icone('alert-triangle')}</div>
+            ${maisCritico ? `<div class="erros-stat-delta">recorrência × prioridade</div>` : ''}
           </div>
         </div>
       </div>`;
