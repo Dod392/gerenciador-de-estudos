@@ -10,6 +10,7 @@ export function criarSessao({ fila, tempoAlvoMin, modo, filtroAssunto = null, fi
     indice: 0,
     confiancaAtual: null,
     revelado: false,
+    aguardandoDesambiguacao: false,
     respostas: [],
     combo: 0,
     melhorCombo: 0,
@@ -43,6 +44,7 @@ export function registrarResposta(sessao, { acertou, emMs = 0 }){
   sessao.indice += 1;
   sessao.revelado = false;
   sessao.confiancaAtual = null;
+  sessao.aguardandoDesambiguacao = false;
   return sessao;
 }
 
@@ -51,6 +53,7 @@ export function pularItem(sessao){
   sessao.indice += 1;
   sessao.revelado = false;
   sessao.confiancaAtual = null;
+  sessao.aguardandoDesambiguacao = false;
   return sessao;
 }
 

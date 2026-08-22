@@ -13,6 +13,7 @@ test('criarSessao monta o objeto com os campos esperados, zerado', () => {
   const s = criarSessao({ fila: filaExemplo(), tempoAlvoMin: 10, modo: 'revisao' });
   assert.equal(s.indice, 0);
   assert.equal(s.revelado, false);
+  assert.equal(s.aguardandoDesambiguacao, false);
   assert.equal(s.combo, 0);
   assert.equal(s.melhorCombo, 0);
   assert.deepEqual(s.respostas, []);
@@ -68,6 +69,20 @@ test('pularItem avança índice sem criar resposta nem mexer no combo', () => {
   assert.equal(s.indice, 2);
   assert.equal(s.respostas.length, 1); // só a resposta registrada antes, não a pulada
   assert.equal(s.combo, 1); // pular não zera nem incrementa
+});
+
+test('registrarResposta reseta aguardandoDesambiguacao ao avançar de item', () => {
+  const s = criarSessao({ fila: filaExemplo(), tempoAlvoMin: 10, modo: 'revisao' });
+  s.aguardandoDesambiguacao = true;
+  registrarResposta(s, { acertou: false });
+  assert.equal(s.aguardandoDesambiguacao, false);
+});
+
+test('pularItem reseta aguardandoDesambiguacao ao avançar de item', () => {
+  const s = criarSessao({ fila: filaExemplo(), tempoAlvoMin: 10, modo: 'revisao' });
+  s.aguardandoDesambiguacao = true;
+  pularItem(s);
+  assert.equal(s.aguardandoDesambiguacao, false);
 });
 
 test('errosCorrigidosHoje conta só status corrigido com dataUltimaRevisao de hoje', () => {
