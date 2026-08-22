@@ -2033,6 +2033,26 @@
     registrarImportacao(state, { tipo: 'erros', errosAdicionados: adicionados });
     return adicionados;
   }
+  function mesclarConteudoExterno(state, entrada){
+    const lista = Array.isArray(entrada) ? entrada : (Array.isArray(entrada?.conteudo) ? entrada.conteudo : null);
+    if(!lista) throw new Error('formato não reconhecido — esperava um array de assuntos (strings, ou objetos com "assunto") ou um objeto com "conteudo"');
+    let adicionados = 0;
+    lista.forEach(item => {
+      const nome = typeof item === 'string' ? item : item?.assunto;
+      if(typeof nome !== 'string' || !nome.trim()) return;
+      const novo = adicionarAssunto(state, nome);
+      if(!novo) return; // nome vazio ou já existia (adicionarAssunto já dedupa por nome)
+      const concursoBruto = item && typeof item === 'object' && item.concurso ? String(item.concurso).trim() : '';
+      if(concursoBruto){
+        const slug = slugConcurso(concursoBruto);
+        const reconhecido = slug === 'ambos' || (state.concursos||[]).some(n => slugConcurso(n) === slug);
+        if(reconhecido) novo.concurso = slug;
+      }
+      adicionados++;
+    });
+    registrarImportacao(state, { tipo: 'conteudo', adicionados });
+    return adicionados;
+  }
 
   function removerAtividadeDia(state, semanaId, dataIso, atividadeId){
     const lista = obterPlano(state, semanaId)?.atividadesPorDia?.[dataIso];
@@ -2225,6 +2245,11 @@
 
   function limparTodosDados(){
     state = seedState();
+    // seedState() vem com os assuntos padrão (usado também no 1º carregamento
+    // do app, sem dado nenhum salvo) — "Limpar todos os dados" promete que
+    // TUDO é removido, então o Mapa precisa ficar realmente vazio aqui, não
+    // repor a lista padrão escondida atrás do botão.
+    state.conteudo = [];
     saveState(state);
   }
 
@@ -3038,6 +3063,12 @@
             <button id="btn-import-erros" class="primary">Importar erros</button>
           </div>
           <div class="card">
+            <h3>${icone('map')} Importar conteúdo</h3>
+            <small class="muted">Cole uma lista de assuntos (JSON) pra adicionar ao Mapa de Conteúdo. Isso soma aos assuntos já existentes — assunto com o mesmo nome não é duplicado.</small>
+            <textarea id="input-import-conteudo" placeholder='Cole aqui os assuntos (JSON), ex: ["PNMA", "SNUC"] ou [{"assunto":"PNMA","concurso":"transpetro"}]' style="margin-top:var(--space-2);"></textarea>
+            <button id="btn-import-conteudo" class="primary">Importar conteúdo</button>
+          </div>
+          <div class="card">
             <h3>${icone('clipboard-list')} Histórico de importações</h3>
             <small class="muted">Todo plano de estudos importado fica registrado aqui — nada é apagado.</small>
             ${historicoImportacoesHtml}
@@ -3173,6 +3204,21 @@
         alert(n > 0 ? `Erros importados: ${n} novo${n===1?'':'s'} adicionado${n===1?'':'s'} ao Caderno de Erros.` : 'Nada novo pra importar — esses erros já estavam registrados.');
       } catch(err){
         alert('Falha ao importar erros: ' + err.message);
+      }
+    });
+    document.getElementById('btn-import-conteudo')?.addEventListener('click', () => {
+      const textarea = document.getElementById('input-import-conteudo');
+      const texto = textarea.value.trim();
+      if(!texto) return;
+      try {
+        const parsed = JSON.parse(texto);
+        const n = mesclarConteudoExterno(state, parsed);
+        saveState(state);
+        textarea.value = '';
+        render();
+        alert(n > 0 ? `Conteúdo importado: ${n} assunto${n===1?'':'s'} novo${n===1?'':'s'} adicionado${n===1?'':'s'} ao Mapa.` : 'Nada novo pra importar — esses assuntos já estavam no Mapa.');
+      } catch(err){
+        alert('Falha ao importar conteúdo: ' + err.message);
       }
     });
 
