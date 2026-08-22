@@ -2266,6 +2266,17 @@
       });
     } catch(e){ /* Notification indisponível neste contexto — sem problema, é best-effort. */ }
   }
+  let ultimaChecagemNotificacaoDiaria = null;
+  // Sem isso, a checagem de revisões pendentes só rodava uma vez no
+  // carregamento da página — quem deixa uma aba aberta por vários dias
+  // (comum num app assim) nunca era avisado depois do primeiro dia. Rechecar
+  // periodicamente detecta a virada do dia sem precisar recarregar a página.
+  function verificarNotificacoesPendentesDiaria(){
+    const hoje = hojeISO();
+    if(ultimaChecagemNotificacaoDiaria === hoje) return;
+    ultimaChecagemNotificacaoDiaria = hoje;
+    verificarNotificacoesPendentes();
+  }
 
   function tocarBeepPomodoro(fase){
     try {
@@ -2595,7 +2606,8 @@
     const piorAssunto = piores[0] || null;
 
     const atividades = atividadesDoDiaCombinadas(plano, state.conteudo, state.checkins, state.sessoes, hojeIso);
-    const proxima = proximaAtividadeDoDia(atividades, fila, state);
+    const retaFinal = dias !== null && dias >= 0 && dias <= RETA_FINAL_DIAS;
+    const proxima = proximaAtividadeDoDia(atividades, fila, state, retaFinal);
     const proximaInfo = proxima
       ? (proxima.origem === 'conteudo' ? { assunto: proxima.assunto, tipo: proxima.tipo || 'questoes' } : { assunto: proxima.erro.assunto, tipo: 'revisao' })
       : null;
@@ -3505,17 +3517,28 @@
     else delete plano.metaMinutosPorDia[dataIso];
     return plano.metaMinutosPorDia[dataIso] ?? null;
   }
-  function proximaAtividadeDoDia(atividades, filaFlashcards, state){
+  const RETA_FINAL_DIAS = 30;
+  function proximaAtividadeDoDia(atividades, filaFlashcards, state, retaFinal){
     const atrasada = atividades.find(a => a.estado === 'atrasada');
     if(atrasada) return {origem:'conteudo', ...atrasada};
-    const pendente = atividades.find(a => a.estado === 'pendente');
-    if(pendente) return {origem:'conteudo', ...pendente};
-    if(filaFlashcards.length){
+    function proximaRevisaoDaFila(){
+      if(!filaFlashcards.length) return null;
       const flashcard = filaFlashcards[0];
       const erro = obterErroDoFlashcard(state, flashcard);
-      if(erro) return {origem:'erro', erro, flashcard};
+      return erro ? {origem:'erro', erro, flashcard} : null;
     }
-    return null;
+    const pendente = atividades.find(a => a.estado === 'pendente');
+    if(retaFinal){
+      // Faltando pouco pra prova, revisão de erro já cometido fura a fila
+      // de conteúdo novo planejado — reforçar o que já falhou importa mais
+      // do que avançar teoria/questões inéditas com o tempo apertado.
+      const revisao = proximaRevisaoDaFila();
+      if(revisao) return revisao;
+      if(pendente) return {origem:'conteudo', ...pendente};
+      return null;
+    }
+    if(pendente) return {origem:'conteudo', ...pendente};
+    return proximaRevisaoDaFila();
   }
   function formatarDataExtenso(iso){
     const d = new Date(iso + 'T00:00:00');
@@ -3543,7 +3566,9 @@
     const plano = obterPlano(state, semanaId);
     const atividades = atividadesDoDiaCombinadas(plano, state.conteudo, state.checkins, state.sessoes, hojeIso);
     const fila = filaFlashcardsRevisao(state, hojeIso);
-    const proxima = proximaAtividadeDoDia(atividades, fila, state);
+    const retaFinal = dias !== null && dias >= 0 && dias <= RETA_FINAL_DIAS;
+    const proxima = proximaAtividadeDoDia(atividades, fila, state, retaFinal);
+    const sugestaoCritica = !proxima && window.ErrosIA ? window.ErrosIA.calcularAssuntoMaisCritico(state.erros) : null;
     const sessoesDeHoje = state.sessoes.filter(s => s.data === hojeIso);
     const minutosHoje = minutosNoDia(ci, sessoesDeHoje);
     const planejadoMin = planejadoMinutosHoje(plano, hojeIso);
@@ -3644,6 +3669,18 @@
       `
     ) : (atividades.length ? `
         <div class="card hero-card"><div class="empty-state"><div class="empty-state-icon">${icone('check-circle',28)}</div><b>Tudo em dia por aqui</b><p class="muted">Você concluiu tudo que planejou pra hoje.</p></div></div>
+      ` : (sugestaoCritica ? `
+        <div class="card hero-card">
+          <div class="hero-eyebrow">${icone('target')} Sugestão do dia</div>
+          <div class="hero-top">
+            <div class="item-icon tipo-revisao">${iconeTipo('revisao')}</div>
+            <div class="hero-title-block">
+              <h3>${escapeHtml(sugestaoCritica.assunto)}</h3>
+              <div class="hero-subtitle">Nada planejado pra hoje ainda — este é o assunto com mais erros/prioridade em aberto no Caderno de Erros.</div>
+            </div>
+            <button class="primary hero-cta" data-iniciar-timer="${escapeHtml(sugestaoCritica.assunto)}" data-tipo-sugerido="revisao" data-origem="proxima">${icone('play')} Iniciar estudo</button>
+          </div>
+        </div>
       ` : `
         <div class="card hero-card">
           <div class="empty-state">
@@ -3656,7 +3693,7 @@
             </div>
           </div>
         </div>
-      `);
+      `));
 
     const planoHtml = `
       <div class="card">
@@ -5636,7 +5673,8 @@
 
   attachSidebarHandlers();
   attachTabsHandlers();
-  verificarNotificacoesPendentes();
+  verificarNotificacoesPendentesDiaria();
+  setInterval(verificarNotificacoesPendentesDiaria, 30 * 60000);
 
   /* === INIT === */
   if('serviceWorker' in navigator){
